@@ -5,8 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+export function formatCurrency(amount: number | string | null | undefined): string {
+  if (amount === null || amount === undefined) return "Rs 0.00";
+  const num = typeof amount === "string" ? parseFloat(amount) : Number(amount);
+  if (isNaN(num)) return "Rs 0.00";
+
   return new Intl.NumberFormat("en-PK", {
     style: "currency",
     currency: "PKR",
@@ -14,22 +17,32 @@ export function formatCurrency(amount: number | string): string {
   }).format(num);
 }
 
-export function formatDate(date: Date | string): string {
-  return new Intl.DateTimeFormat("en-PK", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(date));
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return "-";
+  try {
+    return new Intl.DateTimeFormat("en-PK", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(date));
+  } catch (e) {
+    return "-";
+  }
 }
 
-export function formatDateTime(date: Date | string): string {
-  return new Intl.DateTimeFormat("en-PK", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "-";
+  try {
+    return new Intl.DateTimeFormat("en-PK", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(date));
+  } catch (e) {
+    return "-";
+  }
 }
 
 export function generateInvoiceNumber(): string {

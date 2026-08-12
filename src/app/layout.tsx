@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "RetailPro - Store Management System",
-  description: "Multi-branch retail store management system",
+  title: "Fatima Traders - Retail Management System",
+  description: "Multi-branch retail store management system for Fatima Traders",
 };
 
 export default function RootLayout({

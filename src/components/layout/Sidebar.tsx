@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Building2,
@@ -26,7 +27,11 @@ import {
   Database,
   Store,
   LogOut,
-  X
+  X,
+  CreditCard,
+  RotateCcw,
+  AlertTriangle,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,79 +47,76 @@ const navSections = [
     label: "MAIN",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    ]
+      { name: "POS Terminal", href: "/pos", icon: ShoppingCart },
+    ],
   },
   {
     label: "ORGANIZATION",
     items: [
       { name: "Branches", href: "/branches", icon: Building2 },
-      { name: "Cash Counters", href: "/cash-counters", icon: Monitor },
-    ]
+      { name: "Cash Counters", href: "/counters", icon: Monitor },
+    ],
   },
   {
-    label: "PRODUCTS",
+    label: "PRODUCTS & CATALOG",
     items: [
       { name: "Products", href: "/products", icon: Package },
       { name: "Categories", href: "/categories", icon: Tag },
       { name: "Units", href: "/units", icon: Ruler },
-    ]
+    ],
   },
   {
-    label: "TRANSACTIONS",
+    label: "PARTIES & LEDGERS",
     items: [
-      { name: "POS/Sales", href: "/sales", icon: ShoppingCart },
-      { name: "Purchases", href: "/purchases", icon: ShoppingBag },
-    ]
-  },
-  {
-    label: "PARTIES",
-    items: [
+      { name: "Customers (Buyers)", href: "/buyers", icon: Users },
+      { name: "Outstanding Debtors", href: "/buyers?filter=outstanding", icon: AlertTriangle },
+      { name: "Customer Due Dates", href: "/buyer-due-dates", icon: Calendar },
+      { name: "Buyer Collections", href: "/buyer-payments", icon: CreditCard },
       { name: "Suppliers", href: "/suppliers", icon: Truck },
-      { name: "Buyers", href: "/buyers", icon: Users },
-    ]
+      { name: "Supplier Disbursements", href: "/supplier-payments", icon: Receipt },
+    ],
   },
   {
-    label: "INVENTORY",
+    label: "TRANSACTIONS & INVENTORY",
     items: [
-      { name: "Stock", href: "/stock", icon: Warehouse },
-      { name: "Transfers", href: "/transfers", icon: ArrowLeftRight },
-      { name: "Adjustments", href: "/adjustments", icon: ClipboardEdit },
-    ]
+      { name: "Sales History", href: "/sales", icon: ShoppingCart },
+      { name: "Sales Returns", href: "/sales-returns", icon: RotateCcw },
+      { name: "Purchases", href: "/purchases", icon: ShoppingBag },
+      { name: "Stock Overview", href: "/inventory", icon: Warehouse },
+      { name: "Stock Transfers", href: "/stock-transfers", icon: ArrowLeftRight },
+      { name: "Stock Adjustments", href: "/inventory?tab=adjustments", icon: ClipboardEdit },
+    ],
   },
   {
-    label: "FINANCE",
+    label: "FINANCE & REPORTS",
     items: [
       { name: "Expenses", href: "/expenses", icon: Receipt },
-      { name: "Profit/Loss", href: "/profit-loss", icon: TrendingUp },
-    ]
-  },
-  {
-    label: "REPORTS",
-    items: [
+      { name: "Profit & Loss", href: "/profit-loss", icon: TrendingUp },
+      { name: "Accounting Ledgers", href: "/financials", icon: BarChart3 },
       { name: "Reports", href: "/reports", icon: BarChart3 },
-    ]
+    ],
   },
   {
     label: "SYSTEM",
     items: [
-      { name: "Users", href: "/users", icon: UserCog },
-      { name: "Roles", href: "/roles", icon: Shield },
+      { name: "User Accounts", href: "/users", icon: UserCog },
+      { name: "Roles & Permissions", href: "/roles", icon: Shield },
       { name: "Audit Logs", href: "/audit-logs", icon: FileSearch },
       { name: "Settings", href: "/settings", icon: Settings },
       { name: "Backups", href: "/backups", icon: Database },
-    ]
-  }
+    ],
+  },
 ];
 
-export function Sidebar({ userName = "User", userRole = "Admin", isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay backdrop */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -127,10 +129,10 @@ export function Sidebar({ userName = "User", userRole = "Admin", isOpen, setIsOp
         )}
       >
         {/* Logo area */}
-        <div className="flex h-16 shrink-0 items-center justify-between px-6 py-4">
+        <div className="flex h-16 shrink-0 items-center justify-between px-6 py-4 border-b border-slate-800">
           <Link href="/dashboard" className="flex items-center gap-2 text-white transition-opacity hover:opacity-80">
             <Store className="h-6 w-6 text-blue-500" />
-            <span className="text-xl font-bold tracking-tight">RetailPro</span>
+            <span className="text-base font-bold tracking-tight text-white">Fatima Traders</span>
           </Link>
           <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white md:hidden">
             <X className="h-5 w-5" />
@@ -141,7 +143,7 @@ export function Sidebar({ userName = "User", userRole = "Admin", isOpen, setIsOp
         <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-slate-700">
           {navSections.map((section, idx) => (
             <div key={idx} className="mb-6">
-              <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <h3 className="mb-2 px-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                 {section.label}
               </h3>
               <ul className="space-y-1">
@@ -153,9 +155,9 @@ export function Sidebar({ userName = "User", userRole = "Admin", isOpen, setIsOp
                       <Link
                         href={item.href}
                         className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-colors",
                           isActive
-                            ? "bg-slate-800 border-l-2 border-blue-500 text-white"
+                            ? "bg-slate-800 border-l-2 border-blue-500 text-white font-semibold"
                             : "hover:bg-slate-800/50 hover:text-white"
                         )}
                       >
@@ -170,15 +172,20 @@ export function Sidebar({ userName = "User", userRole = "Admin", isOpen, setIsOp
           ))}
         </div>
 
-        {/* User Info / Logout */}
-        <div className="mt-auto shrink-0 border-t border-slate-700 p-4">
+        {/* User Info & Logout */}
+        <div className="mt-auto shrink-0 border-t border-slate-800 p-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-white">{userName}</span>
               <span className="text-xs text-slate-400">{userRole}</span>
             </div>
-            <button className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+              title="Sign Out of 5 Star Shopping Bag"
+            >
               <LogOut className="h-4 w-4" />
+              <span>Logout</span>
             </button>
           </div>
         </div>

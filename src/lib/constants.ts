@@ -1,0 +1,15 @@
+export const PAKISTANI_BANKS = [
+  { id: "meezan", name: "Meezan Bank" },
+  { id: "hbl", name: "HBL (Habib Bank Limited)" },
+  { id: "mcb", name: "MCB Bank" },
+  { id: "ubl", name: "UBL (United Bank Limited)" },
+  { id: "abl", name: "Allied Bank" },
+  { id: "alfalah", name: "Bank Alfalah" },
+  { id: "faysal", name: "Faysal Bank" },
+  { id: "askari", name: "Askari Bank" },
+  { id: "bop", name: "Bank of Punjab" },
+  { id: "jazzcash", name: "JazzCash" },
+  { id: "easypaisa", name: "EasyPaisa" },
+  { id: "nayapay", name: "NayaPay / SadaPay" },
+  { id: "other", name: "Other Bank / Transfer" },
+];

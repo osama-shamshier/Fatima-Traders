@@ -1,0 +1,82 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  try {
+    const buyers = await prisma.buyer.findMany({
+      where: { isDeleted: false },
+      include: {
+        sales: {
+          where: { isDeleted: false },
+        },
+        buyerPayments: {
+          where: { isDeleted: false },
+        },
+        salesReturns: {
+          where: { isDeleted: false },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const formattedBuyers = buyers.map((buyer) => {
+      // 1. Total Invoiced Sales (Debit)
+      const totalSales = buyer.sales.reduce(
+        (sum, sale) => sum + Number(sale.grandTotal || sale.subtotal || 0),
+        0
+      );
+
+      // 2. Total Payments Received (Credit)
+      const totalPayments = buyer.buyerPayments.reduce(
+        (sum, payment) => sum + Number(payment.amount || 0),
+        0
+      );
+
+      // 3. Total Sales Returns (Credit)
+      const totalReturns = buyer.salesReturns
+        ? buyer.salesReturns.reduce((sum, ret) => sum + Number(ret.totalRefund || 0), 0)
+        : 0;
+
+      // 4. Exact Ledger Outstanding Balance
+      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalReturns);
+
+      return {
+        id: buyer.id,
+        name: buyer.name,
+        companyName: buyer.companyName,
+        contactNumber: buyer.contactNumber,
+        address: buyer.address,
+        notes: buyer.notes,
+        isActive: buyer.isActive,
+        totalOutstanding,
+      };
+    });
+
+    return NextResponse.json(formattedBuyers);
+  } catch (error) {
+    console.error("Error fetching buyers:", error);
+    return NextResponse.json({ error: "Failed to fetch buyers" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { name, contactNumber, address, companyName, notes } = body;
+
+    const buyer = await prisma.buyer.create({
+      data: {
+        name,
+        contactNumber,
+        address,
+        companyName,
+        notes,
+      },
+    });
+
+    return NextResponse.json(buyer, { status: 201 });
+  } catch (error) {
+    console.error("Error creating buyer:", error);
+    return NextResponse.json({ error: "Failed to create buyer" }, { status: 500 });
+  }
+}

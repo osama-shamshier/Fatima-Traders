@@ -481,6 +481,7 @@ model Sale {
   sessionId       String?
   createdById     String
   saleDate        DateTime  @default(now())
+  dueDate         DateTime?
   subtotal        Decimal   @db.Decimal(15, 2)
   discount        Decimal   @default(0) @db.Decimal(15, 2)
   grandTotal      Decimal   @db.Decimal(15, 2)

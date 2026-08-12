@@ -67,7 +67,7 @@ export default function LoginPage() {
             <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-500/30">
               <Store className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mt-4">RetailPro</h1>
+            <h1 className="text-2xl font-bold tracking-tight mt-4 text-center">Fatima Traders</h1>
             <p className="text-blue-200 text-sm font-medium">Multi-Branch Store Management</p>
           </div>
 
