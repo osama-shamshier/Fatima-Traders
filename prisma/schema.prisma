@@ -1,0 +1,697 @@
+// Prisma Schema for Retail Store Management System
+// All 30+ entities from SRS Document v1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTHENTICATION & AUTHORIZATION
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  phone         String?
+  isActive      Boolean   @default(true)
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  branchId      String?
+  branch        Branch?   @relation(fields: [branchId], references: [id])
+
+  userRoles     UserRole[]
+  counterSessions CashCounterSession[]
+  auditLogs     AuditLog[]
+  createdSales      Sale[]       @relation("SaleCreatedBy")
+  createdPurchases  Purchase[]   @relation("PurchaseCreatedBy")
+  createdExpenses   Expense[]    @relation("ExpenseCreatedBy")
+  stockAdjustments  StockAdjustment[] @relation("AdjustmentCreatedBy")
+  stockTransfers    StockTransfer[]   @relation("TransferCreatedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isSystem    Boolean   @default(false)
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String    @id @default(cuid())
+  module      String    // e.g., "sales", "purchases", "inventory"
+  action      String    // e.g., "create", "read", "update", "delete", "export"
+  description String?
+  createdAt   DateTime  @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================
+// ORGANIZATION — BRANCHES & CASH COUNTERS
+// ============================================================
+
+model Branch {
+  id          String    @id @default(cuid())
+  name        String
+  address     String?
+  phone       String?
+  email       String?
+  isActive    Boolean   @default(true)
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  users           User[]
+  cashCounters    CashCounter[]
+  inventory       Inventory[]
+  inventoryLayers InventoryLayer[]
+  stockMovements  StockMovement[]
+  sales           Sale[]
+  purchases       Purchase[]
+  expenses        Expense[]
+  stockAdjustments  StockAdjustment[]
+  outgoingTransfers StockTransfer[] @relation("TransferSource")
+  incomingTransfers StockTransfer[] @relation("TransferDestination")
+
+  @@map("branches")
+}
+
+model CashCounter {
+  id        String    @id @default(cuid())
+  name      String
+  branchId  String
+  isActive  Boolean   @default(true)
+  isDeleted Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  branch   Branch @relation(fields: [branchId], references: [id])
+  sessions CashCounterSession[]
+  sales    Sale[]
+
+  @@map("cash_counters")
+}
+
+model CashCounterSession {
+  id              String    @id @default(cuid())
+  cashCounterId   String
+  userId          String
+  openingAmount   Decimal   @db.Decimal(15, 2)
+  closingAmount   Decimal?  @db.Decimal(15, 2)
+  expectedAmount  Decimal?  @db.Decimal(15, 2)
+  difference      Decimal?  @db.Decimal(15, 2)
+  status          CounterSessionStatus @default(OPEN)
+  openedAt        DateTime  @default(now())
+  closedAt        DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  cashCounter CashCounter @relation(fields: [cashCounterId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+  sales       Sale[]
+
+  @@map("cash_counter_sessions")
+}
+
+enum CounterSessionStatus {
+  OPEN
+  CLOSED
+}
+
+// ============================================================
+// PRODUCTS & CATEGORIES
+// ============================================================
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Unit {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  abbreviation String    @unique
+  isDeleted    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  products Product[]
+
+  @@map("units")
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  sku             String    @unique
+  categoryId      String
+  unitId          String
+  description     String?
+  sellingPrice    Decimal   @db.Decimal(15, 2)
+  minStockLevel   Decimal   @default(0) @db.Decimal(15, 4)
+  isActive        Boolean   @default(true)
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  category        ProductCategory @relation(fields: [categoryId], references: [id])
+  unit            Unit            @relation(fields: [unitId], references: [id])
+  inventory       Inventory[]
+  inventoryLayers InventoryLayer[]
+  stockMovements  StockMovement[]
+  purchaseItems   PurchaseItem[]
+  saleItems       SaleItem[]
+  stockAdjustments StockAdjustment[]
+  stockTransferItems StockTransferItem[]
+
+  @@map("products")
+}
+
+// ============================================================
+// INVENTORY & FIFO LAYERS
+// ============================================================
+
+model Inventory {
+  id          String    @id @default(cuid())
+  productId   String
+  branchId    String
+  quantity    Decimal   @db.Decimal(15, 4)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId])
+  @@map("inventory")
+}
+
+model InventoryLayer {
+  id              String    @id @default(cuid())
+  productId       String
+  branchId        String
+  purchaseItemId  String?
+  quantity         Decimal  @db.Decimal(15, 4) // original quantity
+  remainingQty     Decimal  @db.Decimal(15, 4) // remaining quantity
+  costPerUnit      Decimal  @db.Decimal(15, 4)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product     Product      @relation(fields: [productId], references: [id])
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+
+  @@map("inventory_layers")
+}
+
+model StockMovement {
+  id            String    @id @default(cuid())
+  productId     String
+  branchId      String
+  movementType  StockMovementType
+  quantity      Decimal   @db.Decimal(15, 4)
+  referenceType String?   // "purchase", "sale", "return", "transfer", "adjustment"
+  referenceId   String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model StockAdjustment {
+  id              String    @id @default(cuid())
+  productId       String
+  branchId        String
+  adjustmentType  AdjustmentType
+  quantity        Decimal   @db.Decimal(15, 4)
+  previousQty     Decimal   @db.Decimal(15, 4)
+  newQty          Decimal   @db.Decimal(15, 4)
+  reason          String
+  createdById     String
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  product   Product @relation(fields: [productId], references: [id])
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  createdBy User    @relation("AdjustmentCreatedBy", fields: [createdById], references: [id])
+
+  @@map("stock_adjustments")
+}
+
+enum AdjustmentType {
+  DAMAGED
+  EXPIRED
+  CORRECTION
+  MISSING
+  OTHER
+}
+
+// ============================================================
+// STOCK TRANSFERS
+// ============================================================
+
+model StockTransfer {
+  id                String    @id @default(cuid())
+  sourceBranchId    String
+  destBranchId      String
+  transferDate      DateTime  @default(now())
+  reason            String?
+  status            TransferStatus @default(COMPLETED)
+  createdById       String
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sourceBranch  Branch @relation("TransferSource", fields: [sourceBranchId], references: [id])
+  destBranch    Branch @relation("TransferDestination", fields: [destBranchId], references: [id])
+  createdBy     User   @relation("TransferCreatedBy", fields: [createdById], references: [id])
+  items         StockTransferItem[]
+
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id              String    @id @default(cuid())
+  stockTransferId String
+  productId       String
+  quantity        Decimal   @db.Decimal(15, 4)
+  createdAt       DateTime  @default(now())
+
+  stockTransfer StockTransfer @relation(fields: [stockTransferId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@map("stock_transfer_items")
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================================
+// SUPPLIERS & PURCHASES
+// ============================================================
+
+model Supplier {
+  id           String    @id @default(cuid())
+  name         String
+  contactNumber String?
+  address      String?
+  companyName  String?
+  notes        String?
+  isActive     Boolean   @default(true)
+  isDeleted    Boolean   @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  purchases       Purchase[]
+  supplierPayments SupplierPayment[]
+
+  @@map("suppliers")
+}
+
+model Purchase {
+  id              String    @id @default(cuid())
+  supplierId      String
+  branchId        String
+  invoiceNumber   String?
+  purchaseDate    DateTime  @default(now())
+  totalAmount     Decimal   @db.Decimal(15, 2)
+  amountPaid      Decimal   @default(0) @db.Decimal(15, 2)
+  outstandingAmount Decimal @db.Decimal(15, 2)
+  paymentStatus   PaymentStatus @default(PENDING)
+  notes           String?
+  createdById     String
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  supplier    Supplier  @relation(fields: [supplierId], references: [id])
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  createdBy   User      @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  items       PurchaseItem[]
+  payments    SupplierPayment[]
+
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id            String    @id @default(cuid())
+  purchaseId    String
+  productId     String
+  quantity      Decimal   @db.Decimal(15, 4)
+  purchaseRate  Decimal   @db.Decimal(15, 4)
+  total         Decimal   @db.Decimal(15, 2)
+  createdAt     DateTime  @default(now())
+
+  purchase        Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product         Product        @relation(fields: [productId], references: [id])
+  inventoryLayers InventoryLayer[]
+
+  @@map("purchase_items")
+}
+
+model SupplierPayment {
+  id              String    @id @default(cuid())
+  supplierId      String
+  purchaseId      String?
+  amount          Decimal   @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime  @default(now())
+  bankReference   String?
+  notes           String?
+  createdById     String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  supplier  Supplier  @relation(fields: [supplierId], references: [id])
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id])
+
+  @@map("supplier_payments")
+}
+
+// ============================================================
+// BUYERS & SALES
+// ============================================================
+
+model Buyer {
+  id            String    @id @default(cuid())
+  name          String
+  contactNumber String?
+  address       String?
+  companyName   String?
+  notes         String?
+  isActive      Boolean   @default(true)
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sales         Sale[]
+  buyerPayments BuyerPayment[]
+  salesReturns  SalesReturn[]
+
+  @@map("buyers")
+}
+
+model Sale {
+  id              String    @id @default(cuid())
+  invoiceNumber   String    @unique
+  buyerId         String?
+  branchId        String
+  cashCounterId   String?
+  sessionId       String?
+  createdById     String
+  saleDate        DateTime  @default(now())
+  subtotal        Decimal   @db.Decimal(15, 2)
+  discount        Decimal   @default(0) @db.Decimal(15, 2)
+  grandTotal      Decimal   @db.Decimal(15, 2)
+  amountPaid      Decimal   @default(0) @db.Decimal(15, 2)
+  outstandingAmount Decimal @db.Decimal(15, 2)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod @default(CASH)
+  notes           String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  buyer       Buyer?              @relation(fields: [buyerId], references: [id])
+  branch      Branch              @relation(fields: [branchId], references: [id])
+  cashCounter CashCounter?        @relation(fields: [cashCounterId], references: [id])
+  session     CashCounterSession? @relation(fields: [sessionId], references: [id])
+  createdBy   User                @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  items       SaleItem[]
+  payments    BuyerPayment[]
+  returns     SalesReturn[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id            String    @id @default(cuid())
+  saleId        String
+  productId     String
+  quantity      Decimal   @db.Decimal(15, 4)
+  sellingPrice  Decimal   @db.Decimal(15, 2)
+  discount      Decimal   @default(0) @db.Decimal(15, 2)
+  lineTotal     Decimal   @db.Decimal(15, 2)
+  fifoCost      Decimal   @db.Decimal(15, 2) // COGS for this line
+  createdAt     DateTime  @default(now())
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  returnItems SalesReturnItem[]
+
+  @@map("sale_items")
+}
+
+model BuyerPayment {
+  id              String    @id @default(cuid())
+  buyerId         String
+  saleId          String?
+  amount          Decimal   @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime  @default(now())
+  bankReference   String?
+  notes           String?
+  createdById     String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  buyer Buyer @relation(fields: [buyerId], references: [id])
+  sale  Sale?  @relation(fields: [saleId], references: [id])
+
+  @@map("buyer_payments")
+}
+
+// ============================================================
+// SALES RETURNS & REFUNDS
+// ============================================================
+
+model SalesReturn {
+  id              String    @id @default(cuid())
+  saleId          String
+  buyerId         String?
+  branchId        String?
+  returnDate      DateTime  @default(now())
+  totalRefund     Decimal   @db.Decimal(15, 2)
+  refundMethod    RefundMethod
+  notes           String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sale  Sale   @relation(fields: [saleId], references: [id])
+  buyer Buyer? @relation(fields: [buyerId], references: [id])
+  items SalesReturnItem[]
+
+  @@map("sales_returns")
+}
+
+model SalesReturnItem {
+  id            String    @id @default(cuid())
+  salesReturnId String
+  saleItemId    String
+  quantity      Decimal   @db.Decimal(15, 4)
+  refundAmount  Decimal   @db.Decimal(15, 2)
+  createdAt     DateTime  @default(now())
+
+  salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  saleItem    SaleItem    @relation(fields: [saleItemId], references: [id])
+
+  @@map("sales_return_items")
+}
+
+enum RefundMethod {
+  CASH
+  BANK_TRANSFER
+  ADJUSTMENT
+}
+
+// ============================================================
+// EXPENSES
+// ============================================================
+
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id              String    @id @default(cuid())
+  categoryId      String
+  description     String?
+  amount          Decimal   @db.Decimal(15, 2)
+  branchId        String
+  paymentMethod   PaymentMethod
+  expenseDate     DateTime  @default(now())
+  reference       String?
+  notes           String?
+  createdById     String
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  category  ExpenseCategory @relation(fields: [categoryId], references: [id])
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  createdBy User            @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+
+  @@map("expenses")
+}
+
+// ============================================================
+// SHARED ENUMS
+// ============================================================
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+}
+
+// ============================================================
+// SYSTEM — AUDIT, BACKUP, SETTINGS
+// ============================================================
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  userId        String?
+  action        String    // e.g., "CREATE", "UPDATE", "DELETE"
+  entity        String    // e.g., "sale", "purchase", "product"
+  entityId      String?
+  branchId      String?
+  previousValues Json?
+  newValues      Json?
+  ipAddress     String?
+  createdAt     DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model BackupConfiguration {
+  id          String    @id @default(cuid())
+  frequency   BackupFrequency @default(DAILY)
+  retentionDays Int     @default(30)
+  lastBackupAt  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("backup_configurations")
+}
+
+enum BackupFrequency {
+  DAILY
+  WEEKLY
+}
+
+model SystemSetting {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  value     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("system_settings")
+}
