@@ -86,6 +86,16 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
                 <span>-{formatCurrency(Number(sale.discount))}</span>
               </div>
             )}
+            {Number(sale.roundOff || 0) !== 0 && (
+              <div className="flex justify-between text-xs font-mono">
+                <span>Round Off:</span>
+                <span>
+                  {Number(sale.roundOff) > 0
+                    ? `+${formatCurrency(Number(sale.roundOff))}`
+                    : `-${formatCurrency(Math.abs(Number(sale.roundOff)))}`}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-base mt-2">
               <span>Grand Total:</span>
               <span>{formatCurrency(Number(sale.grandTotal))}</span>

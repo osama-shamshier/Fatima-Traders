@@ -178,24 +178,30 @@ export default function POSPage() {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const [roundOff, setRoundOff] = useState<number>(0);
+
   const subtotal = cart.reduce(
     (sum, item) => sum + Number(item.sellingPrice) * item.cartQuantity - item.itemDiscount,
     0
   );
-  const grandTotal = Math.max(0, subtotal - globalDiscount);
+  const rawGrandTotal = Math.max(0, subtotal - globalDiscount);
+  const grandTotal = Math.max(0, rawGrandTotal + roundOff);
 
   const handleCheckoutSubmit = async (
     amountPaid: number,
     paymentMethod: string,
     bankName?: string,
     bankReference?: string,
-    dueDate?: string
+    dueDate?: string,
+    modalRoundOff?: number
   ) => {
     try {
+      const finalRoundOff = modalRoundOff !== undefined ? modalRoundOff : roundOff;
       const payload = {
         branchId: selectedBranchId,
         buyerId: selectedBuyerId || undefined,
         discount: globalDiscount,
+        roundOff: finalRoundOff,
         amountPaid,
         paymentMethod,
         bankName,
@@ -222,6 +228,7 @@ export default function POSPage() {
         setIsReceiptOpen(true);
         setCart([]);
         setGlobalDiscount(0);
+        setRoundOff(0);
         fetchProducts(); // Instant stock refresh!
       } else {
         const err = await res.json();
@@ -544,7 +551,9 @@ export default function POSPage() {
         <POSCheckoutModal
           isOpen={isCheckoutOpen}
           onClose={() => setIsCheckoutOpen(false)}
-          grandTotal={grandTotal}
+          subtotal={subtotal}
+          discount={globalDiscount}
+          initialRoundOff={roundOff}
           isWalkInCustomer={!selectedBuyerId}
           onCompleteSale={handleCheckoutSubmit}
         />

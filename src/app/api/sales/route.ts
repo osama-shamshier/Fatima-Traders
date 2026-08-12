@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       cashCounterId,
       sessionId,
       discount = 0,
+      roundOff = 0,
       items,
       amountPaid = 0,
       paymentMethod = "CASH",
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
         };
       });
 
-      const grandTotal = Math.max(0, subtotal - Number(discount));
+      const grandTotal = Math.max(0, subtotal - Number(discount) + Number(roundOff));
       const amountPaidNum = Number(amountPaid);
       const outstandingAmount = grandTotal - amountPaidNum;
 
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
           dueDate: dueDate ? new Date(dueDate) : null,
           subtotal,
           discount: Number(discount),
+          roundOff: Number(roundOff),
           grandTotal,
           amountPaid: amountPaidNum,
           outstandingAmount,

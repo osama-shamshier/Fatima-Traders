@@ -484,6 +484,7 @@ model Sale {
   dueDate         DateTime?
   subtotal        Decimal   @db.Decimal(15, 2)
   discount        Decimal   @default(0) @db.Decimal(15, 2)
+  roundOff        Decimal   @default(0) @db.Decimal(15, 2)
   grandTotal      Decimal   @db.Decimal(15, 2)
   amountPaid      Decimal   @default(0) @db.Decimal(15, 2)
   outstandingAmount Decimal @db.Decimal(15, 2)
