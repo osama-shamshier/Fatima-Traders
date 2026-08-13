@@ -111,6 +111,31 @@ const navSections = [
 export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
 
+  const isBillCounterManager = userRole === "Bill Counter Manager";
+  const isOwner = userRole === "Owner" || userRole === "Admin";
+
+  const allowedHrefs = [
+    "/pos",
+    "/sales",
+    "/sales-returns",
+    "/buyers",
+    "/buyers?filter=outstanding",
+    "/buyer-due-dates",
+    "/buyer-payments",
+  ];
+
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (!isOwner && isBillCounterManager) {
+          return allowedHrefs.includes(item.href);
+        }
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
     <>
       {/* Mobile overlay backdrop */}
@@ -130,7 +155,10 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
       >
         {/* Logo area */}
         <div className="flex h-16 shrink-0 items-center justify-between px-6 py-4 border-b border-slate-800">
-          <Link href="/dashboard" className="flex items-center gap-2 text-white transition-opacity hover:opacity-80">
+          <Link
+            href={!isOwner && isBillCounterManager ? "/pos" : "/dashboard"}
+            className="flex items-center gap-2 text-white transition-opacity hover:opacity-80"
+          >
             <Store className="h-6 w-6 text-blue-500" />
             <span className="text-base font-bold tracking-tight text-white">Fatima Traders</span>
           </Link>
@@ -141,7 +169,7 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-slate-700">
-          {navSections.map((section, idx) => (
+          {visibleSections.map((section, idx) => (
             <div key={idx} className="mb-6">
               <h3 className="mb-2 px-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                 {section.label}
@@ -181,11 +209,10 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
-              title="Sign Out of 5 Star Shopping Bag"
+              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+              title="Sign Out"
             >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
         </div>

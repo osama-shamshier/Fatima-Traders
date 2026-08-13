@@ -1,11 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+function getDateRange(period: string | null, startDate: string | null, endDate: string | null) {
+  const now = new Date();
+
+  if (period === "today") {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { gte: start, lte: end };
+  }
+
+  if (period === "this_week") {
+    const start = new Date(now);
+    const day = start.getDay();
+    const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+    start.setDate(diff);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { gte: start, lte: end };
+  }
+
+  if (period === "this_month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { gte: start, lte: end };
+  }
+
+  if (period === "last_month") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { gte: start, lte: end };
+  }
+
+  if (startDate || endDate) {
+    const range: any = {};
+    if (startDate) range.gte = new Date(startDate);
+    if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      range.lte = e;
+    }
+    return range;
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const branchId = searchParams.get("branchId");
     const productId = searchParams.get("productId");
+    const period = searchParams.get("period");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
@@ -17,17 +66,10 @@ export async function GET(request: NextRequest) {
       expenseWhere.branchId = branchId;
     }
 
-    if (startDate || endDate) {
-      saleWhere.createdAt = {};
-      expenseWhere.createdAt = {};
-      if (startDate) {
-        saleWhere.createdAt.gte = new Date(startDate);
-        expenseWhere.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        saleWhere.createdAt.lte = new Date(endDate);
-        expenseWhere.createdAt.lte = new Date(endDate);
-      }
+    const dateRange = getDateRange(period, startDate, endDate);
+    if (dateRange) {
+      saleWhere.createdAt = dateRange;
+      expenseWhere.createdAt = dateRange;
     }
 
     // If filtered by a specific product, filter sales that contain that product

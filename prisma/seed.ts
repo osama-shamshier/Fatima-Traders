@@ -72,12 +72,9 @@ async function main() {
   const bcmCriteria = [
     { module: 'pos', actions: ACTIONS },
     { module: 'sales', actions: ['create', 'read'] },
-    { module: 'buyers', actions: ['read', 'update'] },
+    { module: 'buyers', actions: ['create', 'read', 'update'] },
     { module: 'buyer_payments', actions: ['create', 'read'] },
     { module: 'returns', actions: ['create', 'read'] },
-    { module: 'products', actions: ['read'] },
-    { module: 'inventory', actions: ['read'] },
-    { module: 'counters', actions: ['read', 'update'] },
   ];
   
   await prisma.role.upsert({

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle } from "lucide-react";
+import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle, Calendar } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function ProfitLossPage() {
@@ -14,6 +14,8 @@ export default function ProfitLossPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
 
+  // Filter States
+  const [period, setPeriod] = useState<string>("all");
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
@@ -24,8 +26,11 @@ export default function ProfitLossPage() {
 
   useEffect(() => {
     fetchBranchesAndProducts();
-    fetchProfitLoss();
   }, []);
+
+  useEffect(() => {
+    fetchProfitLoss();
+  }, [period, selectedBranchId, selectedProductId]);
 
   const fetchBranchesAndProducts = async () => {
     try {
@@ -44,10 +49,13 @@ export default function ProfitLossPage() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
+      if (period !== "all") params.append("period", period);
       if (selectedBranchId) params.append("branchId", selectedBranchId);
       if (selectedProductId) params.append("productId", selectedProductId);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+      if (period === "custom") {
+        if (startDate) params.append("startDate", startDate);
+        if (endDate) params.append("endDate", endDate);
+      }
 
       const res = await fetch(`/api/reports/profit-loss?${params.toString()}`);
       if (res.ok) {
@@ -86,64 +94,102 @@ export default function ProfitLossPage() {
         </div>
       </div>
 
-      {/* Filter Controls Bar */}
-      <form onSubmit={handleApplyFilter} className="flex flex-wrap items-end gap-3 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">Filter Branch</Label>
-          <select
-            value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="input text-xs py-1.5 px-3 bg-slate-50"
-          >
-            <option value="">All Branches</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
+      {/* Date Period & Filter Bar */}
+      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-900 uppercase">Profit & Loss Period Filter</span>
+          </div>
+
+          {/* Quick Period Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: "all", label: "All Time" },
+              { id: "today", label: "Today" },
+              { id: "this_week", label: "This Week" },
+              { id: "this_month", label: "This Month" },
+              { id: "last_month", label: "Last Month" },
+              { id: "custom", label: "Custom Range" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id)}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                  period === p.id
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                {p.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
-        <div className="space-y-1 min-w-[200px]">
-          <Label className="text-xs font-semibold">Filter Specific Product / Item</Label>
-          <select
-            value={selectedProductId}
-            onChange={(e) => setSelectedProductId(e.target.value)}
-            className="input text-xs py-1.5 px-3 bg-slate-50"
-          >
-            <option value="">All Products / Items</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.sku})
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Secondary Filters (Branch, Product, Custom Date Range) */}
+        <form onSubmit={handleApplyFilter} className="flex flex-wrap items-end gap-3 pt-1">
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold">Filter Branch</Label>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="input text-xs py-1 px-3 bg-slate-50"
+            >
+              <option value="">All Branches</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">Start Date</Label>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="text-xs py-1 px-2"
-          />
-        </div>
+          <div className="space-y-1 min-w-[200px]">
+            <Label className="text-xs font-semibold">Filter Specific Product</Label>
+            <select
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              className="input text-xs py-1 px-3 bg-slate-50"
+            >
+              <option value="">All Products / Items</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.sku})
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">End Date</Label>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="text-xs py-1 px-2"
-          />
-        </div>
+          {period === "custom" && (
+            <>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Start Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="text-xs py-1 px-2 bg-slate-50"
+                />
+              </div>
 
-        <Button type="submit" size="sm" className="bg-blue-600 text-white font-semibold">
-          <Filter className="w-3.5 h-3.5 mr-1" /> Apply Filter
-        </Button>
-      </form>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">End Date</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="text-xs py-1 px-2 bg-slate-50"
+                />
+              </div>
+
+              <Button type="submit" size="sm" className="bg-blue-600 text-white font-semibold">
+                <Filter className="w-3.5 h-3.5 mr-1" /> Apply Date
+              </Button>
+            </>
+          )}
+        </form>
+      </div>
 
       {/* Loss-Making Items Warning Banner */}
       {lossCount > 0 && (
@@ -154,7 +200,7 @@ export default function ProfitLossPage() {
               <h4 className="text-sm font-bold text-rose-900">
                 ⚠️ Loss Alert: {lossCount} product(s) are selling at a loss!
               </h4>
-              <p className="text-xs text-rose-700">Cost of Goods Sold (COGS) exceeds revenue for these items.</p>
+              <p className="text-xs text-rose-700">Cost of Goods Sold (COGS) exceeds revenue for these items in the selected period.</p>
             </div>
           </div>
           <Button
