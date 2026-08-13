@@ -51,17 +51,28 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
         fetch("/api/branches"),
         fetch("/api/products"),
       ]);
-      if (suppRes.ok) setSuppliers(await suppRes.json());
-      if (branchRes.ok) {
-        const bData = await branchRes.json();
-        setBranches(bData);
-        if (bData.length > 0 && !formData.branchId) {
-          setFormData((prev) => ({ ...prev, branchId: bData[0].id }));
+      if (suppRes.ok) {
+        const sData = await suppRes.json();
+        const sList = Array.isArray(sData) ? sData : [];
+        setSuppliers(sList);
+        if (sList.length > 0 && !formData.supplierId) {
+          setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
         }
       }
-      if (prodRes.ok) setProducts(await prodRes.json());
+      if (branchRes.ok) {
+        const bData = await branchRes.json();
+        const bList = Array.isArray(bData) ? bData : [];
+        setBranches(bList);
+        if (bList.length > 0 && !formData.branchId) {
+          setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+        }
+      }
+      if (prodRes.ok) {
+        const pData = await prodRes.json();
+        setProducts(Array.isArray(pData) ? pData : []);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Error loading purchase modal dropdown data:", error);
     }
   };
 

@@ -115,37 +115,43 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join(" | ");
 
-    const result = await prisma.$transaction(async (tx) => {
-      const expense = await tx.expense.create({
-        data: {
-          branchId,
-          categoryId,
-          amount: Number(amount),
-          paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
-          reference: refText || null,
-          notes,
-          expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
-          createdById,
-        },
-        include: {
-          category: true,
-          branch: true,
-        },
-      });
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const expense = await tx.expense.create({
+          data: {
+            branchId,
+            categoryId,
+            amount: Number(amount),
+            paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
+            reference: refText || null,
+            notes,
+            expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
+            createdById,
+          },
+          include: {
+            category: true,
+            branch: true,
+          },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          action: "CREATE",
-          entity: "expense",
-          entityId: expense.id,
-          branchId,
-          userId: createdById,
-          newValues: JSON.parse(JSON.stringify(expense)),
-        },
-      });
+        await tx.auditLog.create({
+          data: {
+            action: "CREATE",
+            entity: "expense",
+            entityId: expense.id,
+            branchId,
+            userId: createdById,
+            newValues: JSON.parse(JSON.stringify(expense)),
+          },
+        });
 
-      return expense;
-    });
+        return expense;
+      },
+      {
+        maxWait: 15000,
+        timeout: 60000,
+      }
+    );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {

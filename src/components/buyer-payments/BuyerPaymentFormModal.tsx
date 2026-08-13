@@ -19,7 +19,14 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
   const [isLoading, setIsLoading] = useState(false);
   const [buyers, setBuyers] = useState<any[]>([]);
 
-  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    setValue,
+  } = useForm({
     defaultValues: {
       buyerId: "",
       saleId: "",
@@ -31,13 +38,18 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
     },
   });
 
+  const selectedBuyerId = watch("buyerId");
+  const enteredAmount = watch("amount");
   const paymentMethod = watch("paymentMethod");
+
+  const selectedBuyer = buyers.find((b) => b.id === selectedBuyerId);
+  const maxAllowedAmount = selectedBuyer ? Number(selectedBuyer.totalOutstanding || 0) : 0;
 
   useEffect(() => {
     if (isOpen) {
       fetch("/api/buyers")
         .then((res) => res.json())
-        .then((data) => setBuyers(data.filter((b: any) => b.isActive)))
+        .then((data) => setBuyers(Array.isArray(data) ? data.filter((b: any) => b.isActive) : []))
         .catch(console.error);
     }
   }, [isOpen]);
@@ -65,14 +77,17 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to record payment");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to record payment");
+      }
 
       reset();
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Error recording payment");
+      alert(error.message || "Error recording payment");
     } finally {
       setIsLoading(false);
     }
@@ -91,16 +106,32 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
               id="buyerId"
               className="input text-sm bg-white"
               {...register("buyerId", { required: "Buyer is required" })}
+              onChange={(e) => {
+                setValue("buyerId", e.target.value);
+                const b = buyers.find((x) => x.id === e.target.value);
+                if (b && b.totalOutstanding > 0) {
+                  setValue("amount", String(b.totalOutstanding));
+                } else {
+                  setValue("amount", "");
+                }
+              }}
             >
               <option value="">-- Select a Buyer --</option>
               {buyers.map((buyer) => (
                 <option key={buyer.id} value={buyer.id}>
-                  {buyer.name} {buyer.companyName ? `(${buyer.companyName})` : ""}
+                  {buyer.name} {buyer.companyName ? `(${buyer.companyName})` : ""} - Credit: Rs. {Number(buyer.totalOutstanding || 0).toLocaleString()}
                 </option>
               ))}
             </select>
             {errors.buyerId && <p className="text-red-500 text-xs">{errors.buyerId.message as string}</p>}
           </div>
+
+          {selectedBuyer && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${maxAllowedAmount > 0 ? "bg-amber-50 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-900 border-emerald-200"}`}>
+              <span>Total Outstanding Credit:</span>
+              <span className="text-sm font-bold">Rs. {maxAllowedAmount.toLocaleString()}</span>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label htmlFor="amount">Amount Received (PKR) *</Label>
@@ -109,8 +140,22 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
               type="number"
               step="any"
               className="text-lg font-bold text-emerald-600"
-              {...register("amount", { required: "Amount is required" })}
+              {...register("amount", {
+                required: "Amount is required",
+                validate: {
+                  positive: (v) => Number(v) > 0 || "Amount must be greater than 0",
+                  notExceed: (v) => {
+                    if (!selectedBuyer) return true;
+                    if (maxAllowedAmount === 0) return "Customer has Rs. 0 credit balance";
+                    return (
+                      Number(v) <= maxAllowedAmount ||
+                      `Amount cannot exceed credit balance (Rs. ${maxAllowedAmount.toLocaleString()})`
+                    );
+                  },
+                },
+              })}
             />
+            {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount.message as string}</p>}
           </div>
 
           <div className="space-y-1">
@@ -151,7 +196,11 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+            <Button
+              type="submit"
+              disabled={isLoading || (selectedBuyer && maxAllowedAmount === 0) || (enteredAmount && Number(enteredAmount) > maxAllowedAmount)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
+            >
               {isLoading ? "Saving..." : "Record Payment"}
             </Button>
           </div>

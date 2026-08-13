@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -8,20 +8,22 @@ export async function GET() {
       include: {
         purchases: {
           where: { isDeleted: false },
+          select: { totalAmount: true },
         },
         supplierPayments: {
           where: { isDeleted: false },
+          select: { amount: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
     const formattedSuppliers = suppliers.map((supplier) => {
-      const totalPurchases = supplier.purchases.reduce(
+      const totalPurchases = (supplier.purchases || []).reduce(
         (sum, p) => sum + Number(p.totalAmount || 0),
         0
       );
-      const totalPayments = supplier.supplierPayments.reduce(
+      const totalPayments = (supplier.supplierPayments || []).reduce(
         (sum, p) => sum + Number(p.amount || 0),
         0
       );
@@ -35,9 +37,9 @@ export async function GET() {
     });
 
     return NextResponse.json(formattedSuppliers);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching suppliers:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
     const { name, contactNumber, address, companyName, notes } = body;
 
     if (!name) {
-      return new NextResponse("Name is required", { status: 400 });
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
     const supplier = await prisma.supplier.create({
@@ -60,9 +62,9 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(supplier);
-  } catch (error) {
+    return NextResponse.json(supplier, { status: 201 });
+  } catch (error: any) {
     console.error("Error creating supplier:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

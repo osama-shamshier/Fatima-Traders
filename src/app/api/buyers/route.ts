@@ -8,12 +8,15 @@ export async function GET() {
       include: {
         sales: {
           where: { isDeleted: false },
+          select: { grandTotal: true, subtotal: true },
         },
         buyerPayments: {
           where: { isDeleted: false },
+          select: { amount: true },
         },
         salesReturns: {
           where: { isDeleted: false },
+          select: { totalRefund: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -21,23 +24,24 @@ export async function GET() {
 
     const formattedBuyers = buyers.map((buyer) => {
       // 1. Total Invoiced Sales (Debit)
-      const totalSales = buyer.sales.reduce(
+      const totalSales = (buyer.sales || []).reduce(
         (sum, sale) => sum + Number(sale.grandTotal || sale.subtotal || 0),
         0
       );
 
       // 2. Total Payments Received (Credit)
-      const totalPayments = buyer.buyerPayments.reduce(
+      const totalPayments = (buyer.buyerPayments || []).reduce(
         (sum, payment) => sum + Number(payment.amount || 0),
         0
       );
 
       // 3. Total Sales Returns (Credit)
-      const totalReturns = buyer.salesReturns
-        ? buyer.salesReturns.reduce((sum, ret) => sum + Number(ret.totalRefund || 0), 0)
-        : 0;
+      const totalReturns = (buyer.salesReturns || []).reduce(
+        (sum, ret) => sum + Number(ret.totalRefund || 0),
+        0
+      );
 
-      // 4. Exact Ledger Outstanding Balance
+      // 4. Exact Double-Entry Accounting Ledger Outstanding Balance (Ground Truth)
       const totalOutstanding = Math.max(0, totalSales - totalPayments - totalReturns);
 
       return {
