@@ -7,29 +7,54 @@ export async function GET(request: NextRequest) {
     // The prompt says: "Sales Cash + Buyer Payments" vs "Purchases Cash + Supplier Payments + Operating Expenses + Cash Refunds"
     // For simplicity, we just sum them up.
 
-    const sales = await prisma.sale.findMany({ where: { isDeleted: false, paymentStatus: "PAID" } });
-    const buyerPayments = await prisma.buyerPayment.findMany({ where: { isDeleted: false } });
-    
-    // Purchases paid in cash (or bank)
-    const purchases = await prisma.purchase.findMany({ where: { isDeleted: false, paymentStatus: "PAID" } });
-    const supplierPayments = await prisma.supplierPayment.findMany({ where: { isDeleted: false } });
-    const expenses = await prisma.expense.findMany({ where: { isDeleted: false } });
-    const salesReturns = await prisma.salesReturn.findMany({ where: { isDeleted: false } });
+    const [
+      salesCashAgg,
+      buyerPaymentsAgg,
+      purchasesCashAgg,
+      supplierPaymentsAgg,
+      expensesAgg,
+      salesReturnsAgg,
+    ] = await Promise.all([
+      prisma.sale.aggregate({
+        where: { isDeleted: false, paymentStatus: "PAID" },
+        _sum: { amountPaid: true },
+      }),
+      prisma.buyerPayment.aggregate({
+        where: { isDeleted: false },
+        _sum: { amount: true },
+      }),
+      prisma.purchase.aggregate({
+        where: { isDeleted: false, paymentStatus: "PAID" },
+        _sum: { amountPaid: true },
+      }),
+      prisma.supplierPayment.aggregate({
+        where: { isDeleted: false },
+        _sum: { amount: true },
+      }),
+      prisma.expense.aggregate({
+        where: { isDeleted: false },
+        _sum: { amount: true },
+      }),
+      prisma.salesReturn.aggregate({
+        where: { isDeleted: false },
+        _sum: { totalRefund: true },
+      }),
+    ]);
 
     // Assuming Sales "PAID" implies cash received at the time of sale.
     // To avoid double counting with buyerPayments, we ideally just look at amountPaid in Sales if they weren't through a separate buyer payment.
     // However, following the prompt's simple metric definitions:
     
     // Summing Cash In
-    const salesCash = sales.reduce((sum, s) => sum + Number(s.amountPaid), 0);
-    const buyerPaymentsTotal = buyerPayments.reduce((sum, bp) => sum + Number(bp.amount), 0);
+    const salesCash = Number(salesCashAgg._sum.amountPaid || 0);
+    const buyerPaymentsTotal = Number(buyerPaymentsAgg._sum.amount || 0);
     const totalCashIn = salesCash + buyerPaymentsTotal;
 
     // Summing Cash Out
-    const purchasesCash = purchases.reduce((sum, p) => sum + Number(p.amountPaid), 0);
-    const supplierPaymentsTotal = supplierPayments.reduce((sum, sp) => sum + Number(sp.amount), 0);
-    const operatingExpensesTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-    const refundsTotal = salesReturns.reduce((sum, sr) => sum + Number(sr.totalRefund), 0);
+    const purchasesCash = Number(purchasesCashAgg._sum.amountPaid || 0);
+    const supplierPaymentsTotal = Number(supplierPaymentsAgg._sum.amount || 0);
+    const operatingExpensesTotal = Number(expensesAgg._sum.amount || 0);
+    const refundsTotal = Number(salesReturnsAgg._sum.totalRefund || 0);
     const totalCashOut = purchasesCash + supplierPaymentsTotal + operatingExpensesTotal + refundsTotal;
 
     const netCashFlow = totalCashIn - totalCashOut;

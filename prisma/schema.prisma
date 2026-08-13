@@ -39,6 +39,8 @@ model User {
   stockAdjustments  StockAdjustment[] @relation("AdjustmentCreatedBy")
   stockTransfers    StockTransfer[]   @relation("TransferCreatedBy")
 
+  @@index([branchId])
+  @@index([isDeleted, isActive])
   @@map("users")
 }
 
@@ -54,6 +56,7 @@ model Role {
   rolePermissions RolePermission[]
   userRoles       UserRole[]
 
+  @@index([isDeleted])
   @@map("roles")
 }
 
@@ -80,6 +83,7 @@ model UserRole {
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
+  @@index([roleId])
   @@map("user_roles")
 }
 
@@ -93,6 +97,7 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
+  @@index([permissionId])
   @@map("role_permissions")
 }
 
@@ -124,6 +129,7 @@ model Branch {
   outgoingTransfers StockTransfer[] @relation("TransferSource")
   incomingTransfers StockTransfer[] @relation("TransferDestination")
 
+  @@index([isDeleted, isActive])
   @@map("branches")
 }
 
@@ -140,6 +146,8 @@ model CashCounter {
   sessions CashCounterSession[]
   sales    Sale[]
 
+  @@index([branchId])
+  @@index([isDeleted, isActive])
   @@map("cash_counters")
 }
 
@@ -162,6 +170,10 @@ model CashCounterSession {
   user        User        @relation(fields: [userId], references: [id])
   sales       Sale[]
 
+  @@index([cashCounterId])
+  @@index([userId])
+  @@index([status])
+  @@index([openedAt])
   @@map("cash_counter_sessions")
 }
 
@@ -185,6 +197,7 @@ model ProductCategory {
 
   products Product[]
 
+  @@index([isDeleted])
   @@map("product_categories")
 }
 
@@ -198,6 +211,7 @@ model Unit {
 
   products Product[]
 
+  @@index([isDeleted])
   @@map("units")
 }
 
@@ -226,6 +240,9 @@ model Product {
   stockAdjustments StockAdjustment[]
   stockTransferItems StockTransferItem[]
 
+  @@index([categoryId])
+  @@index([unitId])
+  @@index([isDeleted, isActive, createdAt])
   @@map("products")
 }
 
@@ -245,6 +262,8 @@ model Inventory {
   branch  Branch  @relation(fields: [branchId], references: [id])
 
   @@unique([productId, branchId])
+  @@index([branchId])
+  @@index([quantity])
   @@map("inventory")
 }
 
@@ -263,6 +282,8 @@ model InventoryLayer {
   branch      Branch       @relation(fields: [branchId], references: [id])
   purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
 
+  @@index([branchId, productId, remainingQty, createdAt])
+  @@index([purchaseItemId])
   @@map("inventory_layers")
 }
 
@@ -280,6 +301,9 @@ model StockMovement {
   product Product @relation(fields: [productId], references: [id])
   branch  Branch  @relation(fields: [branchId], references: [id])
 
+  @@index([branchId, createdAt])
+  @@index([productId, createdAt])
+  @@index([referenceType, referenceId])
   @@map("stock_movements")
 }
 
@@ -308,6 +332,10 @@ model StockAdjustment {
   branch    Branch  @relation(fields: [branchId], references: [id])
   createdBy User    @relation("AdjustmentCreatedBy", fields: [createdById], references: [id])
 
+  @@index([branchId, createdAt])
+  @@index([productId, createdAt])
+  @@index([createdById])
+  @@index([isDeleted])
   @@map("stock_adjustments")
 }
 
@@ -341,6 +369,11 @@ model StockTransfer {
   createdBy     User   @relation("TransferCreatedBy", fields: [createdById], references: [id])
   items         StockTransferItem[]
 
+  @@index([sourceBranchId])
+  @@index([destBranchId])
+  @@index([createdById])
+  @@index([status, transferDate])
+  @@index([isDeleted, transferDate])
   @@map("stock_transfers")
 }
 
@@ -354,6 +387,8 @@ model StockTransferItem {
   stockTransfer StockTransfer @relation(fields: [stockTransferId], references: [id], onDelete: Cascade)
   product       Product       @relation(fields: [productId], references: [id])
 
+  @@index([stockTransferId])
+  @@index([productId])
   @@map("stock_transfer_items")
 }
 
@@ -383,6 +418,7 @@ model Supplier {
   purchases       Purchase[]
   supplierPayments SupplierPayment[]
 
+  @@index([isDeleted, isActive])
   @@map("suppliers")
 }
 
@@ -409,6 +445,11 @@ model Purchase {
   items       PurchaseItem[]
   payments    SupplierPayment[]
 
+  @@index([supplierId])
+  @@index([branchId, purchaseDate])
+  @@index([createdById])
+  @@index([paymentStatus])
+  @@index([isDeleted, purchaseDate])
   @@map("purchases")
 }
 
@@ -425,6 +466,8 @@ model PurchaseItem {
   product         Product        @relation(fields: [productId], references: [id])
   inventoryLayers InventoryLayer[]
 
+  @@index([purchaseId])
+  @@index([productId])
   @@map("purchase_items")
 }
 
@@ -446,6 +489,9 @@ model SupplierPayment {
   supplier  Supplier  @relation(fields: [supplierId], references: [id])
   purchase  Purchase? @relation(fields: [purchaseId], references: [id])
 
+  @@index([supplierId, paymentDate])
+  @@index([purchaseId])
+  @@index([isDeleted, createdAt])
   @@map("supplier_payments")
 }
 
@@ -470,6 +516,7 @@ model Buyer {
   buyerPayments BuyerPayment[]
   salesReturns  SalesReturn[]
 
+  @@index([isDeleted, isActive])
   @@map("buyers")
 }
 
@@ -506,6 +553,14 @@ model Sale {
   payments    BuyerPayment[]
   returns     SalesReturn[]
 
+  @@index([buyerId])
+  @@index([branchId, createdAt])
+  @@index([cashCounterId])
+  @@index([sessionId])
+  @@index([createdById])
+  @@index([paymentStatus])
+  @@index([dueDate])
+  @@index([isDeleted, createdAt])
   @@map("sales")
 }
 
@@ -524,6 +579,8 @@ model SaleItem {
   product Product @relation(fields: [productId], references: [id])
   returnItems SalesReturnItem[]
 
+  @@index([saleId])
+  @@index([productId])
   @@map("sale_items")
 }
 
@@ -545,6 +602,9 @@ model BuyerPayment {
   buyer Buyer @relation(fields: [buyerId], references: [id])
   sale  Sale?  @relation(fields: [saleId], references: [id])
 
+  @@index([buyerId, paymentDate])
+  @@index([saleId])
+  @@index([isDeleted, createdAt])
   @@map("buyer_payments")
 }
 
@@ -570,6 +630,10 @@ model SalesReturn {
   buyer Buyer? @relation(fields: [buyerId], references: [id])
   items SalesReturnItem[]
 
+  @@index([saleId])
+  @@index([buyerId])
+  @@index([branchId, returnDate])
+  @@index([isDeleted, createdAt])
   @@map("sales_returns")
 }
 
@@ -584,6 +648,8 @@ model SalesReturnItem {
   salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
   saleItem    SaleItem    @relation(fields: [saleItemId], references: [id])
 
+  @@index([salesReturnId])
+  @@index([saleItemId])
   @@map("sales_return_items")
 }
 
@@ -607,6 +673,7 @@ model ExpenseCategory {
 
   expenses Expense[]
 
+  @@index([isDeleted])
   @@map("expense_categories")
 }
 
@@ -630,6 +697,10 @@ model Expense {
   branch    Branch          @relation(fields: [branchId], references: [id])
   createdBy User            @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
 
+  @@index([categoryId])
+  @@index([branchId, expenseDate])
+  @@index([createdById])
+  @@index([isDeleted, createdAt])
   @@map("expenses")
 }
 

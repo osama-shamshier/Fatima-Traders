@@ -207,14 +207,33 @@ export async function POST(request: NextRequest) {
               create: saleItemsData,
             },
           },
-          include: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            saleDate: true,
+            subtotal: true,
+            discount: true,
+            roundOff: true,
+            grandTotal: true,
+            amountPaid: true,
+            outstandingAmount: true,
+            paymentStatus: true,
+            paymentMethod: true,
+            notes: true,
+            buyer: { select: { id: true, name: true } },
+            branch: { select: { id: true, name: true, address: true } },
+            createdBy: { select: { id: true, name: true } },
             items: {
-              include: {
-                product: true,
+              select: {
+                id: true,
+                productId: true,
+                quantity: true,
+                sellingPrice: true,
+                discount: true,
+                lineTotal: true,
+                fifoCost: true,
               },
             },
-            buyer: true,
-            branch: true,
           },
         });
 
@@ -231,17 +250,6 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        await tx.auditLog.create({
-          data: {
-            userId,
-            action: "CREATE",
-            entity: "sale",
-            entityId: sale.id,
-            branchId,
-            newValues: JSON.parse(JSON.stringify(sale)),
-          },
-        });
-
         return sale;
       },
       {
@@ -249,6 +257,27 @@ export async function POST(request: NextRequest) {
         timeout: 60000,
       }
     );
+
+    void prisma.auditLog
+      .create({
+        data: {
+          userId,
+          action: "CREATE",
+          entity: "sale",
+          entityId: result.id,
+          branchId,
+          newValues: {
+            id: result.id,
+            invoiceNumber: result.invoiceNumber,
+            grandTotal: result.grandTotal.toString(),
+            amountPaid: result.amountPaid.toString(),
+            paymentStatus: result.paymentStatus,
+          },
+        },
+      })
+      .catch((error) => {
+        console.error("Failed to write sale audit log:", error);
+      });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {

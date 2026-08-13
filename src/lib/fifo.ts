@@ -1,5 +1,4 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 
 type PrismaTx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -89,28 +88,50 @@ export async function consumeInventoryFIFO(
   branchId: string,
   items: SaleItemInput[]
 ): Promise<Array<{ productId: string; fifoCost: Prisma.Decimal; consumedQty: number }>> {
+  const productIds = [...new Set(items.map((item) => item.productId))];
+  const layers = await tx.inventoryLayer.findMany({
+    where: {
+      branchId,
+      productId: { in: productIds },
+      remainingQty: { gt: 0 },
+    },
+    orderBy: [{ productId: "asc" }, { createdAt: "asc" }],
+  });
+
+  const layersByProduct = new Map<string, typeof layers>();
+  for (const layer of layers) {
+    const productLayers = layersByProduct.get(layer.productId) || [];
+    productLayers.push(layer);
+    layersByProduct.set(layer.productId, productLayers);
+  }
+
+  const fallbackProducts = await tx.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, sellingPrice: true },
+  });
+  const fallbackCostByProduct = new Map(
+    fallbackProducts.map((product) => [
+      product.id,
+      new Prisma.Decimal(product.sellingPrice).mul(0.7),
+    ])
+  );
+
   const result: Array<{ productId: string; fifoCost: Prisma.Decimal; consumedQty: number }> = [];
+  const layerUpdates: Array<ReturnType<typeof tx.inventoryLayer.update>> = [];
+  const fallbackLayerCreates: Array<ReturnType<typeof tx.inventoryLayer.create>> = [];
+  const inventoryUpserts: Array<ReturnType<typeof tx.inventory.upsert>> = [];
+  const stockMovements: Prisma.StockMovementCreateManyInput[] = [];
 
   for (const item of items) {
     let remainingToConsume = new Prisma.Decimal(item.quantity);
     let totalLineCOGS = new Prisma.Decimal(0);
 
-    // Fetch oldest available layers with remainingQty > 0
-    const layers = await tx.inventoryLayer.findMany({
-      where: {
-        branchId,
-        productId: item.productId,
-        remainingQty: { gt: 0 },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
-
-    for (const layer of layers) {
+    for (const layer of layersByProduct.get(item.productId) || []) {
       if (remainingToConsume.lte(0)) break;
 
       const layerRemaining = new Prisma.Decimal(layer.remainingQty);
+      if (layerRemaining.lte(0)) continue;
+
       const consumeFromThisLayer = Prisma.Decimal.min(remainingToConsume, layerRemaining);
 
       const layerCOGS = consumeFromThisLayer.mul(new Prisma.Decimal(layer.costPerUnit));
@@ -118,68 +139,79 @@ export async function consumeInventoryFIFO(
 
       const newRemaining = layerRemaining.sub(consumeFromThisLayer);
       remainingToConsume = remainingToConsume.sub(consumeFromThisLayer);
+      layer.remainingQty = newRemaining;
 
-      // Update layer remainingQty
-      await tx.inventoryLayer.update({
-        where: { id: layer.id },
-        data: { remainingQty: newRemaining },
-      });
+      layerUpdates.push(
+        tx.inventoryLayer.update({
+          where: { id: layer.id },
+          data: { remainingQty: newRemaining },
+        })
+      );
     }
 
     // Fallback if remaining stock was not covered by existing purchase FIFO layers
     if (remainingToConsume.gt(0)) {
-      const prod = await tx.product.findUnique({ where: { id: item.productId } });
-      const fallbackCostPerUnit = prod ? new Prisma.Decimal(prod.sellingPrice).mul(0.7) : new Prisma.Decimal(0);
+      const fallbackCostPerUnit = fallbackCostByProduct.get(item.productId) || new Prisma.Decimal(0);
       const fallbackCOGS = remainingToConsume.mul(fallbackCostPerUnit);
       totalLineCOGS = totalLineCOGS.add(fallbackCOGS);
 
-      await tx.inventoryLayer.create({
-        data: {
-          branchId,
-          productId: item.productId,
-          quantity: new Prisma.Decimal(item.quantity),
-          remainingQty: new Prisma.Decimal(0),
-          costPerUnit: fallbackCostPerUnit,
-        },
-      });
+      fallbackLayerCreates.push(
+        tx.inventoryLayer.create({
+          data: {
+            branchId,
+            productId: item.productId,
+            quantity: new Prisma.Decimal(item.quantity),
+            remainingQty: new Prisma.Decimal(0),
+            costPerUnit: fallbackCostPerUnit,
+          },
+        })
+      );
     }
 
     const qty = new Prisma.Decimal(item.quantity);
 
     // Decrease Branch Inventory Stock (upsert in case inventory row didn't exist yet)
-    await tx.inventory.upsert({
-      where: {
-        productId_branchId: {
+    inventoryUpserts.push(
+      tx.inventory.upsert({
+        where: {
+          productId_branchId: {
+            productId: item.productId,
+            branchId,
+          },
+        },
+        update: {
+          quantity: { decrement: qty },
+        },
+        create: {
           productId: item.productId,
           branchId,
+          quantity: new Prisma.Decimal(0).sub(qty),
         },
-      },
-      update: {
-        quantity: { decrement: qty },
-      },
-      create: {
-        productId: item.productId,
-        branchId,
-        quantity: new Prisma.Decimal(0).sub(qty),
-      },
-    });
+      })
+    );
 
     // Record Stock Movement
-    await tx.stockMovement.create({
-      data: {
-        branchId,
-        productId: item.productId,
-        movementType: "OUT",
-        quantity: qty,
-        referenceType: "sale",
-        notes: `FIFO consumed at total COGS ${totalLineCOGS.toString()}`,
-      },
+    stockMovements.push({
+      branchId,
+      productId: item.productId,
+      movementType: "OUT",
+      quantity: qty,
+      referenceType: "sale",
+      notes: `FIFO consumed at total COGS ${totalLineCOGS.toString()}`,
     });
 
     result.push({
       productId: item.productId,
       fifoCost: totalLineCOGS,
       consumedQty: item.quantity,
+    });
+  }
+
+  await Promise.all([...layerUpdates, ...fallbackLayerCreates, ...inventoryUpserts]);
+
+  if (stockMovements.length > 0) {
+    await tx.stockMovement.createMany({
+      data: stockMovements,
     });
   }
 

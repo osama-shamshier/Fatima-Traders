@@ -17,8 +17,11 @@ export async function GET() {
       totalRevenueAgg,
       lowStockProducts,
       recentSales,
-      buyersWithSales,
-      suppliersWithPurchases,
+      buyerSalesTotals,
+      buyerPaymentTotals,
+      buyerReturnTotals,
+      supplierPurchaseTotals,
+      supplierPaymentTotals,
     ] = await Promise.all([
       prisma.product.count({ where: { isDeleted: false, isActive: true } }),
       prisma.branch.count({ where: { isDeleted: false, isActive: true } }),
@@ -27,9 +30,17 @@ export async function GET() {
           isDeleted: false,
           createdAt: { gte: todayStart, lte: todayEnd },
         },
-        include: {
-          buyer: true,
-          branch: true,
+        select: {
+          id: true,
+          invoiceNumber: true,
+          amountPaid: true,
+          outstandingAmount: true,
+          grandTotal: true,
+          paymentMethod: true,
+          notes: true,
+          createdAt: true,
+          buyer: { select: { name: true } },
+          branch: { select: { name: true } },
         },
       }),
       prisma.buyerPayment.findMany({
@@ -37,9 +48,15 @@ export async function GET() {
           isDeleted: false,
           createdAt: { gte: todayStart, lte: todayEnd },
         },
-        include: {
-          buyer: true,
-          sale: true,
+        select: {
+          id: true,
+          amount: true,
+          paymentMethod: true,
+          bankReference: true,
+          notes: true,
+          createdAt: true,
+          buyer: { select: { name: true } },
+          sale: { select: { invoiceNumber: true } },
         },
       }),
       prisma.sale.aggregate({
@@ -55,25 +72,39 @@ export async function GET() {
         where: { isDeleted: false },
         take: 5,
         orderBy: { createdAt: "desc" },
-        include: {
-          buyer: true,
-          branch: true,
+        select: {
+          id: true,
+          invoiceNumber: true,
+          grandTotal: true,
+          createdAt: true,
+          buyer: { select: { name: true } },
+          branch: { select: { name: true } },
         },
       }),
-      prisma.buyer.findMany({
-        where: { isDeleted: false },
-        include: {
-          sales: { where: { isDeleted: false } },
-          buyerPayments: { where: { isDeleted: false } },
-          salesReturns: { where: { isDeleted: false } },
-        },
+      prisma.sale.groupBy({
+        by: ["buyerId"],
+        where: { isDeleted: false, buyerId: { not: null } },
+        _sum: { grandTotal: true },
       }),
-      prisma.supplier.findMany({
+      prisma.buyerPayment.groupBy({
+        by: ["buyerId"],
         where: { isDeleted: false },
-        include: {
-          purchases: { where: { isDeleted: false } },
-          supplierPayments: { where: { isDeleted: false } },
-        },
+        _sum: { amount: true },
+      }),
+      prisma.salesReturn.groupBy({
+        by: ["buyerId"],
+        where: { isDeleted: false, buyerId: { not: null } },
+        _sum: { totalRefund: true },
+      }),
+      prisma.purchase.groupBy({
+        by: ["supplierId"],
+        where: { isDeleted: false },
+        _sum: { totalAmount: true },
+      }),
+      prisma.supplierPayment.groupBy({
+        by: ["supplierId"],
+        where: { isDeleted: false },
+        _sum: { amount: true },
       }),
     ]);
 
@@ -130,12 +161,37 @@ export async function GET() {
       }
     });
 
-    // Exact Customer Outstanding Receivables
-    const outstandingDebtors = buyersWithSales
-      .map((buyer) => {
-        const totalSales = buyer.sales.reduce((sum, s) => sum + Number(s.grandTotal || s.subtotal || 0), 0);
-        const totalPayments = buyer.buyerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        const totalReturns = buyer.salesReturns ? buyer.salesReturns.reduce((sum, r) => sum + Number(r.totalRefund || 0), 0) : 0;
+    const buyerIds = Array.from(
+      new Set([
+        ...buyerSalesTotals.map((row) => row.buyerId).filter(Boolean),
+        ...buyerPaymentTotals.map((row) => row.buyerId),
+        ...buyerReturnTotals.map((row) => row.buyerId).filter(Boolean),
+      ])
+    ) as string[];
+
+    const buyersById = new Map(
+      (
+        await prisma.buyer.findMany({
+          where: { id: { in: buyerIds }, isDeleted: false },
+          select: { id: true, name: true, companyName: true, contactNumber: true },
+        })
+      ).map((buyer) => [buyer.id, buyer])
+    );
+
+    const buyerPaymentById = new Map(buyerPaymentTotals.map((row) => [row.buyerId, Number(row._sum.amount || 0)]));
+    const buyerReturnById = new Map(
+      buyerReturnTotals.map((row) => [row.buyerId, Number(row._sum.totalRefund || 0)])
+    );
+
+    const outstandingDebtors = buyerSalesTotals
+      .map((row) => {
+        if (!row.buyerId) return null;
+        const buyer = buyersById.get(row.buyerId);
+        if (!buyer) return null;
+
+        const totalSales = Number(row._sum.grandTotal || 0);
+        const totalPayments = buyerPaymentById.get(row.buyerId) || 0;
+        const totalReturns = buyerReturnById.get(row.buyerId) || 0;
         const outstanding = Math.max(0, totalSales - totalPayments - totalReturns);
 
         return {
@@ -146,16 +202,20 @@ export async function GET() {
           totalOutstanding: outstanding,
         };
       })
+      .filter((buyer): buyer is NonNullable<typeof buyer> => Boolean(buyer))
       .filter((b) => b.totalOutstanding > 0)
       .sort((a, b) => b.totalOutstanding - a.totalOutstanding);
 
     const totalBuyerReceivables = outstandingDebtors.reduce((sum, b) => sum + b.totalOutstanding, 0);
 
     // Exact Supplier Outstanding Payables
-    const totalSupplierPayables = suppliersWithPurchases.reduce((sum, s) => {
-      const pur = s.purchases.reduce((pSum, p) => pSum + Number(p.totalAmount || 0), 0);
-      const pay = s.supplierPayments.reduce((paySum, p) => paySum + Number(p.amount || 0), 0);
-      return sum + Math.max(0, pur - pay);
+    const supplierPaymentById = new Map(
+      supplierPaymentTotals.map((row) => [row.supplierId, Number(row._sum.amount || 0)])
+    );
+    const totalSupplierPayables = supplierPurchaseTotals.reduce((sum, row) => {
+      const purchased = Number(row._sum.totalAmount || 0);
+      const paid = supplierPaymentById.get(row.supplierId) || 0;
+      return sum + Math.max(0, purchased - paid);
     }, 0);
 
     return NextResponse.json({
