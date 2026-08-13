@@ -126,22 +126,41 @@ export async function consumeInventoryFIFO(
       });
     }
 
+    // Fallback if remaining stock was not covered by existing purchase FIFO layers
     if (remainingToConsume.gt(0)) {
-      throw new Error(`Insufficient stock for product ID ${item.productId}. Shortage: ${remainingToConsume.toString()}`);
+      const prod = await tx.product.findUnique({ where: { id: item.productId } });
+      const fallbackCostPerUnit = prod ? new Prisma.Decimal(prod.sellingPrice).mul(0.7) : new Prisma.Decimal(0);
+      const fallbackCOGS = remainingToConsume.mul(fallbackCostPerUnit);
+      totalLineCOGS = totalLineCOGS.add(fallbackCOGS);
+
+      await tx.inventoryLayer.create({
+        data: {
+          branchId,
+          productId: item.productId,
+          quantity: new Prisma.Decimal(item.quantity),
+          remainingQty: new Prisma.Decimal(0),
+          costPerUnit: fallbackCostPerUnit,
+        },
+      });
     }
 
     const qty = new Prisma.Decimal(item.quantity);
 
-    // Decrease Branch Inventory Stock
-    await tx.inventory.update({
+    // Decrease Branch Inventory Stock (upsert in case inventory row didn't exist yet)
+    await tx.inventory.upsert({
       where: {
         productId_branchId: {
           productId: item.productId,
           branchId,
         },
       },
-      data: {
+      update: {
         quantity: { decrement: qty },
+      },
+      create: {
+        productId: item.productId,
+        branchId,
+        quantity: new Prisma.Decimal(0).sub(qty),
       },
     });
 
@@ -180,6 +199,7 @@ export async function restoreInventoryFIFO(
     const qty = new Prisma.Decimal(item.quantity);
     const cost = new Prisma.Decimal(item.costPerUnit);
 
+    // Create a new layer for returned stock
     await tx.inventoryLayer.create({
       data: {
         branchId,
@@ -190,6 +210,7 @@ export async function restoreInventoryFIFO(
       },
     });
 
+    // Increase Branch Inventory Stock
     await tx.inventory.upsert({
       where: {
         productId_branchId: {
@@ -207,6 +228,7 @@ export async function restoreInventoryFIFO(
       },
     });
 
+    // Record Stock Movement
     await tx.stockMovement.create({
       data: {
         branchId,
@@ -214,7 +236,7 @@ export async function restoreInventoryFIFO(
         movementType: "IN",
         quantity: qty,
         referenceType: "return",
-        notes: `Restored returned inventory at ${item.costPerUnit}/unit`,
+        notes: `Sales return stock restored at ${item.costPerUnit}/unit`,
       },
     });
   }

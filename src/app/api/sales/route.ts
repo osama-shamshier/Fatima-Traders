@@ -73,13 +73,13 @@ export async function GET(request: NextRequest) {
     const sales = await prisma.sale.findMany({
       where: whereClause,
       include: {
-        buyer: true,
-        branch: true,
-        cashCounter: true,
+        buyer: { select: { id: true, name: true, companyName: true, contactNumber: true } },
+        branch: { select: { id: true, name: true } },
+        cashCounter: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         items: {
           include: {
-            product: true,
+            product: { select: { id: true, name: true, sku: true } },
           },
         },
       },
@@ -112,132 +112,143 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    const user = await prisma.user.findFirst();
-    if (!user) throw new Error("No user found in system.");
-    const userId = user.id;
-
-    if (!branchId) {
-      const defaultBranch = await prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } });
-      if (defaultBranch) branchId = defaultBranch.id;
-      else return NextResponse.json({ error: "Branch ID is required" }, { status: 400 });
-    }
-
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Items are required" }, { status: 400 });
     }
 
-    if (!sessionId) {
-      const activeSession = await prisma.cashCounterSession.findFirst({
-        where: { status: "OPEN", cashCounter: { branchId } },
-      });
-      if (activeSession) {
-        sessionId = activeSession.id;
-        cashCounterId = activeSession.cashCounterId;
-      }
+    // Execute pre-checks concurrently in a single network round-trip
+    const [user, defaultBranch, activeSession] = await Promise.all([
+      prisma.user.findFirst(),
+      !branchId ? prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } }) : null,
+      !sessionId ? prisma.cashCounterSession.findFirst({ where: { status: "OPEN" } }) : null,
+    ]);
+
+    if (!user) throw new Error("No user found in system.");
+    const userId = user.id;
+
+    if (!branchId && defaultBranch) {
+      branchId = defaultBranch.id;
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const invoiceNumber = generateInvoiceNumber();
+    if (!branchId) {
+      return NextResponse.json({ error: "Branch ID is required" }, { status: 400 });
+    }
 
-      const fifoItems = items.map((i: any) => ({
-        productId: i.productId,
-        quantity: Number(i.quantity),
-      }));
+    if (!sessionId && activeSession) {
+      sessionId = activeSession.id;
+      cashCounterId = activeSession.cashCounterId;
+    }
 
-      const fifoResult = await consumeInventoryFIFO(tx as any, branchId, fifoItems);
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const invoiceNumber = generateInvoiceNumber();
 
-      let subtotal = 0;
-      const saleItemsData = items.map((item: any, index: number) => {
-        const lineTotal = Number(item.quantity) * Number(item.sellingPrice) - Number(item.discount || 0);
-        subtotal += lineTotal;
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          sellingPrice: item.sellingPrice,
-          discount: item.discount || 0,
-          lineTotal,
-          fifoCost: fifoResult[index].fifoCost,
-        };
-      });
+        const fifoItems = items.map((i: any) => ({
+          productId: i.productId,
+          quantity: Number(i.quantity),
+        }));
 
-      const grandTotal = Math.max(0, subtotal - Number(discount) + Number(roundOff));
-      const amountPaidNum = Number(amountPaid);
-      const outstandingAmount = grandTotal - amountPaidNum;
+        const fifoResult = await consumeInventoryFIFO(tx as any, branchId, fifoItems);
 
-      if (!buyerId && amountPaidNum < grandTotal) {
-        throw new Error("Credit sales are not allowed for Walk-in Customers. Please select a registered buyer to record partial or pending credit.");
-      }
+        let subtotal = 0;
+        const saleItemsData = items.map((item: any, index: number) => {
+          const lineTotal = Number(item.quantity) * Number(item.sellingPrice) - Number(item.discount || 0);
+          subtotal += lineTotal;
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            sellingPrice: item.sellingPrice,
+            discount: item.discount || 0,
+            lineTotal,
+            fifoCost: fifoResult[index].fifoCost,
+          };
+        });
 
-      const paymentStatus =
-        amountPaidNum >= grandTotal ? "PAID" : amountPaidNum > 0 ? "PARTIAL" : "PENDING";
+        const grandTotal = Math.max(0, subtotal - Number(discount) + Number(roundOff));
+        const amountPaidNum = Number(amountPaid);
+        const outstandingAmount = grandTotal - amountPaidNum;
 
-      const fullNotes = [
-        notes,
-        bankName ? `Bank/Wallet: ${bankName}` : null,
-        bankReference ? `Ref: ${bankReference}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | ");
+        if (!buyerId && amountPaidNum < grandTotal) {
+          throw new Error(
+            "Credit sales are not allowed for Walk-in Customers. Please select a registered buyer to record partial or pending credit."
+          );
+        }
 
-      const sale = await tx.sale.create({
-        data: {
-          invoiceNumber,
-          branchId,
-          buyerId: buyerId || null,
-          cashCounterId: cashCounterId || null,
-          sessionId: sessionId || null,
-          createdById: userId,
-          dueDate: dueDate ? new Date(dueDate) : null,
-          subtotal,
-          discount: Number(discount),
-          roundOff: Number(roundOff),
-          grandTotal,
-          amountPaid: amountPaidNum,
-          outstandingAmount,
-          paymentStatus,
-          paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
-          notes: fullNotes,
-          items: {
-            create: saleItemsData,
-          },
-        },
-        include: {
-          items: {
-            include: {
-              product: true,
+        const paymentStatus =
+          amountPaidNum >= grandTotal ? "PAID" : amountPaidNum > 0 ? "PARTIAL" : "PENDING";
+
+        const fullNotes = [
+          notes,
+          bankName ? `Bank/Wallet: ${bankName}` : null,
+          bankReference ? `Ref: ${bankReference}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+
+        const sale = await tx.sale.create({
+          data: {
+            invoiceNumber,
+            branchId,
+            buyerId: buyerId || null,
+            cashCounterId: cashCounterId || null,
+            sessionId: sessionId || null,
+            createdById: userId,
+            dueDate: dueDate ? new Date(dueDate) : null,
+            subtotal,
+            discount: Number(discount),
+            roundOff: Number(roundOff),
+            grandTotal,
+            amountPaid: amountPaidNum,
+            outstandingAmount,
+            paymentStatus,
+            paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
+            notes: fullNotes,
+            items: {
+              create: saleItemsData,
             },
           },
-          buyer: true,
-          branch: true,
-        },
-      });
-
-      if (amountPaidNum > 0 && buyerId) {
-        await tx.buyerPayment.create({
-          data: {
-            buyerId,
-            saleId: sale.id,
-            amount: amountPaidNum,
-            paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
-            bankReference: bankReference || bankName || null,
-            createdById: userId,
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            buyer: true,
+            branch: true,
           },
         });
+
+        if (amountPaidNum > 0 && buyerId) {
+          await tx.buyerPayment.create({
+            data: {
+              buyerId,
+              saleId: sale.id,
+              amount: amountPaidNum,
+              paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
+              bankReference: bankReference || bankName || null,
+              createdById: userId,
+            },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "CREATE",
+            entity: "sale",
+            entityId: sale.id,
+            branchId,
+            newValues: JSON.parse(JSON.stringify(sale)),
+          },
+        });
+
+        return sale;
+      },
+      {
+        maxWait: 15000,
+        timeout: 60000,
       }
-
-      await tx.auditLog.create({
-        data: {
-          userId,
-          action: "CREATE",
-          entity: "sale",
-          entityId: sale.id,
-          branchId,
-          newValues: JSON.parse(JSON.stringify(sale)),
-        },
-      });
-
-      return sale;
-    });
+    );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
