@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { createInventoryLayers } from "@/lib/fifo";
 
 export async function GET() {
@@ -20,7 +19,7 @@ export async function GET() {
         items: {
           include: {
             product: {
-              select: { name: true },
+              select: { name: true, sellingPrice: true },
             },
           },
         },
@@ -48,11 +47,6 @@ export async function POST(request: Request) {
       notes,
     } = body;
 
-    // Hardcode createdById for now if not using auth context in this snippet
-    // In production, get from session
-    const createdById = "cm00000000000000000000000"; // Dummy ID, better if we fetch any user or just rely on a valid user in DB
-
-    // Let's grab the first user just for demo purposes if we don't have session
     const user = await prisma.user.findFirst();
     if (!user) {
       return new NextResponse("No users found in system", { status: 400 });
@@ -96,7 +90,7 @@ export async function POST(request: Request) {
           outstandingAmount: outstandingAmountNum,
           paymentStatus,
           notes,
-          createdById: user.id, // Replace with actual session user ID
+          createdById: user.id,
           items: {
             create: purchaseItemsData,
           },
@@ -105,6 +99,17 @@ export async function POST(request: Request) {
           items: true,
         },
       });
+
+      // Automatically update retail sale prices on the Product catalog if updated in purchase form
+      for (const item of items) {
+        const newSellingPrice = Number(item.newSellingPrice || item.sellingPrice || 0);
+        if (item.productId && newSellingPrice > 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { sellingPrice: newSellingPrice },
+          });
+        }
+      }
 
       const inventoryItemsInput = newPurchase.items.map((item) => ({
         productId: item.productId,
@@ -121,7 +126,7 @@ export async function POST(request: Request) {
             supplierId,
             purchaseId: newPurchase.id,
             amount: amountPaidNum,
-            paymentMethod: "CASH", // Defaulting to CASH for initial payment, can be dynamic
+            paymentMethod: "CASH",
             notes: "Initial payment for purchase",
           },
         });
@@ -131,8 +136,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(purchase);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating purchase:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return new NextResponse(error.message || "Internal Server Error", { status: 500 });
   }
 }
