@@ -5,6 +5,7 @@ import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 import { ArrowDownRight, ArrowUpRight, DollarSign } from "lucide-react";
 
 export default function FinancialsPage() {
@@ -41,7 +42,7 @@ export default function FinancialsPage() {
           <div className="rounded-md border bg-card text-card-foreground shadow-sm">
             <div className="p-6">
               {loadingLedger ? (
-                <div className="py-8 text-center text-muted-foreground">Loading ledger...</div>
+                <Loader text="Loading ledger..." className="py-12" />
               ) : (
                 <div className="relative w-full overflow-auto max-h-[600px]">
                   <table className="w-full caption-bottom text-sm">
@@ -84,7 +85,7 @@ export default function FinancialsPage() {
 
         <TabsContent value="cash-flow" className="space-y-4">
           {loadingCashFlow ? (
-            <div className="py-8 text-center text-muted-foreground">Loading cash flow...</div>
+            <Loader text="Loading cash flow..." className="py-12" />
           ) : cashFlow && (
             <>
               <div className="grid gap-4 md:grid-cols-3">

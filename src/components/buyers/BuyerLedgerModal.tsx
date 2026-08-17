@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, RefreshCw, DollarSign, User } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 
 interface BuyerLedgerModalProps {
   isOpen: boolean;
@@ -241,7 +242,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
         {/* Complete Screen Table — NO HORIZONTAL SCROLLBAR NEEDED */}
         <div className="flex-1 overflow-y-auto mt-2 border rounded-xl bg-white shadow-xs">
           {isLoading ? (
-            <div className="p-12 text-center text-slate-400 font-medium text-xs">Loading customer ledger...</div>
+            <Loader text="Loading customer ledger..." className="py-12" />
           ) : (
             <table className="w-full text-xs text-left border-collapse table-fixed">
               <thead className="bg-slate-50 sticky top-0 font-semibold border-b text-slate-700 uppercase tracking-wider">

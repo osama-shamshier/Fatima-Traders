@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 import { Plus, Edit, Trash2, FileText, Search, CreditCard, AlertCircle } from "lucide-react";
 import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
@@ -163,11 +164,7 @@ export default function BuyersPage() {
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {isLoading ? (
-              <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-400">
-                  Loading buyers list...
-                </td>
-              </tr>
+              <TableLoader colSpan={7} text="Loading buyers list..." />
             ) : filteredBuyers.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-slate-400">

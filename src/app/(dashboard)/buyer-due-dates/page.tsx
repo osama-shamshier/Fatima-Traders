@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableLoader } from "@/components/ui/loader";
 import { Calendar, Filter, RefreshCw, FileText, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 
@@ -167,11 +168,7 @@ export default function BuyerDueDatesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
-                    Loading payment due dates...
-                  </td>
-                </tr>
+                <TableLoader colSpan={9} text="Loading payment due dates..." />
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="p-8 text-center text-slate-400">

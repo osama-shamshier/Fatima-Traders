@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle, Calendar } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -317,11 +318,7 @@ export default function ProfitLossPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
-                    Calculating itemized profitability...
-                  </td>
-                </tr>
+                <TableLoader colSpan={9} text="Calculating itemized profitability..." />
               ) : filteredBreakdown.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="p-8 text-center text-slate-400">

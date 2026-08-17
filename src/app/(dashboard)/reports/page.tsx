@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableLoader } from "@/components/ui/loader";
 import { BarChart3, Download, TrendingUp, TrendingDown, DollarSign, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -160,7 +161,7 @@ export default function ReportsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
-                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">Loading valuation report...</td></tr>
+                    <TableLoader colSpan={6} text="Loading valuation report..." />
                   ) : (
                     (valuationData?.items || []).map((item: any, idx: number) => (
                       <tr key={idx} className="hover:bg-slate-50/50">

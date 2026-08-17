@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 import { PurchaseCreateModal } from "@/components/purchases/PurchaseCreateModal";
 import { PurchaseViewModal } from "@/components/purchases/PurchaseViewModal";
 
@@ -54,7 +55,7 @@ export default function PurchasesPage() {
 
       <div className="bg-white rounded-md border">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">Loading purchases...</div>
+          <Loader text="Loading purchases..." className="py-12" />
         ) : (
           <div className="relative w-full overflow-auto">
             <table className="w-full caption-bottom text-sm">

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TableLoader } from "@/components/ui/loader";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, Plus, Truck, RefreshCw } from "lucide-react";
@@ -161,7 +162,7 @@ export default function SupplierPaymentsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
               {isLoading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-sans">Loading supplier payments...</td></tr>
+                <TableLoader colSpan={7} text="Loading supplier payments..." />
               ) : payments.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-400 font-sans">

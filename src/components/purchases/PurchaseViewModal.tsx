@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 
 interface PurchaseViewModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function PurchaseViewModal({ isOpen, onClose, purchaseId }: PurchaseViewM
           <DialogTitle className="text-lg font-bold text-slate-900">Purchase Invoice Details</DialogTitle>
         </DialogHeader>
         {loading ? (
-          <div className="py-8 text-center text-sm text-slate-500">Loading purchase details...</div>
+          <Loader text="Loading purchase details..." className="py-12" />
         ) : purchase ? (
           <div className="py-4 space-y-6">
             <div className="grid grid-cols-2 gap-4 text-xs font-medium">

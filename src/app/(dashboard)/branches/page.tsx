@@ -5,6 +5,7 @@ import { BranchFormModal } from "@/components/branches/BranchFormModal";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 
 export default function BranchesPage() {
   const [branches, setBranches] = useState<any[]>([]);
@@ -66,7 +67,7 @@ export default function BranchesPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={7} className="px-4 py-4 text-center">Loading...</td></tr>
+              <TableLoader colSpan={7} text="Loading branches..." />
             ) : branches.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-4 text-center">No branches found.</td></tr>
             ) : (

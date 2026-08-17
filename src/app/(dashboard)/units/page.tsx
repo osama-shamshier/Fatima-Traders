@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, Ruler, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
 
@@ -86,11 +87,7 @@ export default function UnitsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400">
-                    Loading units...
-                  </td>
-                </tr>
+                <TableLoader colSpan={5} text="Loading units..." />
               ) : units.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400">

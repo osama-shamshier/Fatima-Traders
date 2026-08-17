@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Shield, Lock } from 'lucide-react';
 import { RoleFormModal } from '@/components/roles/RoleFormModal';
+import { TableLoader } from "@/components/ui/loader";
 
 export default function RolesPage() {
   const [roles, setRoles] = useState<any[]>([]);
@@ -109,11 +110,7 @@ export default function RolesPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                    Loading roles...
-                  </td>
-                </tr>
+                <TableLoader colSpan={6} text="Loading roles..." />
               ) : roles.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">

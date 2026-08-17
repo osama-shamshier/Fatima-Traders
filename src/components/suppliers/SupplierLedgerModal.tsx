@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Truck } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 
 interface SupplierLedgerModalProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
 
         <div className="flex-1 overflow-y-auto mt-4 border rounded-xl bg-white shadow-xs">
           {loading ? (
-            <p className="text-center text-xs text-slate-400 py-12 font-medium">Loading chronological supplier ledger...</p>
+            <Loader text="Loading supplier ledger..." className="py-12" />
           ) : (
             <table className="w-full text-xs text-left border-collapse table-fixed">
               <thead className="bg-slate-50 sticky top-0 font-semibold border-b text-slate-700 uppercase tracking-wider">

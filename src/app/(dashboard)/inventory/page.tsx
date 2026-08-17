@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { StockAdjustmentModal } from "@/components/inventory/StockAdjustmentModal";
 import { Search, AlertTriangle, RefreshCw, Warehouse, ArrowLeftRight, ClipboardEdit } from "lucide-react";
@@ -208,11 +209,7 @@ export default function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-400">
-                        Loading real-time stock levels...
-                      </td>
-                    </tr>
+                    <TableLoader colSpan={8} text="Loading real-time stock levels..." />
                   ) : inventory.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="text-center py-8 text-slate-400">
@@ -294,11 +291,7 @@ export default function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400">
-                        Loading movement logs...
-                      </td>
-                    </tr>
+                    <TableLoader colSpan={6} text="Loading movement logs..." />
                   ) : movements.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-slate-400">
@@ -357,11 +350,7 @@ export default function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-400">
-                        Loading adjustments...
-                      </td>
-                    </tr>
+                    <TableLoader colSpan={7} text="Loading adjustments..." />
                   ) : adjustments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-slate-400">

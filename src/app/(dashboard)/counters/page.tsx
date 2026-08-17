@@ -7,6 +7,7 @@ import { CloseSessionModal } from "@/components/counters/CloseSessionModal";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit, Trash2, KeyRound, LockKeyhole } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 
 export default function CountersPage() {
   const [counters, setCounters] = useState<any[]>([]);
@@ -70,7 +71,7 @@ export default function CountersPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-4 text-center">Loading...</td></tr>
+              <TableLoader colSpan={6} text="Loading counters..." />
             ) : counters.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-4 text-center">No counters found.</td></tr>
             ) : (

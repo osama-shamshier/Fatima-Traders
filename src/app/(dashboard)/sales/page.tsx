@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableLoader } from "@/components/ui/loader";
 import { Plus, Filter, RefreshCw, ShoppingCart, Calculator, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { InvoiceModalWrapper } from "./components/InvoiceModalWrapper";
@@ -199,11 +200,7 @@ export default function SalesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
-                    Loading sales records...
-                  </td>
-                </tr>
+                <TableLoader colSpan={9} text="Loading sales records..." />
               ) : sales.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="p-8 text-center text-slate-400">

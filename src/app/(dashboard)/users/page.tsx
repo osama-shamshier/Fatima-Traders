@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/utils";
 import UserFormModal from "@/components/users/UserFormModal";
 import DeleteConfirmModal from "@/components/users/DeleteConfirmModal";
 import { Edit, Trash2, Plus, Search } from "lucide-react";
+import { TableLoader } from "@/components/ui/loader";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -137,11 +138,7 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </td>
-                </tr>
+                <TableLoader colSpan={7} text="Loading users..." />
               ) : users.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { TableLoader } from "@/components/ui/loader";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { BuyerPaymentFormModal } from "@/components/buyer-payments/BuyerPaymentFormModal";
@@ -52,9 +53,7 @@ export default function BuyerPaymentsPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr>
-                <td colSpan={7} className="p-4 text-center text-slate-500">Loading payments...</td>
-              </tr>
+              <TableLoader colSpan={7} text="Loading payments..." />
             ) : payments.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-4 text-center text-slate-500">No payments recorded.</td>

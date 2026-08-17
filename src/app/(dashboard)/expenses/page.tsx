@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableLoader } from "@/components/ui/loader";
 import { ExpenseFormModal } from "@/components/expenses/ExpenseFormModal";
 import { ExpenseCategoryModal } from "@/components/expenses/ExpenseCategoryModal";
 import { PlusCircle, Tags, Trash2, Filter, Receipt } from "lucide-react";
@@ -168,11 +169,7 @@ export default function ExpensesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    Loading expenses...
-                  </td>
-                </tr>
+                <TableLoader colSpan={7} text="Loading expenses..." />
               ) : expenses.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-400">

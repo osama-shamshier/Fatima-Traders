@@ -6,6 +6,7 @@ import { SupplierFormModal } from "@/components/suppliers/SupplierFormModal";
 import { SupplierLedgerModal } from "@/components/suppliers/SupplierLedgerModal";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Loader } from "@/components/ui/loader";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -76,7 +77,7 @@ export default function SuppliersPage() {
 
       <div className="bg-white rounded-md border">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">Loading suppliers...</div>
+          <Loader text="Loading suppliers..." className="py-12" />
         ) : (
           <div className="relative w-full overflow-auto">
             <table className="w-full caption-bottom text-sm">

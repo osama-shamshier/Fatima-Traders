@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, Search, Package, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableLoader } from "@/components/ui/loader";
 import { formatCurrency } from "@/lib/utils";
 import { ProductFormModal } from "@/components/products/ProductFormModal";
 
@@ -147,11 +148,7 @@ export default function ProductsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-400">
-                    Loading product catalog...
-                  </td>
-                </tr>
+                <TableLoader colSpan={8} text="Loading product catalog..." />
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-400">

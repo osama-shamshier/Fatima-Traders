@@ -6,7 +6,8 @@ import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Store, Mail, Lock, Loader2 } from "lucide-react";
+import { Store, Mail, Lock } from "lucide-react";
+import { ButtonSpinner } from "@/components/ui/loader";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -128,7 +129,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <ButtonSpinner />
                   Signing in...
                 </>
               ) : (

@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { TableLoader } from "@/components/ui/loader";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 
 export default function DashboardPage() {
@@ -214,7 +215,7 @@ export default function DashboardPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
-                <tr><td colSpan={5} className="p-6 text-center text-slate-400">Loading debtors list...</td></tr>
+                <TableLoader colSpan={5} text="Loading debtors list..." />
               ) : (stats?.outstandingDebtors || []).length === 0 ? (
                 <tr><td colSpan={5} className="p-6 text-center text-emerald-700 font-semibold">🎉 All customer payments are settled! No pending debt.</td></tr>
               ) : (
