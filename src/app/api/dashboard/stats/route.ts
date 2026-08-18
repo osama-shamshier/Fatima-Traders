@@ -50,6 +50,7 @@ export async function GET() {
         },
         select: {
           id: true,
+          saleId: true,
           amount: true,
           paymentMethod: true,
           bankReference: true,
@@ -118,6 +119,7 @@ export async function GET() {
     let todayPendingCredit = 0;
     const bankDetailsList: any[] = [];
 
+    // 1. Direct POS Sales Today
     salesToday.forEach((sale) => {
       const paid = Number(sale.amountPaid || 0);
       const outstanding = Number(sale.outstandingAmount || 0);
@@ -142,22 +144,24 @@ export async function GET() {
       }
     });
 
-    // Also include today's buyer collections that went through bank transfer
+    // 2. Only standalone customer credit settlements today (exclude checkout payments with saleId to prevent duplicate counting)
     buyerPaymentsToday.forEach((bp) => {
-      const paid = Number(bp.amount || 0);
-      if (bp.paymentMethod === "BANK_TRANSFER") {
-        todayBankSales += paid;
-        bankDetailsList.push({
-          id: bp.id,
-          invoiceNumber: bp.sale?.invoiceNumber || "Collection Settlement",
-          customerName: bp.buyer?.name || "Customer",
-          amount: paid,
-          paymentMethod: "Bank Transfer Collection",
-          reference: bp.bankReference || bp.notes || "Bank Payment",
-          createdAt: bp.createdAt,
-        });
-      } else {
-        todayCashSales += paid;
+      if (!bp.saleId) {
+        const paid = Number(bp.amount || 0);
+        if (bp.paymentMethod === "BANK_TRANSFER") {
+          todayBankSales += paid;
+          bankDetailsList.push({
+            id: bp.id,
+            invoiceNumber: bp.sale?.invoiceNumber || "Credit Settlement",
+            customerName: bp.buyer?.name || "Customer",
+            amount: paid,
+            paymentMethod: "Bank Transfer Settlement",
+            reference: bp.bankReference || bp.notes || "Bank Payment",
+            createdAt: bp.createdAt,
+          });
+        } else {
+          todayCashSales += paid;
+        }
       }
     });
 
