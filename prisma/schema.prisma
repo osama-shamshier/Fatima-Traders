@@ -37,6 +37,7 @@ model User {
   createdExpenses   Expense[]    @relation("ExpenseCreatedBy")
   stockAdjustments  StockAdjustment[] @relation("AdjustmentCreatedBy")
   stockTransfers    StockTransfer[]   @relation("TransferCreatedBy")
+  createdSalesReturns SalesReturn[]   @relation("SalesReturnCreatedBy")
 
   @@index([branchId])
   @@index([isDeleted, isActive])
@@ -124,6 +125,7 @@ model Branch {
   sales           Sale[]
   purchases       Purchase[]
   expenses        Expense[]
+  salesReturns    SalesReturn[]
   stockAdjustments  StockAdjustment[]
   outgoingTransfers StockTransfer[] @relation("TransferSource")
   incomingTransfers StockTransfer[] @relation("TransferDestination")
@@ -236,6 +238,7 @@ model Product {
   stockMovements  StockMovement[]
   purchaseItems   PurchaseItem[]
   saleItems       SaleItem[]
+  salesReturnItems SalesReturnItem[]
   stockAdjustments StockAdjustment[]
   stockTransferItems StockTransferItem[]
 
@@ -613,21 +616,28 @@ model BuyerPayment {
 
 model SalesReturn {
   id              String    @id @default(cuid())
-  saleId          String
+  referenceNumber String?   @unique
+  saleId          String?
   buyerId         String?
-  branchId        String?
+  branchId        String
   returnDate      DateTime  @default(now())
   totalRefund     Decimal   @db.Decimal(15, 2)
   refundMethod    RefundMethod
+  bankName        String?
+  bankReference   String?
+  reason          String?
   notes           String?
+  createdById     String?
   isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  sale  Sale   @relation(fields: [saleId], references: [id])
-  buyer Buyer? @relation(fields: [buyerId], references: [id])
-  items SalesReturnItem[]
+  sale      Sale?     @relation(fields: [saleId], references: [id])
+  buyer     Buyer?    @relation(fields: [buyerId], references: [id])
+  branch    Branch    @relation(fields: [branchId], references: [id])
+  createdBy User?     @relation("SalesReturnCreatedBy", fields: [createdById], references: [id])
+  items     SalesReturnItem[]
 
   @@index([saleId])
   @@index([buyerId])
@@ -637,17 +647,22 @@ model SalesReturn {
 }
 
 model SalesReturnItem {
-  id            String    @id @default(cuid())
-  salesReturnId String
-  saleItemId    String
-  quantity      Decimal   @db.Decimal(15, 4)
-  refundAmount  Decimal   @db.Decimal(15, 2)
-  createdAt     DateTime  @default(now())
+  id              String    @id @default(cuid())
+  salesReturnId   String
+  productId       String
+  saleItemId      String?
+  quantity        Decimal   @db.Decimal(15, 4)
+  unitRefundRate  Decimal   @db.Decimal(15, 2)
+  refundAmount    Decimal   @db.Decimal(15, 2)
+  reason          String?
+  createdAt       DateTime  @default(now())
 
   salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
-  saleItem    SaleItem    @relation(fields: [saleItemId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+  saleItem    SaleItem?   @relation(fields: [saleItemId], references: [id])
 
   @@index([salesReturnId])
+  @@index([productId])
   @@index([saleItemId])
   @@map("sales_return_items")
 }

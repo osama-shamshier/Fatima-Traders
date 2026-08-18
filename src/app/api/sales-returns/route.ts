@@ -1,23 +1,41 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { restoreInventoryFIFO } from "@/lib/fifo";
 
-export async function GET() {
+function generateReturnReference(): string {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `RET-${year}${month}-${random}`;
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const searchParams = req.nextUrl.searchParams;
+    const buyerId = searchParams.get("buyerId");
+    const branchId = searchParams.get("branchId");
+
+    const where: any = { isDeleted: false };
+    if (buyerId) where.buyerId = buyerId;
+    if (branchId) where.branchId = branchId;
+
     const returns = await prisma.salesReturn.findMany({
-      where: { isDeleted: false },
+      where,
       include: {
-        sale: {
-          include: {
-            branch: true,
-          },
-        },
-        buyer: true,
+        branch: { select: { id: true, name: true } },
+        buyer: { select: { id: true, name: true, contactNumber: true, companyName: true } },
+        sale: { select: { id: true, invoiceNumber: true, grandTotal: true, saleDate: true } },
+        createdBy: { select: { id: true, name: true } },
         items: {
           include: {
-            saleItem: {
-              include: {
-                product: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: { select: { abbreviation: true } },
+                category: { select: { name: true } },
               },
             },
           },
@@ -28,61 +46,210 @@ export async function GET() {
 
     return NextResponse.json(returns);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error fetching sales returns:", error);
+    return NextResponse.json({ error: error.message || "Failed to fetch sales returns" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { saleId, branchId, buyerId, items, refundMethod, notes } = body;
+    let {
+      branchId,
+      buyerId,
+      saleId,
+      refundMethod = "CASH",
+      bankName,
+      bankReference,
+      reason,
+      notes,
+      items,
+    } = body;
 
-    const result = await prisma.$transaction(async (tx) => {
-      const returnItems = items.map((item: any) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity),
-      }));
-      await restoreInventoryFIFO(tx, branchId, returnItems);
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: "At least one item is required for return" }, { status: 400 });
+    }
 
-      const totalRefund = items.reduce(
-        (sum: number, item: any) => sum + Number(item.quantity) * Number(item.unitRefundRate || item.refundRate || 0),
-        0
-      );
+    if (!branchId) {
+      const defaultBranch = await prisma.branch.findFirst({ where: { isDeleted: false, isActive: true } });
+      if (defaultBranch) branchId = defaultBranch.id;
+      else return NextResponse.json({ error: "Branch is required" }, { status: 400 });
+    }
 
-      const sale = await tx.sale.findUnique({
-        where: { id: saleId },
-        include: { items: true },
-      });
+    const user = await prisma.user.findFirst();
+    const createdById = user?.id || null;
 
-      if (!sale) throw new Error("Sale not found");
+    const referenceNumber = generateReturnReference();
 
-      const returnItemsData = items.map((item: any) => {
-        const saleItem = sale.items.find((si) => si.productId === item.productId);
-        return {
-          saleItemId: saleItem?.id || sale.items[0].id,
-          quantity: item.quantity,
-          refundAmount: Number(item.quantity) * Number(item.unitRefundRate || item.refundRate || 0),
-        };
-      });
+    // Map refundMethod to schema enum
+    let normalizedRefundMethod: "CASH" | "BANK_TRANSFER" | "ADJUSTMENT" = "CASH";
+    if (refundMethod === "ADJUSTMENT" || refundMethod === "BUYER_CREDIT") {
+      normalizedRefundMethod = "ADJUSTMENT";
+    } else if (refundMethod === "BANK_TRANSFER") {
+      normalizedRefundMethod = "BANK_TRANSFER";
+    } else {
+      normalizedRefundMethod = "CASH";
+    }
 
-      const salesReturn = await tx.salesReturn.create({
-        data: {
-          saleId,
-          buyerId,
-          refundMethod: refundMethod === "BUYER_CREDIT" ? "ADJUSTMENT" : "CASH",
-          totalRefund: totalRefund,
-          notes,
-          items: {
-            create: returnItemsData,
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // 1. Fetch product information for costing & inventory restoration
+        const productIds = items.map((i: any) => i.productId);
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true, sellingPrice: true },
+        });
+        const productMap = new Map(products.map((p) => [p.id, p]));
+
+        let totalRefundAmount = 0;
+        const returnItemsForFIFO: any[] = [];
+        const returnItemsData: any[] = [];
+
+        for (const item of items) {
+          const qty = Number(item.quantity);
+          const rate = Number(item.unitRefundRate || item.refundRate || 0);
+          const lineRefund = qty * rate;
+          totalRefundAmount += lineRefund;
+
+          const prod = productMap.get(item.productId);
+          // FIFO restore cost: use 70% of rate/selling price as standard baseline inventory asset cost
+          const costPerUnit = rate > 0 ? rate * 0.7 : Number(prod?.sellingPrice || 0) * 0.7;
+
+          returnItemsForFIFO.push({
+            productId: item.productId,
+            quantity: qty,
+            costPerUnit: Math.max(0.01, costPerUnit),
+          });
+
+          returnItemsData.push({
+            productId: item.productId,
+            saleItemId: item.saleItemId || null,
+            quantity: qty,
+            unitRefundRate: rate,
+            refundAmount: lineRefund,
+            reason: item.reason || reason || null,
+          });
+        }
+
+        // 2. RESTORE INVENTORY (Increases Stock + Adds FIFO Layer + Logs Stock Movement)
+        await restoreInventoryFIFO(tx as any, branchId, returnItemsForFIFO);
+
+        // 3. HANDLE REFUND / CREDIT ADJUSTMENT
+        if (normalizedRefundMethod === "ADJUSTMENT" && buyerId) {
+          if (saleId) {
+            // Specific Sale Invoice adjustment
+            const targetSale = await tx.sale.findUnique({ where: { id: saleId } });
+            if (targetSale) {
+              const currentOutstanding = Number(targetSale.outstandingAmount || 0);
+              const currentPaid = Number(targetSale.amountPaid || 0);
+              const totalAmount = Number(targetSale.grandTotal || 0);
+
+              const newOutstanding = Math.max(0, currentOutstanding - totalRefundAmount);
+              const newAmountPaid = Math.min(totalAmount, currentPaid + totalRefundAmount);
+              const newStatus = newOutstanding <= 0 ? "PAID" : "PARTIAL";
+
+              await tx.sale.update({
+                where: { id: saleId },
+                data: {
+                  outstandingAmount: newOutstanding,
+                  amountPaid: newAmountPaid,
+                  paymentStatus: newStatus as any,
+                },
+              });
+            }
+          } else {
+            // General Customer Credit Adjustment: Apply FIFO across pending sales
+            const pendingSales = await tx.sale.findMany({
+              where: {
+                buyerId,
+                isDeleted: false,
+                paymentStatus: { in: ["PENDING", "PARTIAL"] },
+              },
+              orderBy: { createdAt: "asc" },
+            });
+
+            let unallocatedRefund = totalRefundAmount;
+
+            for (const sale of pendingSales) {
+              if (unallocatedRefund <= 0) break;
+
+              const outstanding = Number(sale.outstandingAmount || 0);
+              if (outstanding <= 0) continue;
+
+              const apply = Math.min(unallocatedRefund, outstanding);
+              const updatedOutstanding = Math.max(0, outstanding - apply);
+              const updatedPaid = Number(sale.amountPaid || 0) + apply;
+              const updatedStatus = updatedOutstanding <= 0 ? "PAID" : "PARTIAL";
+
+              await tx.sale.update({
+                where: { id: sale.id },
+                data: {
+                  outstandingAmount: updatedOutstanding,
+                  amountPaid: updatedPaid,
+                  paymentStatus: updatedStatus as any,
+                },
+              });
+
+              unallocatedRefund -= apply;
+            }
+          }
+        }
+
+        // 4. Create Sales Return Header & Items
+        const salesReturn = await tx.salesReturn.create({
+          data: {
+            referenceNumber,
+            saleId: saleId || null,
+            buyerId: buyerId || null,
+            branchId,
+            totalRefund: totalRefundAmount,
+            refundMethod: normalizedRefundMethod,
+            bankName: bankName || null,
+            bankReference: bankReference || null,
+            reason: reason || null,
+            notes: notes || null,
+            createdById,
+            items: {
+              create: returnItemsData,
+            },
           },
-        },
-      });
+          include: {
+            branch: true,
+            buyer: true,
+            sale: true,
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
 
-      return salesReturn;
-    });
+        // 5. Create Audit Log
+        if (createdById) {
+          await tx.auditLog.create({
+            data: {
+              userId: createdById,
+              action: "CREATE",
+              entity: "sales_return",
+              entityId: salesReturn.id,
+              branchId,
+              newValues: JSON.parse(JSON.stringify(salesReturn)),
+            },
+          });
+        }
 
-    return NextResponse.json(result);
+        return salesReturn;
+      },
+      {
+        maxWait: 15000,
+        timeout: 60000,
+      }
+    );
+
+    return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error processing sales return:", error);
+    return NextResponse.json({ error: error.message || "Failed to process sales return" }, { status: 500 });
   }
 }
