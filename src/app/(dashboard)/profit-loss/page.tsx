@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
-import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle, Calendar } from "lucide-react";
+import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle, Calendar, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function ProfitLossPage() {
@@ -86,7 +86,9 @@ export default function ProfitLossPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Profit & Loss Statement & Item Profitability</h1>
-          <p className="text-slate-500 text-sm">Itemized gross margin analysis based on FIFO inventory cost of goods sold (COGS).</p>
+          <p className="text-slate-500 text-sm">
+            Net revenue and gross margin analysis accounting for sales returns and FIFO cost of goods sold.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchProfitLoss}>
@@ -216,37 +218,58 @@ export default function ProfitLossPage() {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Net Revenue */}
         <Card className="bg-white border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Gross Revenue (Sales)</CardTitle>
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Net Revenue (Sales)</CardTitle>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <ArrowUpRight className="w-4 h-4" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{formatCurrency(plData?.revenue || 0)}</div>
-            <p className="text-[11px] text-slate-400 mt-1">Total revenue from {plData?.totalSalesCount || 0} sales</p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Gross: {formatCurrency(plData?.grossRevenue || 0)}
+            </p>
           </CardContent>
         </Card>
 
+        {/* Returns & Refunds */}
         <Card className="bg-white border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Cost of Goods Sold (COGS)</CardTitle>
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Returns & Refunds (-)</CardTitle>
             <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <RotateCcw className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-rose-600">{formatCurrency(plData?.totalReturns || 0)}</div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {plData?.totalReturnsCount || 0} sales returns deducted
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Net COGS */}
+        <Card className="bg-white border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Cost of Goods (COGS)</CardTitle>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <ArrowDownRight className="w-4 h-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{formatCurrency(plData?.cogs || 0)}</div>
-            <p className="text-[11px] text-slate-400 mt-1">FIFO cost basis of sold inventory</p>
+            <div className="text-2xl font-bold text-slate-800">{formatCurrency(plData?.cogs || 0)}</div>
+            <p className="text-[11px] text-slate-400 mt-1">Restocked COGS deducted</p>
           </CardContent>
         </Card>
 
+        {/* Gross Profit Margin */}
         <Card className="bg-white border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Gross Profit Margin</CardTitle>
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Gross Profit</CardTitle>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -257,9 +280,10 @@ export default function ProfitLossPage() {
           </CardContent>
         </Card>
 
+        {/* Net Profit */}
         <Card className="bg-white border border-slate-200 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Net Profit / Loss</CardTitle>
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Net Profit / (Loss)</CardTitle>
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -308,9 +332,10 @@ export default function ProfitLossPage() {
                 <th className="p-3">SKU</th>
                 <th className="p-3">Product Name</th>
                 <th className="p-3">Category</th>
-                <th className="p-3 text-right">Quantity Sold</th>
-                <th className="p-3 text-right">Total Revenue</th>
-                <th className="p-3 text-right">FIFO COGS Cost</th>
+                <th className="p-3 text-right">Sold Qty</th>
+                <th className="p-3 text-right">Returned Qty</th>
+                <th className="p-3 text-right">Net Revenue</th>
+                <th className="p-3 text-right">Net FIFO Cost</th>
                 <th className="p-3 text-right">Gross Profit / Loss</th>
                 <th className="p-3 text-right">Margin %</th>
                 <th className="p-3 text-center">Status</th>
@@ -318,10 +343,10 @@ export default function ProfitLossPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
-                <TableLoader colSpan={9} text="Calculating itemized profitability..." />
+                <TableLoader colSpan={10} text="Calculating itemized profitability..." />
               ) : filteredBreakdown.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
+                  <td colSpan={10} className="p-8 text-center text-slate-400">
                     {showLossOnly
                       ? "🎉 Great news! No items are currently selling at a loss."
                       : "No sold item records found matching filters."}
@@ -338,13 +363,16 @@ export default function ProfitLossPage() {
                       </Badge>
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-slate-800">
-                      {item.totalQuantitySold} {item.unitAbbr}
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-emerald-600">
-                      {formatCurrency(item.totalRevenue)}
+                      {item.quantitySold} {item.unitAbbr}
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-rose-600">
-                      {formatCurrency(item.totalCogs)}
+                      {item.quantityReturned > 0 ? `-${item.quantityReturned} ${item.unitAbbr}` : "0"}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-600">
+                      {formatCurrency(item.netRevenue)}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-slate-700">
+                      {formatCurrency(item.netCogs)}
                     </td>
                     <td
                       className={`p-3 text-right font-mono font-extrabold text-sm ${
