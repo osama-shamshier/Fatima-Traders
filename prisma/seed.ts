@@ -117,7 +117,70 @@ async function main() {
     },
   });
 
-  // 3. Create Default Owner User
+  // 3. Create Default Branch
+  console.log('Creating default branch...');
+  const defaultBranch = await prisma.branch.upsert({
+    where: { id: 'main-branch-01' },
+    update: {},
+    create: {
+      id: 'main-branch-01',
+      name: 'Main Branch - Lahore',
+      address: 'Fatima Traders Commercial Market',
+      phone: '0300-1234567',
+      email: 'store@fatimatraders.com',
+      isActive: true,
+    }
+  });
+
+  // 4. Create Default Cash Counter
+  console.log('Creating default cash counter...');
+  await prisma.cashCounter.upsert({
+    where: { id: 'counter-01' },
+    update: {},
+    create: {
+      id: 'counter-01',
+      name: 'Counter 1',
+      branchId: defaultBranch.id,
+      isActive: true,
+    }
+  });
+
+  // 5. Create Default Units
+  console.log('Creating default units...');
+  const units = [
+    { name: 'Kilogram', abbreviation: 'kg' },
+    { name: 'Gram', abbreviation: 'g' },
+    { name: 'Liter', abbreviation: 'L' },
+    { name: 'Piece', abbreviation: 'pcs' },
+    { name: 'Packet', abbreviation: 'pkt' },
+    { name: 'Bag', abbreviation: 'bag' },
+    { name: 'Drum', abbreviation: 'drum' },
+  ];
+  for (const u of units) {
+    await prisma.unit.upsert({
+      where: { name: u.name },
+      update: {},
+      create: { name: u.name, abbreviation: u.abbreviation }
+    });
+  }
+
+  // 6. Create Default Categories
+  console.log('Creating default categories...');
+  const categories = [
+    { name: 'Chemicals', description: 'Industrial & Raw Chemicals' },
+    { name: 'Packaging Material', description: 'Bags, Bottles, Drums' },
+    { name: 'Raw Material', description: 'Manufacturing Raw Materials' },
+    { name: 'Finished Goods', description: 'Ready to sell products' },
+  ];
+  for (const c of categories) {
+    await prisma.category.upsert({
+      where: { name: c.name },
+      update: {},
+      create: { name: c.name, description: c.description }
+    });
+  }
+
+  // 7. Create Default Owner User
   console.log('Creating default admin user...');
   const hashedPassword = await bcryptjs.hash('admin123', 12);
   
@@ -128,6 +191,8 @@ async function main() {
       name: 'Usama Shamshiri',
       email: 'usamashamshiri@gmail.com',
       password: hashedPassword,
+      branchId: defaultBranch.id,
+      isActive: true,
       userRoles: {
         create: {
           roleId: ownerRole.id
@@ -136,7 +201,7 @@ async function main() {
     }
   });
 
-  console.log('Seeding completed successfully.');
+  console.log('🎉 Seeding completed successfully.');
 }
 
 main()
