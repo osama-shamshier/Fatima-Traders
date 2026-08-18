@@ -61,6 +61,10 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html[lang="ur"] {
+    font-size: 114%;
+  }
+
   html[lang="ur"] body,
   html[lang="ur"] input,
   html[lang="ur"] select,
@@ -68,7 +72,56 @@
   html[lang="ur"] button,
   .font-urdu {
     font-family: "Jameel Noori Nastaleeq", "Jameel Noori Nastaleeq Regular", "Noto Nastaliq Urdu", "Segoe UI", Tahoma, sans-serif !important;
-    line-height: 1.8;
+    font-size: 1.15rem;
+    line-height: 2;
+  }
+
+  html[lang="ur"] .text-xs,
+  html[lang="ur"] .text-\[10px\],
+  html[lang="ur"] .text-\[11px\] {
+    font-size: 0.95rem !important;
+    line-height: 1.8 !important;
+  }
+
+  html[lang="ur"] .text-sm {
+    font-size: 1.08rem !important;
+    line-height: 1.9 !important;
+  }
+
+  html[lang="ur"] .text-base {
+    font-size: 1.22rem !important;
+    line-height: 2 !important;
+  }
+
+  html[lang="ur"] .text-lg {
+    font-size: 1.4rem !important;
+    line-height: 1.9 !important;
+  }
+
+  html[lang="ur"] .text-xl {
+    font-size: 1.6rem !important;
+    line-height: 1.8 !important;
+  }
+
+  html[lang="ur"] .text-2xl {
+    font-size: 1.95rem !important;
+    line-height: 1.8 !important;
+  }
+
+  html[lang="ur"] .text-3xl {
+    font-size: 2.35rem !important;
+    line-height: 1.7 !important;
+  }
+
+  html[lang="ur"] table th,
+  html[lang="ur"] table td {
+    font-size: 1.1rem !important;
+    line-height: 1.9 !important;
+  }
+
+  html[lang="ur"] nav a,
+  html[lang="ur"] button {
+    font-size: 1.12rem !important;
   }
 
   /* Custom scrollbar */
