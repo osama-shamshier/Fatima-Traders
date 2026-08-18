@@ -164,7 +164,7 @@ async function main() {
     });
   }
 
-  // 6. Create Default Categories
+  // 6. Create Default Product Categories
   console.log('Creating default categories...');
   const categories = [
     { name: 'Chemicals', description: 'Industrial & Raw Chemicals' },
@@ -173,7 +173,7 @@ async function main() {
     { name: 'Finished Goods', description: 'Ready to sell products' },
   ];
   for (const c of categories) {
-    await prisma.category.upsert({
+    await prisma.productCategory.upsert({
       where: { name: c.name },
       update: {},
       create: { name: c.name, description: c.description }
