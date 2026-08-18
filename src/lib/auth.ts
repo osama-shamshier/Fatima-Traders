@@ -18,55 +18,68 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email as string,
-            isDeleted: false,
-            isActive: true,
-          },
-          include: {
-            userRoles: {
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: true,
+        try {
+          const email = (credentials.email as string).trim().toLowerCase();
+          const password = credentials.password as string;
+
+          const user = await prisma.user.findFirst({
+            where: {
+              email: { equals: email, mode: "insensitive" },
+              isDeleted: false,
+              isActive: true,
+            },
+            include: {
+              userRoles: {
+                include: {
+                  role: {
+                    include: {
+                      rolePermissions: {
+                        include: {
+                          permission: true,
+                        },
                       },
                     },
                   },
                 },
               },
+              branch: true,
             },
-            branch: true,
-          },
-        });
+          });
 
-        if (!user) return null;
+          if (!user) {
+            console.log(`[Auth] User not found for email: ${email}`);
+            return null;
+          }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
+          const isPasswordValid = await bcrypt.compare(password, user.password);
 
-        if (!isPasswordValid) return null;
+          if (!isPasswordValid) {
+            console.log(`[Auth] Invalid password for user: ${email}`);
+            return null;
+          }
 
-        const roles = user.userRoles.map((ur) => ur.role.name);
-        const permissions = user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map(
-            (rp) => `${rp.permission.module}:${rp.permission.action}`
-          )
-        );
+          const roles = user.userRoles.map((ur) => ur.role.name);
+          const permissions = user.userRoles.flatMap((ur) =>
+            ur.role.rolePermissions.map(
+              (rp) => `${rp.permission.module}:${rp.permission.action}`
+            )
+          );
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          roles,
-          permissions,
-          branchId: user.branchId,
-          branchName: user.branch?.name || null,
-        };
+          console.log(`[Auth] User logged in successfully: ${email} (${roles.join(", ")})`);
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            roles,
+            permissions,
+            branchId: user.branchId,
+            branchName: user.branch?.name || null,
+          };
+        } catch (error) {
+          console.error("[Auth] Database error during authorize:", error);
+          return null;
+        }
       },
     }),
   ],
