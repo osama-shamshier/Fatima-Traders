@@ -3,56 +3,54 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    // We filter for Cash-related if needed, but since it's "Cash Flow", we might include BANK_TRANSFER as well (it's liquid).
-    // The prompt says: "Sales Cash + Buyer Payments" vs "Purchases Cash + Supplier Payments + Operating Expenses + Cash Refunds"
-    // For simplicity, we just sum them up.
-
     const [
       salesCashAgg,
-      buyerPaymentsAgg,
+      buyerSettlementsAgg,
       purchasesCashAgg,
-      supplierPaymentsAgg,
+      supplierSettlementsAgg,
       expensesAgg,
       salesReturnsAgg,
     ] = await Promise.all([
+      // 1. Initial cash/bank paid at POS checkout
       prisma.sale.aggregate({
-        where: { isDeleted: false, paymentStatus: "PAID" },
+        where: { isDeleted: false },
         _sum: { amountPaid: true },
       }),
+      // 2. Unlinked Buyer Credit Settlements (to prevent double-counting checkout payments)
       prisma.buyerPayment.aggregate({
-        where: { isDeleted: false },
+        where: { isDeleted: false, saleId: null },
         _sum: { amount: true },
       }),
+      // 3. Initial cash/bank paid at Purchase time
       prisma.purchase.aggregate({
-        where: { isDeleted: false, paymentStatus: "PAID" },
+        where: { isDeleted: false },
         _sum: { amountPaid: true },
       }),
+      // 4. Unlinked Supplier Payments (to prevent double-counting purchase checkout payments)
       prisma.supplierPayment.aggregate({
-        where: { isDeleted: false },
+        where: { isDeleted: false, purchaseId: null },
         _sum: { amount: true },
       }),
+      // 5. Operating expenses
       prisma.expense.aggregate({
         where: { isDeleted: false },
         _sum: { amount: true },
       }),
+      // 6. Sales returns refunds
       prisma.salesReturn.aggregate({
         where: { isDeleted: false },
         _sum: { totalRefund: true },
       }),
     ]);
 
-    // Assuming Sales "PAID" implies cash received at the time of sale.
-    // To avoid double counting with buyerPayments, we ideally just look at amountPaid in Sales if they weren't through a separate buyer payment.
-    // However, following the prompt's simple metric definitions:
-    
-    // Summing Cash In
+    // Summing Cash Inflows (POS checkout payments + Subsequent credit collections)
     const salesCash = Number(salesCashAgg._sum.amountPaid || 0);
-    const buyerPaymentsTotal = Number(buyerPaymentsAgg._sum.amount || 0);
+    const buyerPaymentsTotal = Number(buyerSettlementsAgg._sum.amount || 0);
     const totalCashIn = salesCash + buyerPaymentsTotal;
 
-    // Summing Cash Out
+    // Summing Cash Outflows (Purchase payments + Subsequent supplier payables + Expenses + Refunds)
     const purchasesCash = Number(purchasesCashAgg._sum.amountPaid || 0);
-    const supplierPaymentsTotal = Number(supplierPaymentsAgg._sum.amount || 0);
+    const supplierPaymentsTotal = Number(supplierSettlementsAgg._sum.amount || 0);
     const operatingExpensesTotal = Number(expensesAgg._sum.amount || 0);
     const refundsTotal = Number(salesReturnsAgg._sum.totalRefund || 0);
     const totalCashOut = purchasesCash + supplierPaymentsTotal + operatingExpensesTotal + refundsTotal;
@@ -69,8 +67,8 @@ export async function GET(request: NextRequest) {
         purchasesCash,
         supplierPaymentsTotal,
         operatingExpensesTotal,
-        refundsTotal
-      }
+        refundsTotal,
+      },
     });
   } catch (error) {
     console.error("Cash flow error:", error);

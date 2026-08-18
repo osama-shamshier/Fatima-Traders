@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
-import { Calendar, AlertTriangle, Calculator } from "lucide-react";
+import { Calendar, AlertTriangle, Calculator, Loader2 } from "lucide-react";
 
 interface POSCheckoutModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ interface POSCheckoutModalProps {
     bankReference?: string,
     dueDate?: string,
     roundOff?: number
-  ) => void;
+  ) => Promise<void> | void;
 }
 
 export function POSCheckoutModal({
@@ -41,6 +41,7 @@ export function POSCheckoutModal({
   const [bankName, setBankName] = useState<string>("");
   const [bankReference, setBankReference] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const rawTotal = Math.max(0, subtotal - discount);
   const netPayable = Math.max(0, rawTotal + (Number(roundOff) || 0));
@@ -53,6 +54,7 @@ export function POSCheckoutModal({
       setPaymentMethod("CASH");
       setBankName("");
       setBankReference("");
+      setIsSubmitting(false);
 
       // Default due date to 7 days from today
       const defaultDue = new Date();
@@ -78,8 +80,25 @@ export function POSCheckoutModal({
   const upperDiff = upperRound - rawTotal;
   const showSuggestions = rawTotal > 0 && rawTotal % 10 !== 0;
 
+  const handleConfirm = async () => {
+    if (isSubmitting || isWalkInCreditBlocked) return;
+    setIsSubmitting(true);
+    try {
+      await onCompleteSale(
+        amountPaid,
+        paymentMethod,
+        bankName,
+        bankReference,
+        isPartial ? dueDate : undefined,
+        roundOff
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
       <DialogContent className="sm:max-w-[500px] bg-white rounded-2xl p-6 shadow-2xl">
         <DialogHeader className="border-b pb-3">
           <DialogTitle className="text-xl font-bold text-slate-900">Complete Payment Checkout</DialogTitle>
@@ -270,28 +289,25 @@ export function POSCheckoutModal({
         </div>
 
         <DialogFooter className="border-t pt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
-            onClick={() =>
-              onCompleteSale(
-                amountPaid,
-                paymentMethod,
-                bankName,
-                bankReference,
-                isPartial ? dueDate : undefined,
-                roundOff
-              )
-            }
-            disabled={isWalkInCreditBlocked}
-            className={`font-semibold shadow-sm ${
-              isWalkInCreditBlocked
+            onClick={handleConfirm}
+            disabled={isWalkInCreditBlocked || isSubmitting}
+            className={`font-semibold shadow-sm flex items-center gap-2 ${
+              isWalkInCreditBlocked || isSubmitting
                 ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                 : "bg-emerald-600 hover:bg-emerald-700 text-white"
             }`}
           >
-            Confirm & Print Receipt
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Processing Checkout...
+              </>
+            ) : (
+              "Confirm & Print Receipt"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
