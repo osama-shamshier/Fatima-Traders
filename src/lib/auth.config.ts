@@ -28,7 +28,7 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const pathname = nextUrl.pathname;
 
-      const publicRoutes = ["/login", "/api/auth"];
+      const publicRoutes = ["/login", "/api/auth", "/api/debug-db"];
       const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
       if (isPublicRoute) return true;
