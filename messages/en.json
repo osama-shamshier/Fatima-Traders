@@ -1,0 +1,82 @@
+{
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "urdu": "Urdu",
+    "switchTo": "Switch language"
+  },
+  "header": {
+    "logout": "Logout",
+    "signOut": "Sign Out",
+    "mainBranch": "Main Branch",
+    "notifications": "Notifications",
+    "openMenu": "Open menu"
+  },
+  "sidebar": {
+    "sections": {
+      "main": "Main",
+      "organization": "Organization",
+      "catalog": "Products & Catalog",
+      "parties": "Parties & Ledgers",
+      "transactions": "Transactions & Inventory",
+      "finance": "Finance & Reports",
+      "system": "System"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "posTerminal": "POS Terminal",
+      "branches": "Branches",
+      "cashCounters": "Cash Counters",
+      "products": "Products",
+      "categories": "Categories",
+      "units": "Units",
+      "customers": "Customers (Buyers)",
+      "outstandingDebtors": "Outstanding Debtors",
+      "customerDueDates": "Customer Due Dates",
+      "buyerCollections": "Buyer Collections",
+      "suppliers": "Suppliers",
+      "supplierDisbursements": "Supplier Disbursements",
+      "salesHistory": "Sales History",
+      "salesReturns": "Sales Returns",
+      "purchases": "Purchases",
+      "stockOverview": "Stock Overview",
+      "stockTransfers": "Stock Transfers",
+      "stockAdjustments": "Stock Adjustments",
+      "expenses": "Expenses",
+      "profitLoss": "Profit & Loss",
+      "accountingLedgers": "Accounting Ledgers",
+      "reports": "Reports",
+      "userAccounts": "User Accounts",
+      "rolesPermissions": "Roles & Permissions",
+      "auditLogs": "Audit Logs",
+      "settings": "Settings",
+      "backups": "Backups"
+    }
+  },
+  "common": {
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "print": "Print",
+    "checkout": "Checkout",
+    "paid": "Paid",
+    "pending": "Pending",
+    "partial": "Partial",
+    "active": "Active",
+    "inactive": "Inactive",
+    "name": "Name",
+    "phone": "Phone",
+    "address": "Address",
+    "branch": "Branch",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "quantity": "Quantity",
+    "price": "Price",
+    "total": "Total",
+    "loading": "Loading...",
+    "noData": "No data found"
+  }
+}

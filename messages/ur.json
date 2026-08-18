@@ -1,0 +1,82 @@
+{
+  "language": {
+    "label": "زبان",
+    "english": "English",
+    "urdu": "اردو",
+    "switchTo": "زبان تبدیل کریں"
+  },
+  "header": {
+    "logout": "لاگ آؤٹ",
+    "signOut": "لاگ آؤٹ",
+    "mainBranch": "مرکزی برانچ",
+    "notifications": "اطلاعات",
+    "openMenu": "مینو کھولیں"
+  },
+  "sidebar": {
+    "sections": {
+      "main": "مین",
+      "organization": "ادارہ",
+      "catalog": "مصنوعات اور کیٹلاگ",
+      "parties": "پارٹیز اور لیجرز",
+      "transactions": "لین دین اور انوینٹری",
+      "finance": "فنانس اور رپورٹس",
+      "system": "سسٹم"
+    },
+    "items": {
+      "dashboard": "ڈیش بورڈ",
+      "posTerminal": "پی او ایس ٹرمینل",
+      "branches": "برانچز",
+      "cashCounters": "کیش کاؤنٹرز",
+      "products": "مصنوعات",
+      "categories": "کیٹیگریز",
+      "units": "یونٹس",
+      "customers": "کسٹمرز (خریدار)",
+      "outstandingDebtors": "باقی رقم والے کسٹمرز",
+      "customerDueDates": "کسٹمر ادائیگی تاریخیں",
+      "buyerCollections": "کسٹمر وصولیاں",
+      "suppliers": "سپلائرز",
+      "supplierDisbursements": "سپلائر ادائیگیاں",
+      "salesHistory": "سیلز ہسٹری",
+      "salesReturns": "سیلز واپسی",
+      "purchases": "خریداری",
+      "stockOverview": "اسٹاک جائزہ",
+      "stockTransfers": "اسٹاک ٹرانسفرز",
+      "stockAdjustments": "اسٹاک ایڈجسٹمنٹس",
+      "expenses": "اخراجات",
+      "profitLoss": "منافع اور نقصان",
+      "accountingLedgers": "اکاؤنٹنگ لیجرز",
+      "reports": "رپورٹس",
+      "userAccounts": "یوزر اکاؤنٹس",
+      "rolesPermissions": "رولز اور اجازتیں",
+      "auditLogs": "آڈٹ لاگز",
+      "settings": "سیٹنگز",
+      "backups": "بیک اپس"
+    }
+  },
+  "common": {
+    "add": "شامل کریں",
+    "edit": "ترمیم",
+    "delete": "حذف کریں",
+    "save": "محفوظ کریں",
+    "cancel": "منسوخ",
+    "search": "تلاش",
+    "print": "پرنٹ",
+    "checkout": "چیک آؤٹ",
+    "paid": "ادا شدہ",
+    "pending": "زیر التوا",
+    "partial": "جزوی",
+    "active": "فعال",
+    "inactive": "غیر فعال",
+    "name": "نام",
+    "phone": "فون",
+    "address": "پتہ",
+    "branch": "برانچ",
+    "customer": "کسٹمر",
+    "supplier": "سپلائر",
+    "quantity": "مقدار",
+    "price": "قیمت",
+    "total": "کل",
+    "loading": "لوڈ ہو رہا ہے...",
+    "noData": "کوئی ڈیٹا نہیں ملا"
+  }
+}

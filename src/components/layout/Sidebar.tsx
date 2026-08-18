@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import {
   LayoutDashboard,
   Building2,
@@ -46,73 +47,73 @@ interface SidebarProps {
 
 const navSections = [
   {
-    label: "Main",
+    labelKey: "sections.main",
     icon: LayoutDashboard,
     items: [
-      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { name: "POS Terminal", href: "/pos", icon: ShoppingCart },
+      { labelKey: "items.dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { labelKey: "items.posTerminal", href: "/pos", icon: ShoppingCart },
     ],
   },
   {
-    label: "Organization",
+    labelKey: "sections.organization",
     icon: Building2,
     items: [
-      { name: "Branches", href: "/branches", icon: Building2 },
-      { name: "Cash Counters", href: "/counters", icon: Monitor },
+      { labelKey: "items.branches", href: "/branches", icon: Building2 },
+      { labelKey: "items.cashCounters", href: "/counters", icon: Monitor },
     ],
   },
   {
-    label: "Products & Catalog",
+    labelKey: "sections.catalog",
     icon: Package,
     items: [
-      { name: "Products", href: "/products", icon: Package },
-      { name: "Categories", href: "/categories", icon: Tag },
-      { name: "Units", href: "/units", icon: Ruler },
+      { labelKey: "items.products", href: "/products", icon: Package },
+      { labelKey: "items.categories", href: "/categories", icon: Tag },
+      { labelKey: "items.units", href: "/units", icon: Ruler },
     ],
   },
   {
-    label: "Parties & Ledgers",
+    labelKey: "sections.parties",
     icon: Users,
     items: [
-      { name: "Customers (Buyers)", href: "/buyers", icon: Users },
-      { name: "Outstanding Debtors", href: "/buyers?filter=outstanding", icon: AlertTriangle },
-      { name: "Customer Due Dates", href: "/buyer-due-dates", icon: Calendar },
-      { name: "Buyer Collections", href: "/buyer-payments", icon: CreditCard },
-      { name: "Suppliers", href: "/suppliers", icon: Truck },
-      { name: "Supplier Disbursements", href: "/supplier-payments", icon: Receipt },
+      { labelKey: "items.customers", href: "/buyers", icon: Users },
+      { labelKey: "items.outstandingDebtors", href: "/buyers?filter=outstanding", icon: AlertTriangle },
+      { labelKey: "items.customerDueDates", href: "/buyer-due-dates", icon: Calendar },
+      { labelKey: "items.buyerCollections", href: "/buyer-payments", icon: CreditCard },
+      { labelKey: "items.suppliers", href: "/suppliers", icon: Truck },
+      { labelKey: "items.supplierDisbursements", href: "/supplier-payments", icon: Receipt },
     ],
   },
   {
-    label: "Transactions & Inventory",
+    labelKey: "sections.transactions",
     icon: ShoppingCart,
     items: [
-      { name: "Sales History", href: "/sales", icon: ShoppingCart },
-      { name: "Sales Returns", href: "/sales-returns", icon: RotateCcw },
-      { name: "Purchases", href: "/purchases", icon: ShoppingBag },
-      { name: "Stock Overview", href: "/inventory", icon: Warehouse },
-      { name: "Stock Transfers", href: "/stock-transfers", icon: ArrowLeftRight },
-      { name: "Stock Adjustments", href: "/inventory?tab=adjustments", icon: ClipboardEdit },
+      { labelKey: "items.salesHistory", href: "/sales", icon: ShoppingCart },
+      { labelKey: "items.salesReturns", href: "/sales-returns", icon: RotateCcw },
+      { labelKey: "items.purchases", href: "/purchases", icon: ShoppingBag },
+      { labelKey: "items.stockOverview", href: "/inventory", icon: Warehouse },
+      { labelKey: "items.stockTransfers", href: "/stock-transfers", icon: ArrowLeftRight },
+      { labelKey: "items.stockAdjustments", href: "/inventory?tab=adjustments", icon: ClipboardEdit },
     ],
   },
   {
-    label: "Finance & Reports",
+    labelKey: "sections.finance",
     icon: TrendingUp,
     items: [
-      { name: "Expenses", href: "/expenses", icon: Receipt },
-      { name: "Profit & Loss", href: "/profit-loss", icon: TrendingUp },
-      { name: "Accounting Ledgers", href: "/financials", icon: BarChart3 },
-      { name: "Reports", href: "/reports", icon: BarChart3 },
+      { labelKey: "items.expenses", href: "/expenses", icon: Receipt },
+      { labelKey: "items.profitLoss", href: "/profit-loss", icon: TrendingUp },
+      { labelKey: "items.accountingLedgers", href: "/financials", icon: BarChart3 },
+      { labelKey: "items.reports", href: "/reports", icon: BarChart3 },
     ],
   },
   {
-    label: "System",
+    labelKey: "sections.system",
     icon: Settings,
     items: [
-      { name: "User Accounts", href: "/users", icon: UserCog },
-      { name: "Roles & Permissions", href: "/roles", icon: Shield },
-      { name: "Audit Logs", href: "/audit-logs", icon: FileSearch },
-      { name: "Settings", href: "/settings", icon: Settings },
-      { name: "Backups", href: "/backups", icon: Database },
+      { labelKey: "items.userAccounts", href: "/users", icon: UserCog },
+      { labelKey: "items.rolesPermissions", href: "/roles", icon: Shield },
+      { labelKey: "items.auditLogs", href: "/audit-logs", icon: FileSearch },
+      { labelKey: "items.settings", href: "/settings", icon: Settings },
+      { labelKey: "items.backups", href: "/backups", icon: Database },
     ],
   },
 ];
@@ -132,6 +133,7 @@ function CollapsibleSection({
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | undefined>(isExpanded ? undefined : 0);
   const SectionIcon = section.icon;
+  const t = useTranslations("sidebar");
 
   const hasActiveChild = section.items.some(
     (item) => pathname === item.href || (pathname?.startsWith(`${item.href}/`) ?? false)
@@ -178,7 +180,7 @@ function CollapsibleSection({
             hasActiveChild ? "text-blue-500" : "text-slate-400"
           )}
         />
-        <span className="flex-1 text-left">{section.label}</span>
+        <span className="flex-1 text-start">{t(section.labelKey)}</span>
         <ChevronRight
           className={cn(
             "h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-200",
@@ -193,13 +195,13 @@ function CollapsibleSection({
         className="overflow-hidden transition-[height] duration-200 ease-in-out"
         style={{ height: height === undefined ? "auto" : height }}
       >
-        <ul className="mt-1 space-y-0.5 pl-4 border-l border-slate-700/50 ml-5">
+        <ul className="mt-1 space-y-0.5 border-s border-slate-700/50 ps-4 ms-5">
           {section.items.map((item) => {
             const isActive =
               pathname === item.href || (pathname?.startsWith(`${item.href}/`) ?? false);
             const Icon = item.icon;
             return (
-              <li key={item.name}>
+              <li key={item.labelKey}>
                 <Link
                   href={item.href}
                   className={cn(
@@ -215,7 +217,7 @@ function CollapsibleSection({
                       isActive ? "text-blue-400" : "text-slate-500"
                     )}
                   />
-                  {item.name}
+                  {t(item.labelKey)}
                 </Link>
               </li>
             );
@@ -228,6 +230,7 @@ function CollapsibleSection({
 
 export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
+  const t = useTranslations("header");
 
   const isBillCounterManager = userRole === "Bill Counter Manager";
   const isOwner = userRole === "Owner" || userRole === "Admin";
@@ -297,7 +300,8 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0",
+          "fixed top-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0",
+          "left-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -338,7 +342,7 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-              title="Sign Out"
+              title={t("signOut")}
             >
               <LogOut className="h-5 w-5" />
             </button>

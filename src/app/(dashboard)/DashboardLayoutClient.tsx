@@ -50,7 +50,7 @@ export function DashboardLayoutClient({
         userName={userName}
         userRole={userRole}
       />
-      <div className="flex flex-1 flex-col md:pl-64">
+      <div className="flex flex-1 flex-col md:ps-64">
         <Header 
           onMenuClick={() => setIsSidebarOpen(true)} 
           userName={userName}
