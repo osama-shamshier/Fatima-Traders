@@ -1,4 +1,21 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap');
+
+@font-face {
+  font-family: 'Jameel Noori Nastaleeq';
+  src: url('/fonts/Jameel-Noori-Nastaleeq-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Jameel Noori Nastaleeq Regular';
+  src: url('/fonts/Jameel-Noori-Nastaleeq-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @theme {
   --color-primary: #2563eb;
@@ -44,8 +61,14 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  html[lang="ur"] body {
-    font-family: "Noto Naskh Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+  html[lang="ur"] body,
+  html[lang="ur"] input,
+  html[lang="ur"] select,
+  html[lang="ur"] textarea,
+  html[lang="ur"] button,
+  .font-urdu {
+    font-family: "Jameel Noori Nastaleeq", "Jameel Noori Nastaleeq Regular", "Noto Nastaliq Urdu", "Segoe UI", Tahoma, sans-serif !important;
+    line-height: 1.8;
   }
 
   /* Custom scrollbar */
