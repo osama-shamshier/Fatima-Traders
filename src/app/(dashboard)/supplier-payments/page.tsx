@@ -9,13 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { TableLoader } from "@/components/ui/loader";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, Plus, Truck, RefreshCw } from "lucide-react";
+import { CreditCard, Plus, Truck, RefreshCw, Search, X } from "lucide-react";
 
 export default function SupplierPaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [methodFilter, setMethodFilter] = useState<string>("ALL");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +41,10 @@ export default function SupplierPaymentsPage() {
     setIsLoading(true);
     try {
       const res = await fetch("/api/supplier-payments");
-      if (res.ok) setPayments(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setPayments(Array.isArray(data) ? data : []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -63,6 +68,23 @@ export default function SupplierPaymentsPage() {
   const filteredPurchases = purchases.filter(
     (p) => p.supplierId === formData.supplierId && Number(p.outstandingAmount) > 0
   );
+
+  const filteredPayments = payments.filter((p) => {
+    const q = search.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      p.supplier?.name?.toLowerCase().includes(q) ||
+      p.supplier?.companyName?.toLowerCase().includes(q) ||
+      p.purchase?.invoiceNumber?.toLowerCase().includes(q) ||
+      p.bankReference?.toLowerCase().includes(q) ||
+      p.notes?.toLowerCase().includes(q);
+
+    const matchesMethod = methodFilter === "ALL" || p.paymentMethod === methodFilter;
+
+    return matchesSearch && matchesMethod;
+  });
+
+  const totalDisbursed = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,63 +147,146 @@ export default function SupplierPaymentsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 p-4 md:p-8 pt-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Supplier Payments & Outgoing Disbursements</h1>
-          <p className="text-slate-500 text-sm">Record payments to suppliers for inventory purchase bills and payables settlement.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+            <CreditCard className="w-7 h-7 text-blue-600" /> Supplier Payments & Disbursements
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Record payments to vendors for inventory purchase bills and payables settlement.
+          </p>
         </div>
         <Button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-sm"
         >
-          <Plus className="w-4 h-4 mr-2" /> Record Supplier Payment
+          <Plus className="w-4 h-4" /> Record Supplier Payment
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-900 text-sm">Supplier Payment Log</h3>
-          <Button variant="outline" size="sm" onClick={fetchPayments}>
-            <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+      {/* Search Bar & Method Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+        <div className="sm:col-span-7 relative">
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Search payments by supplier name, bill #, bank TRX ref, notes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 pr-9 text-xs bg-white border-slate-200 shadow-xs h-10 rounded-xl"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Method Filter Pills */}
+        <div className="sm:col-span-5 flex gap-1.5 overflow-x-auto justify-start sm:justify-end">
+          {[
+            { id: "ALL", label: "All Payments" },
+            { id: "CASH", label: "💵 Cash" },
+            { id: "BANK_TRANSFER", label: "🏦 Bank / Wallet" },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setMethodFilter(pill.id)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                methodFilter === pill.id
+                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-semibold">Total Paid to Suppliers:</span>
+          <span className="text-base font-extrabold font-mono text-rose-600">
+            {formatCurrency(totalDisbursed)}
+          </span>
+        </div>
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-semibold">Total Payment Transactions:</span>
+          <span className="text-base font-extrabold font-mono text-blue-700">
+            {payments.length} Transactions
+          </span>
+        </div>
+      </div>
+
+      {/* Supplier Payment Log Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-4 border-b flex justify-between items-center bg-slate-50/80">
+          <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+            Payment History Log ({filteredPayments.length})
+          </h3>
+          <Button variant="outline" size="sm" onClick={fetchPayments} className="h-7 text-xs">
+            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
           </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600 border-b font-medium text-xs">
+        <div className="relative w-full overflow-auto">
+          <table className="w-full caption-bottom text-xs text-left">
+            <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
               <tr>
-                <th className="p-4">Date</th>
-                <th className="p-4">Supplier Name</th>
-                <th className="p-4">Purchase Bill #</th>
-                <th className="p-4">Payment Method</th>
-                <th className="p-4">Bank / TRX Reference</th>
-                <th className="p-4 text-right">Amount Paid</th>
-                <th className="p-4">Notes</th>
+                <th className="h-11 px-4">Date</th>
+                <th className="h-11 px-4">Supplier Name</th>
+                <th className="h-11 px-4">Purchase Bill #</th>
+                <th className="h-11 px-4">Payment Method</th>
+                <th className="h-11 px-4">Bank / TRX Reference</th>
+                <th className="h-11 px-4 text-right">Amount Paid</th>
+                <th className="h-11 px-4">Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono text-xs">
+            <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
                 <TableLoader colSpan={7} text="Loading supplier payments..." />
-              ) : payments.length === 0 ? (
+              ) : filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400 font-sans">
+                  <td colSpan={7} className="p-12 text-center text-slate-400">
                     <Truck className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    No supplier payments recorded yet.
+                    {search || methodFilter !== "ALL"
+                      ? "No supplier payments found matching current filters."
+                      : "No supplier payments recorded yet."}
                   </td>
                 </tr>
               ) : (
-                payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/50">
-                    <td className="p-4 font-sans text-slate-600">{formatDate(p.createdAt || p.paymentDate)}</td>
-                    <td className="p-4 font-sans font-semibold text-slate-900">{p.supplier?.name}</td>
-                    <td className="p-4 font-bold text-blue-600">{p.purchase?.invoiceNumber || "-"}</td>
-                    <td className="p-4 font-sans">
-                      <Badge variant="outline">{p.paymentMethod}</Badge>
+                filteredPayments.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-4 whitespace-nowrap text-slate-600">
+                      {formatDate(p.createdAt || p.paymentDate)}
                     </td>
-                    <td className="p-4 font-sans text-slate-600">{p.bankReference || "-"}</td>
-                    <td className="p-4 text-right font-bold text-rose-600">{formatCurrency(p.amount)}</td>
-                    <td className="p-4 font-sans text-slate-500 truncate max-w-xs">{p.notes || "-"}</td>
+                    <td className="p-4 font-bold text-slate-900">
+                      {p.supplier?.name}
+                      {p.supplier?.companyName && (
+                        <span className="text-[10px] text-slate-400 font-normal block">
+                          {p.supplier.companyName}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 font-bold font-mono text-blue-600">
+                      {p.purchase?.invoiceNumber ? `#${p.purchase.invoiceNumber}` : "General Account"}
+                    </td>
+                    <td className="p-4">
+                      <Badge variant="outline" className="text-[11px] font-bold">
+                        {p.paymentMethod}
+                      </Badge>
+                    </td>
+                    <td className="p-4 text-slate-600 font-mono text-xs">{p.bankReference || "-"}</td>
+                    <td className="p-4 text-right font-extrabold font-mono text-rose-600 text-sm">
+                      {formatCurrency(p.amount)}
+                    </td>
+                    <td className="p-4 text-slate-500 truncate max-w-xs">{p.notes || "-"}</td>
                   </tr>
                 ))
               )}
@@ -202,7 +307,7 @@ export default function SupplierPaymentsPage() {
                   required
                   value={formData.supplierId}
                   onChange={(e) => setFormData({ ...formData, supplierId: e.target.value, purchaseId: "" })}
-                  className="input text-sm bg-white"
+                  className="input text-sm bg-white mt-1"
                 >
                   <option value="">Choose Supplier</option>
                   {suppliers.map((s) => (
@@ -235,12 +340,12 @@ export default function SupplierPaymentsPage() {
                 <Label>Payment Amount (PKR) *</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="any"
                   required
                   min="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="font-bold text-rose-600 text-base"
+                  className="font-bold text-rose-600 text-base mt-1"
                 />
               </div>
 
@@ -249,7 +354,7 @@ export default function SupplierPaymentsPage() {
                 <select
                   value={formData.paymentMethod}
                   onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="input text-sm bg-white"
+                  className="input text-sm bg-white mt-1"
                 >
                   <option value="CASH">💵 Cash Payment</option>
                   <option value="BANK_TRANSFER">🏦 Bank Transfer / Digital Wallet</option>
@@ -293,6 +398,7 @@ export default function SupplierPaymentsPage() {
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="e.g. Bank cheque # / Transfer receipt"
+                  className="mt-1 text-xs"
                 />
               </div>
 
