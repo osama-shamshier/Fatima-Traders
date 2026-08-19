@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { POSCheckoutModal } from "./components/POSCheckoutModal";
 import { ReceiptModal } from "./components/ReceiptModal";
+import { CustomerSearchSelect } from "@/components/pos/CustomerSearchSelect";
 
 interface Product {
   id: string;
@@ -280,18 +281,11 @@ export default function POSPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedBuyerId}
-            onChange={(e) => setSelectedBuyerId(e.target.value)}
-            className="input text-xs py-1 px-3 bg-slate-50 border-slate-200 font-semibold min-w-[200px]"
-          >
-            <option value="">👤 Walk-in Customer (Cash Sale)</option>
-            {buyers.map((b) => (
-              <option key={b.id} value={b.id}>
-                🏢 {b.name} {b.companyName ? `(${b.companyName})` : ""}
-              </option>
-            ))}
-          </select>
+          <CustomerSearchSelect
+            buyers={buyers}
+            selectedBuyerId={selectedBuyerId}
+            onSelectBuyer={setSelectedBuyerId}
+          />
 
           <Button variant="outline" size="sm" onClick={fetchProducts} className="h-8 text-xs">
             <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh Stock
