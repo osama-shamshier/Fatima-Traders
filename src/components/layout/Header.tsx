@@ -1,8 +1,8 @@
 "use client";
 
-import { Menu, Bell, ChevronRight, Store, LogOut } from "lucide-react";
+import { Menu, ChevronRight, ChevronDown, LogOut, User } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -30,8 +30,23 @@ export function Header({
   const t = useTranslations("header");
   const displayBranchName = branchName === "Main Branch" ? t("mainBranch") : branchName;
 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-white px-4 shadow-sm sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-white px-4 shadow-xs sm:px-6">
+      {/* Left Area: Mobile Menu & Breadcrumbs */}
       <div className="flex items-center gap-4">
         <button
           onClick={onMenuClick}
@@ -66,43 +81,54 @@ export function Header({
         </div>
       </div>
 
+      {/* Right Area: Branch Badge, Language Switcher, Profile with Dropdown */}
       <div className="flex items-center gap-3">
-        {/* Brand Display in Top Header */}
-        <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-900 to-slate-900 text-white rounded-xl shadow-xs">
-          <Store className="h-4 w-4 text-blue-400" />
-          <span className="text-xs font-bold tracking-wide uppercase">Fatima Traders</span>
-        </div>
-
-        <div className="hidden items-center gap-2 md:flex">
-          <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+        {/* Branch Badge */}
+        <div className="flex items-center">
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 border border-blue-200">
             {displayBranchName}
           </span>
         </div>
 
+        {/* Language Switcher */}
         <LanguageSwitcher />
 
-        <button
-          className="relative rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-500"
-          title={t("notifications")}
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute end-1.5 top-1.5 flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-        </button>
-
-        <div className="flex items-center gap-2 border-s ps-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-sm font-medium text-white">
-            {userName ? userName.charAt(0).toUpperCase() : "U"}
-          </div>
-          <span className="hidden text-sm font-medium text-slate-700 sm:block">{userName}</span>
-
+        {/* Profile Dropdown */}
+        <div className="relative border-s ps-3" ref={dropdownRef}>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-600 hover:text-white transition-all ms-1"
-            title={t("signOut")}
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100 transition-colors focus:outline-none"
+            aria-expanded={isDropdownOpen}
           >
-            <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t("logout")}</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white shadow-xs">
+              {userName ? userName.charAt(0).toUpperCase() : "U"}
+            </div>
+            <span className="hidden text-sm font-semibold text-slate-800 sm:block">{userName}</span>
+            <ChevronDown className="h-4 w-4 text-slate-400" />
           </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white p-1.5 shadow-xl border border-slate-200 z-50 animate-in fade-in-50 zoom-in-95">
+              <div className="px-3 py-2 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-900 truncate">{userName}</p>
+                <p className="text-[11px] text-slate-500 font-medium">Logged in</p>
+              </div>
+
+              <div className="p-1">
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    signOut({ callbackUrl: "/login" });
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>{t("logout")}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

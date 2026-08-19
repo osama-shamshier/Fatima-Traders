@@ -86,7 +86,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Fatima Traders — Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Fatima Traders Dashboard</h1>
           <p className="text-slate-500 text-sm">Real-time overview of sales, cash & bank collections, customer debt, and operational status.</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchStats}>
