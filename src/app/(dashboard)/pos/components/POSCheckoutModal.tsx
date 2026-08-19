@@ -244,7 +244,7 @@ export function POSCheckoutModal({
                   <option value="">-- Choose Pakistani Bank / Digital Wallet --</option>
                   {PAKISTANI_BANKS.map((b) => (
                     <option key={b.id} value={b.name}>
-                      {b.name} ({b.code})
+                      {b.name}
                     </option>
                   ))}
                 </select>
