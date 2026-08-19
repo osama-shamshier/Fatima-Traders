@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Truck, Download, Printer } from "lucide-react";
+import { RefreshCw, Truck, Download, Calendar, X, FileText } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 interface SupplierLedgerModalProps {
@@ -18,10 +19,14 @@ interface SupplierLedgerModalProps {
 export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName }: SupplierLedgerModalProps) {
   const [ledger, setLedger] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   useEffect(() => {
     if (isOpen && supplierId) {
       fetchLedger();
+      setStartDate("");
+      setEndDate("");
     }
   }, [isOpen, supplierId]);
 
@@ -40,63 +45,139 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
     }
   };
 
-  const lastEntry = ledger.length > 0 ? ledger[ledger.length - 1] : null;
-  const currentPayable = lastEntry ? Number(lastEntry.balance || 0) : 0;
+  // Date Filtering & Running Balance recalculation
+  const { openingBalance, filteredLedger, periodDebit, periodCredit, closingBalance } = useMemo(() => {
+    let openBal = 0;
+    let entries: any[] = [];
 
-  const totalDebit = ledger.reduce((sum, e) => sum + Number(e.debit || 0), 0);
-  const totalCredit = ledger.reduce((sum, e) => sum + Number(e.credit || 0), 0);
+    const start = startDate ? new Date(startDate + "T00:00:00") : null;
+    const end = endDate ? new Date(endDate + "T23:59:59") : null;
+
+    ledger.forEach((item) => {
+      const itemDate = new Date(item.date);
+      if (start && itemDate < start) {
+        openBal += (Number(item.debit) || 0) - (Number(item.credit) || 0);
+      } else if ((!start || itemDate >= start) && (!end || itemDate <= end)) {
+        entries.push(item);
+      }
+    });
+
+    let running = openBal;
+    let pDebit = 0;
+    let pCredit = 0;
+
+    const recalculatedEntries = entries.map((item) => {
+      const debit = Number(item.debit) || 0;
+      const credit = Number(item.credit) || 0;
+      pDebit += debit;
+      pCredit += credit;
+      running += debit - credit;
+      return {
+        ...item,
+        calculatedBalance: running,
+      };
+    });
+
+    return {
+      openingBalance: openBal,
+      filteredLedger: recalculatedEntries,
+      periodDebit: pDebit,
+      periodCredit: pCredit,
+      closingBalance: running,
+    };
+  }, [ledger, startDate, endDate]);
+
+  const handleDownloadPDF = () => {
+    window.print();
+  };
 
   const handleDownloadCSV = () => {
-    if (!ledger || ledger.length === 0) {
-      alert("No ledger entries to export.");
+    if (filteredLedger.length === 0 && openingBalance === 0) {
+      alert("No ledger entries to export for selected dates.");
       return;
     }
 
     const headers = ["Date", "Type", "Ref / Invoice #", "Description", "Debit (Purchases)", "Credit (Payments)", "Running Balance"];
-    const rows = ledger.map((entry) => [
-      `"${formatDate(entry.date)}"`,
-      `"${entry.type || ""}"`,
-      `"${entry.reference || ""}"`,
-      `"${(entry.description || "").replace(/"/g, '""')}"`,
-      entry.debit || 0,
-      entry.credit || 0,
-      entry.balance || 0,
-    ]);
+    const rows: string[][] = [];
+
+    if (startDate && openingBalance !== 0) {
+      rows.push([
+        `"${formatDate(startDate)}"`,
+        `"OPENING"`,
+        `"-"`,
+        `"Opening Balance"`,
+        "0",
+        "0",
+        String(openingBalance),
+      ]);
+    }
+
+    filteredLedger.forEach((entry) => {
+      rows.push([
+        `"${formatDate(entry.date)}"`,
+        `"${entry.type || ""}"`,
+        `"${entry.reference || ""}"`,
+        `"${(entry.description || "").replace(/"/g, '""')}"`,
+        String(entry.debit || 0),
+        String(entry.credit || 0),
+        String(entry.calculatedBalance || 0),
+      ]);
+    });
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Supplier_Ledger_${supplierName.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
+    const dateTag = startDate ? `${startDate}_to_${endDate || "latest"}` : "all_time";
+    link.download = `Supplier_Ledger_${supplierName.replace(/[^a-zA-Z0-9]/g, "_")}_${dateTag}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const setPresetRange = (type: "THIS_MONTH" | "LAST_30" | "ALL") => {
+    if (type === "ALL") {
+      setStartDate("");
+      setEndDate("");
+      return;
+    }
+
+    const now = new Date();
+    const endStr = now.toISOString().split("T")[0];
+
+    if (type === "THIS_MONTH") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(firstDay.toISOString().split("T")[0]);
+      setEndDate(endStr);
+    } else if (type === "LAST_30") {
+      const past30 = new Date();
+      past30.setDate(past30.getDate() - 30);
+      setStartDate(past30.toISOString().split("T")[0]);
+      setEndDate(endStr);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl w-full sm:max-w-6xl max-h-[94vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
+        {/* Modal Header */}
         <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between print:hidden">
           <div>
             <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Truck className="w-5 h-5 text-blue-600" /> Supplier Financial Ledger — {supplierName}
             </DialogTitle>
             <p className="text-xs text-slate-500">
-              Chronological history of purchases, disbursements, and running payables.
+              Filter by date, view opening balance, and download official PDF statements or Excel spreadsheets.
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Current Payable Balance</span>
-              <span className={`text-xl font-extrabold font-mono ${currentPayable > 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                {formatCurrency(currentPayable)}
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Closing Balance Due</span>
+              <span className={`text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                {formatCurrency(closingBalance)}
               </span>
             </div>
 
@@ -105,27 +186,94 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadCSV}
-                disabled={ledger.length === 0}
+                disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 border-slate-300 hover:bg-slate-50"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" /> Download CSV / Excel
+                <Download className="w-3.5 h-3.5 text-blue-600" /> Export CSV / Excel
               </Button>
 
               <Button
                 size="sm"
-                onClick={handlePrint}
-                disabled={ledger.length === 0}
-                className="text-xs font-semibold gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-xs"
+                onClick={handleDownloadPDF}
+                disabled={filteredLedger.length === 0 && openingBalance === 0}
+                className="text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
               >
-                <Printer className="w-3.5 h-3.5" /> Print / PDF Statement
+                <FileText className="w-3.5 h-3.5" /> Download PDF Statement
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Printable Area */}
-        <div id="supplier-ledger-print-area" className="flex-1 overflow-y-auto mt-4 p-1">
-          {/* Printable Letterhead (Visible in Print) */}
+        {/* Date Filter Bar (Hidden in Print) */}
+        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200 mt-3 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-slate-700 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date Range:
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">From:</span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-7 text-xs py-0 px-2 bg-white w-32 font-medium"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">To:</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-7 text-xs py-0 px-2 bg-white w-32 font-medium"
+              />
+            </div>
+
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1 rounded"
+              >
+                <X className="w-3 h-3" /> Clear Filter
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filter Presets */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setPresetRange("THIS_MONTH")}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setPresetRange("LAST_30")}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => setPresetRange("ALL")}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-all ${
+                !startDate && !endDate
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              All Time
+            </button>
+          </div>
+        </div>
+
+        {/* Printable / Viewable Ledger Content */}
+        <div id="supplier-ledger-print-area" className="flex-1 overflow-y-auto mt-2 p-1">
+          {/* Official Letterhead (Visible in Print / PDF) */}
           <div className="hidden print:block mb-6 border-b pb-4">
             <div className="flex justify-between items-start">
               <div>
@@ -137,27 +285,34 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 <h2 className="text-lg font-bold text-slate-900 uppercase">Supplier Account Statement</h2>
                 <p className="text-xs text-slate-500 font-mono">Date Generated: {formatDate(new Date())}</p>
                 <p className="text-xs font-bold text-slate-800 mt-1">Supplier: {supplierName}</p>
+                <p className="text-[11px] text-blue-700 font-semibold font-mono mt-0.5">
+                  Period: {startDate ? formatDate(startDate) : "Beginning"} — {endDate ? formatDate(endDate) : "Today"}
+                </p>
               </div>
             </div>
 
-            {/* Print Summary Bar */}
-            <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t text-xs">
+            {/* Print Summary Metrics */}
+            <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t text-xs">
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Total Purchases (Debit):</span>
-                <strong className="text-slate-900 font-mono">{formatCurrency(totalDebit)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Opening Balance:</span>
+                <strong className="text-slate-900 font-mono">{formatCurrency(openingBalance)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Total Payments (Credit):</span>
-                <strong className="text-emerald-700 font-mono">{formatCurrency(totalCredit)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Period Purchases (Debit):</span>
+                <strong className="text-rose-700 font-mono">{formatCurrency(periodDebit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Closing Balance Due:</span>
-                <strong className="text-rose-700 font-mono">{formatCurrency(currentPayable)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Period Payments (Credit):</span>
+                <strong className="text-emerald-700 font-mono">{formatCurrency(periodCredit)}</strong>
+              </div>
+              <div className="p-2 bg-slate-50 border rounded">
+                <span className="text-slate-500 block text-[10px] uppercase">Closing Balance Due:</span>
+                <strong className="text-rose-700 font-mono font-black">{formatCurrency(closingBalance)}</strong>
               </div>
             </div>
           </div>
 
-          {/* Table Container */}
+          {/* Table */}
           <div className="border rounded-xl bg-white shadow-xs overflow-hidden">
             {loading ? (
               <Loader text="Loading supplier ledger..." className="py-12" />
@@ -175,7 +330,26 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {ledger.map((entry, idx) => (
+                  {/* Opening Balance Row if date filtered */}
+                  {startDate && (
+                    <tr className="bg-blue-50/40 font-bold border-b border-blue-100">
+                      <td className="p-3 font-mono text-slate-600">{formatDate(startDate)}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] uppercase font-black">
+                          OPENING
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-400">-</td>
+                      <td className="p-3 text-slate-800">Opening Balance Brought Forward</td>
+                      <td className="p-3 text-right font-mono">-</td>
+                      <td className="p-3 text-right font-mono">-</td>
+                      <td className="p-3 text-right font-mono font-extrabold text-slate-900">
+                        {formatCurrency(openingBalance)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {filteredLedger.map((entry, idx) => (
                     <tr key={`${entry.id}-${idx}`} className="hover:bg-slate-50">
                       <td className="p-3 font-mono text-slate-600 whitespace-nowrap">{formatDate(entry.date)}</td>
                       <td className="p-3">
@@ -192,14 +366,15 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                         {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
                       </td>
                       <td className="p-3 text-right font-mono font-extrabold text-sm text-slate-900 whitespace-nowrap">
-                        {formatCurrency(entry.balance)}
+                        {formatCurrency(entry.calculatedBalance)}
                       </td>
                     </tr>
                   ))}
-                  {ledger.length === 0 && (
+
+                  {filteredLedger.length === 0 && openingBalance === 0 && (
                     <tr>
                       <td colSpan={7} className="p-12 text-center text-slate-400">
-                        No ledger transactions found for this supplier.
+                        No ledger transactions found for the selected date range.
                       </td>
                     </tr>
                   )}

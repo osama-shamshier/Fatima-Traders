@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, RefreshCw, DollarSign, User, Download, Printer } from "lucide-react";
+import { CreditCard, RefreshCw, DollarSign, User, Download, Calendar, X, FileText } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 interface BuyerLedgerModalProps {
@@ -22,7 +22,8 @@ interface BuyerLedgerModalProps {
 export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSuccess }: BuyerLedgerModalProps) {
   const [ledger, setLedger] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentBalance, setCurrentBalance] = useState<number>(0);
+  const [startDate, setStartDate] = useState<string>("" );
+  const [endDate, setEndDate] = useState<string>("");
 
   // Settlement Form State
   const [isSettleOpen, setIsSettleOpen] = useState(false);
@@ -38,6 +39,8 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
   useEffect(() => {
     if (isOpen && buyerId) {
       fetchLedger();
+      setStartDate("");
+      setEndDate("");
     }
   }, [isOpen, buyerId]);
 
@@ -50,7 +53,6 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
         setLedger(Array.isArray(data) ? data : []);
         if (data.length > 0) {
           const lastEntry = data[data.length - 1];
-          setCurrentBalance(Number(lastEntry.balance || 0));
           setSettleForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(lastEntry.balance))) }));
         }
       }
@@ -61,40 +63,118 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
     }
   };
 
-  const totalDebit = ledger.reduce((sum, e) => sum + Number(e.debit || 0), 0);
-  const totalCredit = ledger.reduce((sum, e) => sum + Number(e.credit || 0), 0);
+  // Date Filtering & Running Balance recalculation
+  const { openingBalance, filteredLedger, periodDebit, periodCredit, closingBalance } = useMemo(() => {
+    let openBal = 0;
+    let entries: any[] = [];
+
+    const start = startDate ? new Date(startDate + "T00:00:00") : null;
+    const end = endDate ? new Date(endDate + "T23:59:59") : null;
+
+    ledger.forEach((item) => {
+      const itemDate = new Date(item.date);
+      if (start && itemDate < start) {
+        openBal += (Number(item.debit) || 0) - (Number(item.credit) || 0);
+      } else if ((!start || itemDate >= start) && (!end || itemDate <= end)) {
+        entries.push(item);
+      }
+    });
+
+    let running = openBal;
+    let pDebit = 0;
+    let pCredit = 0;
+
+    const recalculatedEntries = entries.map((item) => {
+      const debit = Number(item.debit) || 0;
+      const credit = Number(item.credit) || 0;
+      pDebit += debit;
+      pCredit += credit;
+      running += debit - credit;
+      return {
+        ...item,
+        calculatedBalance: running,
+      };
+    });
+
+    return {
+      openingBalance: openBal,
+      filteredLedger: recalculatedEntries,
+      periodDebit: pDebit,
+      periodCredit: pCredit,
+      closingBalance: running,
+    };
+  }, [ledger, startDate, endDate]);
+
+  const handleDownloadPDF = () => {
+    window.print();
+  };
 
   const handleDownloadCSV = () => {
-    if (!ledger || ledger.length === 0) {
-      alert("No ledger entries to export.");
+    if (filteredLedger.length === 0 && openingBalance === 0) {
+      alert("No ledger entries to export for selected dates.");
       return;
     }
 
     const headers = ["Date", "Type", "Ref / Invoice #", "Description", "Debit (Invoiced)", "Credit (Received)", "Running Balance"];
-    const rows = ledger.map((entry) => [
-      `"${formatDate(entry.date)}"`,
-      `"${entry.type || ""}"`,
-      `"${entry.reference || ""}"`,
-      `"${(entry.description || "").replace(/"/g, '""')}"`,
-      entry.debit || 0,
-      entry.credit || 0,
-      entry.balance || 0,
-    ]);
+    const rows: string[][] = [];
+
+    if (startDate && openingBalance !== 0) {
+      rows.push([
+        `"${formatDate(startDate)}"`,
+        `"OPENING"`,
+        `"-"`,
+        `"Opening Balance"`,
+        "0",
+        "0",
+        String(openingBalance),
+      ]);
+    }
+
+    filteredLedger.forEach((entry) => {
+      rows.push([
+        `"${formatDate(entry.date)}"`,
+        `"${entry.type || ""}"`,
+        `"${entry.reference || ""}"`,
+        `"${(entry.description || "").replace(/"/g, '""')}"`,
+        String(entry.debit || 0),
+        String(entry.credit || 0),
+        String(entry.calculatedBalance || 0),
+      ]);
+    });
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Customer_Ledger_${(buyerName || "Customer").replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
+    const dateTag = startDate ? `${startDate}_to_${endDate || "latest"}` : "all_time";
+    link.download = `Customer_Ledger_${(buyerName || "Customer").replace(/[^a-zA-Z0-9]/g, "_")}_${dateTag}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const setPresetRange = (type: "THIS_MONTH" | "LAST_30" | "ALL") => {
+    if (type === "ALL") {
+      setStartDate("");
+      setEndDate("");
+      return;
+    }
+
+    const now = new Date();
+    const endStr = now.toISOString().split("T")[0];
+
+    if (type === "THIS_MONTH") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(firstDay.toISOString().split("T")[0]);
+      setEndDate(endStr);
+    } else if (type === "LAST_30") {
+      const past30 = new Date();
+      past30.setDate(past30.getDate() - 30);
+      setStartDate(past30.toISOString().split("T")[0]);
+      setEndDate(endStr);
+    }
   };
 
   const handleSettleSubmit = async (e: React.FormEvent) => {
@@ -155,21 +235,22 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl w-full sm:max-w-6xl max-h-[94vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
+        {/* Header */}
         <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between print:hidden">
           <div>
             <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <User className="w-5 h-5 text-blue-600" /> Customer Financial Ledger & Settlement — {buyerName || "Buyer"}
             </DialogTitle>
             <p className="text-xs text-slate-500">
-              Complete chronological ledger history of invoices, credit collections, and account settlements.
+              Filter by date range, track opening debt, and download official PDF statements or Excel spreadsheets.
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Current Outstanding</span>
-              <span className={`text-xl font-extrabold font-mono ${currentBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                {formatCurrency(currentBalance)}
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Closing Balance Due</span>
+              <span className={`text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                {formatCurrency(closingBalance)}
               </span>
             </div>
 
@@ -178,30 +259,97 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadCSV}
-                disabled={ledger.length === 0}
+                disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 border-slate-300 hover:bg-slate-50"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" /> Download CSV / Excel
+                <Download className="w-3.5 h-3.5 text-blue-600" /> Export CSV / Excel
               </Button>
 
               <Button
                 size="sm"
-                onClick={handlePrint}
-                disabled={ledger.length === 0}
-                className="text-xs font-semibold gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-xs"
+                onClick={handleDownloadPDF}
+                disabled={filteredLedger.length === 0 && openingBalance === 0}
+                className="text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
               >
-                <Printer className="w-3.5 h-3.5" /> Print / PDF Statement
+                <FileText className="w-3.5 h-3.5" /> Download PDF Statement
               </Button>
 
               <Button
                 onClick={() => setIsSettleOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 px-4 shadow-sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-3 shadow-sm"
               >
-                <CreditCard className="w-4 h-4 mr-1.5" /> Settle Bill
+                <CreditCard className="w-3.5 h-3.5 mr-1" /> Settle Bill
               </Button>
             </div>
           </div>
         </DialogHeader>
+
+        {/* Date Filter Bar (Hidden in Print) */}
+        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200 mt-2 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-slate-700 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date Range:
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">From:</span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-7 text-xs py-0 px-2 bg-white w-32 font-medium"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">To:</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-7 text-xs py-0 px-2 bg-white w-32 font-medium"
+              />
+            </div>
+
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1 rounded"
+              >
+                <X className="w-3 h-3" /> Clear Filter
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filter Presets */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setPresetRange("THIS_MONTH")}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setPresetRange("LAST_30")}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => setPresetRange("ALL")}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-all ${
+                !startDate && !endDate
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              All Time
+            </button>
+          </div>
+        </div>
 
         {/* Inline Settlement Form */}
         {isSettleOpen && (
@@ -298,9 +446,9 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
           </div>
         )}
 
-        {/* Printable Area */}
+        {/* Printable / Viewable Ledger Content */}
         <div id="buyer-ledger-print-area" className="flex-1 overflow-y-auto mt-2 p-1">
-          {/* Printable Letterhead (Visible in Print) */}
+          {/* Official Letterhead (Visible in Print / PDF) */}
           <div className="hidden print:block mb-6 border-b pb-4">
             <div className="flex justify-between items-start">
               <div>
@@ -312,27 +460,34 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 <h2 className="text-lg font-bold text-slate-900 uppercase">Customer Account Statement</h2>
                 <p className="text-xs text-slate-500 font-mono">Date Generated: {formatDate(new Date())}</p>
                 <p className="text-xs font-bold text-slate-800 mt-1">Customer: {buyerName || "Customer"}</p>
+                <p className="text-[11px] text-blue-700 font-semibold font-mono mt-0.5">
+                  Period: {startDate ? formatDate(startDate) : "Beginning"} — {endDate ? formatDate(endDate) : "Today"}
+                </p>
               </div>
             </div>
 
-            {/* Print Summary Bar */}
-            <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t text-xs">
+            {/* Print Summary Metrics */}
+            <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t text-xs">
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Total Invoiced (Debit):</span>
-                <strong className="text-slate-900 font-mono">{formatCurrency(totalDebit)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Opening Balance:</span>
+                <strong className="text-slate-900 font-mono">{formatCurrency(openingBalance)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Total Received (Credit):</span>
-                <strong className="text-emerald-700 font-mono">{formatCurrency(totalCredit)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Period Invoices (Debit):</span>
+                <strong className="text-rose-700 font-mono">{formatCurrency(periodDebit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block">Current Outstanding Due:</span>
-                <strong className="text-rose-700 font-mono">{formatCurrency(currentBalance)}</strong>
+                <span className="text-slate-500 block text-[10px] uppercase">Period Receipts (Credit):</span>
+                <strong className="text-emerald-700 font-mono">{formatCurrency(periodCredit)}</strong>
+              </div>
+              <div className="p-2 bg-slate-50 border rounded">
+                <span className="text-slate-500 block text-[10px] uppercase">Closing Balance Due:</span>
+                <strong className="text-rose-700 font-mono font-black">{formatCurrency(closingBalance)}</strong>
               </div>
             </div>
           </div>
 
-          {/* Table Container */}
+          {/* Table */}
           <div className="border rounded-xl bg-white shadow-xs overflow-hidden">
             {isLoading ? (
               <Loader text="Loading customer ledger..." className="py-12" />
@@ -350,47 +505,66 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {ledger.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-12 text-center text-slate-400">
-                        No ledger transactions recorded for this customer yet.
+                  {/* Opening Balance Row if date filtered */}
+                  {startDate && (
+                    <tr className="bg-blue-50/40 font-bold border-b border-blue-100">
+                      <td className="p-3 font-mono text-slate-600">{formatDate(startDate)}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] uppercase font-black">
+                          OPENING
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-400">-</td>
+                      <td className="p-3 text-slate-800">Opening Balance Brought Forward</td>
+                      <td className="p-3 text-right font-mono">-</td>
+                      <td className="p-3 text-right font-mono">-</td>
+                      <td className="p-3 text-right font-mono font-extrabold text-slate-900">
+                        {formatCurrency(openingBalance)}
                       </td>
                     </tr>
-                  ) : (
-                    ledger.map((entry, index) => (
-                      <tr key={`${entry.id}-${index}`} className="hover:bg-slate-50">
-                        <td className="p-3 text-slate-600 font-mono whitespace-nowrap">{formatDate(entry.date)}</td>
-                        <td className="p-3">
-                          <Badge
-                            variant={
-                              entry.type === "SALE"
-                                ? "outline"
-                                : entry.type === "PAYMENT"
-                                ? "success"
-                                : "warning"
-                            }
-                            className="text-[11px] font-bold"
-                          >
-                            {entry.type}
-                          </Badge>
-                        </td>
-                        <td className="p-3 font-mono font-bold text-blue-600 truncate">{entry.reference || "-"}</td>
-                        <td className="p-3 text-slate-700 truncate">{entry.description || "-"}</td>
-                        <td className="p-3 text-right font-mono font-bold text-rose-600 whitespace-nowrap">
-                          {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
-                        </td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
-                          {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
-                        </td>
-                        <td
-                          className={`p-3 text-right font-mono font-extrabold text-sm whitespace-nowrap ${
-                            entry.balance > 0 ? "text-slate-900" : "text-emerald-700"
-                          }`}
+                  )}
+
+                  {filteredLedger.map((entry, index) => (
+                    <tr key={`${entry.id}-${index}`} className="hover:bg-slate-50">
+                      <td className="p-3 text-slate-600 font-mono whitespace-nowrap">{formatDate(entry.date)}</td>
+                      <td className="p-3">
+                        <Badge
+                          variant={
+                            entry.type === "SALE"
+                              ? "outline"
+                              : entry.type === "PAYMENT"
+                              ? "success"
+                              : "warning"
+                          }
+                          className="text-[11px] font-bold"
                         >
-                          {formatCurrency(entry.balance)}
-                        </td>
-                      </tr>
-                    ))
+                          {entry.type}
+                        </Badge>
+                      </td>
+                      <td className="p-3 font-mono font-bold text-blue-600 truncate">{entry.reference || "-"}</td>
+                      <td className="p-3 text-slate-700 truncate">{entry.description || "-"}</td>
+                      <td className="p-3 text-right font-mono font-bold text-rose-600 whitespace-nowrap">
+                        {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
+                        {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
+                      </td>
+                      <td
+                        className={`p-3 text-right font-mono font-extrabold text-sm whitespace-nowrap ${
+                          entry.calculatedBalance > 0 ? "text-slate-900" : "text-emerald-700"
+                        }`}
+                      >
+                        {formatCurrency(entry.calculatedBalance)}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredLedger.length === 0 && openingBalance === 0 && (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-slate-400">
+                        No ledger transactions recorded for the selected date range.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
