@@ -357,62 +357,82 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid */}
-          <div className="flex-1 p-3 overflow-y-auto min-h-0 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {products.map((p) => {
-              const inCart = cart.find((item) => item.id === p.id);
-              const isOutOfStock = Number(p.availableStock || 0) <= 0;
+          {/* Product Catalog Table Form */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10">
+                <tr>
+                  <th className="p-3">Product Name</th>
+                  <th className="p-3">SKU</th>
+                  <th className="p-3 text-center">Available Stock</th>
+                  <th className="p-3 text-right">Price</th>
+                  <th className="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {products.map((p) => {
+                  const inCart = cart.find((item) => item.id === p.id);
+                  const isOutOfStock = Number(p.availableStock || 0) <= 0;
 
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => !isOutOfStock && openQtyModal(p)}
-                  className={`p-3 rounded-xl border flex flex-col justify-between transition-all ${
-                    isOutOfStock
-                      ? "opacity-50 bg-slate-50 border-slate-200 cursor-not-allowed"
-                      : "bg-white border-slate-200 hover:border-blue-400 hover:shadow-md cursor-pointer group"
-                  }`}
-                >
-                  <div>
-                    <div className="flex justify-between items-start gap-1">
-                      <span className="text-[10px] font-mono text-slate-400 truncate">{p.sku}</span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                          isOutOfStock
-                            ? "bg-rose-100 text-rose-700"
-                            : p.availableStock <= 5
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                        }`}
-                      >
-                        {p.availableStock} {p.unit?.abbreviation || ""}
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1 line-clamp-2 leading-tight">
-                      {p.name}
-                    </h4>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100">
-                    <span className="text-sm font-extrabold font-mono text-blue-700">
-                      {formatCurrency(p.sellingPrice)}
-                    </span>
-                    <Button
-                      size="sm"
-                      disabled={isOutOfStock}
-                      className="h-7 text-xs px-2 bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white border-0"
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={() => !isOutOfStock && openQtyModal(p)}
+                      className={`transition-colors cursor-pointer ${
+                        isOutOfStock
+                          ? "opacity-50 bg-slate-50 cursor-not-allowed"
+                          : "hover:bg-blue-50/60"
+                      }`}
                     >
-                      {inCart ? `In Cart (${inCart.cartQuantity})` : "Add"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {products.length === 0 && (
-              <div className="col-span-full text-center py-12 text-slate-400 text-xs">
-                No products found matching filters.
-              </div>
-            )}
+                      <td className="p-3 font-bold text-slate-900">
+                        {p.name}
+                        {p.category?.name && (
+                          <span className="text-[10px] text-slate-400 font-normal block">{p.category.name}</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-mono text-slate-500">{p.sku}</td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isOutOfStock
+                              ? "bg-rose-100 text-rose-700"
+                              : p.availableStock <= 5
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {p.availableStock} {p.unit?.abbreviation || ""}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-extrabold font-mono text-blue-700 text-sm whitespace-nowrap">
+                        {formatCurrency(p.sellingPrice)}
+                      </td>
+                      <td className="p-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          disabled={isOutOfStock}
+                          onClick={() => openQtyModal(p)}
+                          className={`h-7 text-xs px-2.5 font-bold ${
+                            inCart
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-0"
+                          }`}
+                        >
+                          {inCart ? `In Cart (${inCart.cartQuantity})` : "Add"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {products.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-12 text-slate-400 text-xs">
+                      No products found matching filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
