@@ -81,10 +81,13 @@ export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalPro
                 {sale.items?.map((item: any) => (
                   <tr key={item.id}>
                     <td className="py-3">
-                      <p className="font-medium">{item.product?.name || `Product ${item.productId.substring(0,6)}`}</p>
+                      <p className="font-semibold text-slate-900">{item.product?.name || item.name || `Product ${item.productId.substring(0,6)}`}</p>
+                      {Number(item.discount || 0) > 0 && (
+                        <p className="text-xs text-rose-600 font-mono">(Item Disc: -{formatCurrency(Number(item.discount))})</p>
+                      )}
                     </td>
                     <td className="py-3 text-right">{formatCurrency(Number(item.sellingPrice))}</td>
-                    <td className="py-3 text-right">{Number(item.quantity)}</td>
+                    <td className="py-3 text-right">{Number(item.quantity)} {item.product?.unit?.abbreviation || ""}</td>
                     <td className="py-3 text-right font-medium">{formatCurrency(Number(item.lineTotal))}</td>
                   </tr>
                 ))}

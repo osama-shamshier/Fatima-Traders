@@ -14,6 +14,8 @@ interface POSCheckoutModalProps {
   onClose: () => void;
   subtotal: number;
   discount: number;
+  itemsGrossTotal?: number;
+  itemsDiscountTotal?: number;
   initialRoundOff?: number;
   isWalkInCustomer?: boolean;
   onCompleteSale: (
@@ -31,6 +33,8 @@ export function POSCheckoutModal({
   onClose,
   subtotal,
   discount,
+  itemsGrossTotal,
+  itemsDiscountTotal = 0,
   initialRoundOff = 0,
   isWalkInCustomer = true,
   onCompleteSale,
@@ -107,13 +111,28 @@ export function POSCheckoutModal({
         <div className="space-y-4 py-3">
           {/* Bill Summary Breakdown */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-            <div className="flex justify-between items-center text-xs text-slate-600 font-medium">
-              <span>Subtotal:</span>
+            {itemsGrossTotal !== undefined && itemsGrossTotal > subtotal && (
+              <div className="flex justify-between items-center text-xs text-slate-600 font-medium">
+                <span>Items Gross Total:</span>
+                <span className="font-bold font-mono">{formatCurrency(itemsGrossTotal)}</span>
+              </div>
+            )}
+
+            {itemsDiscountTotal > 0 && (
+              <div className="flex justify-between items-center text-xs text-rose-600 font-medium">
+                <span>Item-wise Discounts:</span>
+                <span className="font-bold font-mono">- {formatCurrency(itemsDiscountTotal)}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center text-xs text-slate-700 font-medium">
+              <span>Items Subtotal:</span>
               <span className="font-bold font-mono">{formatCurrency(subtotal)}</span>
             </div>
+
             {discount > 0 && (
               <div className="flex justify-between items-center text-xs text-amber-700 font-medium">
-                <span>Discount:</span>
+                <span>Order-Level Discount:</span>
                 <span className="font-bold font-mono">- {formatCurrency(discount)}</span>
               </div>
             )}
@@ -181,132 +200,165 @@ export function POSCheckoutModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="font-semibold text-xs text-slate-700">Select Payment Method</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
+          {/* Payment Method Toggle (Cash vs Bank Transfer) */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Method *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
                 type="button"
-                variant={paymentMethod === "CASH" ? "primary" : "outline"}
-                className={`w-full py-2.5 text-xs font-semibold ${paymentMethod === "CASH" ? "bg-blue-600 text-white" : ""}`}
                 onClick={() => setPaymentMethod("CASH")}
+                className={`py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                  paymentMethod === "CASH"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-500/20 shadow-xs"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
               >
-                💵 Cash Payment
-              </Button>
-              <Button
+                <span className="text-base">💵</span> Cash Payment
+              </button>
+
+              <button
                 type="button"
-                variant={paymentMethod === "BANK_TRANSFER" ? "primary" : "outline"}
-                className={`w-full py-2.5 text-xs font-semibold ${paymentMethod === "BANK_TRANSFER" ? "bg-blue-600 text-white" : ""}`}
                 onClick={() => setPaymentMethod("BANK_TRANSFER")}
+                className={`py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                  paymentMethod === "BANK_TRANSFER"
+                    ? "bg-blue-50 border-blue-500 text-blue-800 ring-2 ring-blue-500/20 shadow-xs"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
               >
-                🏦 Bank / Digital Wallet
-              </Button>
+                <span className="text-base">🏦</span> Bank / Digital Wallet
+              </button>
             </div>
           </div>
 
+          {/* Bank Selection & Reference Details */}
           {paymentMethod === "BANK_TRANSFER" && (
-            <div className="space-y-3 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
+            <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 space-y-3">
               <div>
-                <Label className="text-xs font-medium">Select Pakistani Bank / Wallet *</Label>
+                <Label className="text-xs font-semibold text-blue-900">Select Bank / Wallet *</Label>
                 <select
+                  required
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
-                  className="input text-xs bg-white mt-1"
-                  required
+                  className="input text-xs bg-white mt-1 w-full"
                 >
-                  <option value="">Choose Bank / Wallet</option>
+                  <option value="">-- Choose Pakistani Bank / Digital Wallet --</option>
                   {PAKISTANI_BANKS.map((b) => (
                     <option key={b.id} value={b.name}>
-                      {b.name}
+                      {b.name} ({b.code})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <Label className="text-xs font-medium">Transaction / Bank Reference #</Label>
+                <Label className="text-xs font-semibold text-blue-900">Transaction ID / Reference #</Label>
                 <Input
-                  placeholder="e.g. TRX-987654321"
+                  placeholder="e.g. TRX-982341 or Cheque #"
                   value={bankReference}
                   onChange={(e) => setBankReference(e.target.value)}
-                  className="text-xs mt-1"
+                  className="text-xs mt-1 bg-white"
                 />
               </div>
             </div>
           )}
 
-          <div className="space-y-1">
-            <Label className="font-semibold text-xs text-slate-700">Amount Paid by Customer (PKR)</Label>
+          {/* Amount Paid & Quick Cash Pills */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Amount Paid (PKR) *</Label>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAmountPaid(netPayable)}
+                  className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-semibold text-slate-700"
+                >
+                  Exact ({formatCurrency(netPayable)})
+                </button>
+                {[500, 1000, 5000].map((note) => (
+                  <button
+                    key={note}
+                    type="button"
+                    onClick={() => setAmountPaid(note)}
+                    className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-semibold text-slate-700"
+                  >
+                    Rs. {note}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Input
               type="number"
+              min="0"
               step="any"
-              value={amountPaid || ""}
+              value={amountPaid === 0 ? "" : amountPaid}
               onChange={(e) => setAmountPaid(Number(e.target.value))}
-              className="text-xl font-bold py-2 font-mono"
+              className="text-2xl font-black font-mono py-2 text-slate-900 bg-white"
               autoFocus
             />
           </div>
 
-          {paymentMethod === "CASH" && change > 0 && (
-            <div className="flex justify-between items-center p-3 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200">
-              <span className="text-xs font-medium">Cash Change to Return:</span>
-              <span className="text-lg font-bold font-mono">{formatCurrency(change)}</span>
+          {/* Walk-in Customer Blocking Alert */}
+          {isWalkInCreditBlocked && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-800">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold block">Walk-in Customer Credit Not Allowed</strong>
+                <span>Walk-in cash customers must pay the full bill ({formatCurrency(netPayable)}). Select a registered buyer to issue partial credit.</span>
+              </div>
             </div>
           )}
 
-          {/* WALK-IN CUSTOMER CREDIT BLOCKED WARNING */}
-          {isWalkInCreditBlocked ? (
-            <div className="p-3.5 bg-rose-50 text-rose-900 rounded-xl border border-rose-200 space-y-1">
-              <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
-                <span>Credit Sales Blocked for Walk-in Customers</span>
-              </div>
-              <p className="text-xs text-rose-700 font-medium">
-                Walk-in customers cannot buy on credit. Please collect full payment of{" "}
-                <strong className="font-bold">{formatCurrency(netPayable)}</strong> or select a registered buyer.
-              </p>
-            </div>
-          ) : isPartial ? (
-            <div className="p-3.5 bg-amber-50/90 text-amber-900 rounded-xl border border-amber-200 space-y-2">
-              <div className="flex justify-between items-center border-b border-amber-200/60 pb-1.5">
-                <span className="text-xs font-bold uppercase">Remaining Pending Amount:</span>
-                <span className="text-sm font-extrabold font-mono text-rose-700">{formatCurrency(netPayable - amountPaid)}</span>
+          {/* Due Date & Remaining Credit for Registered Buyer */}
+          {isPartial && !isWalkInCustomer && (
+            <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-amber-900">Remaining Balance (Receivable Credit):</span>
+                <span className="font-extrabold font-mono text-rose-600 text-sm">
+                  {formatCurrency(netPayable - amountPaid)}
+                </span>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-amber-700" /> Set Remaining Credit Payment Due Date *
+              <div>
+                <Label className="text-xs font-semibold text-amber-900 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> Expected Payment Due Date
                 </Label>
                 <Input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="text-xs bg-white text-slate-900 font-bold border-amber-300 focus:ring-amber-500"
-                  required={isPartial}
+                  className="text-xs mt-1 bg-white font-medium"
                 />
               </div>
             </div>
-          ) : null}
+          )}
+
+          {/* Change to Return */}
+          {!isPartial && amountPaid > netPayable && (
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center">
+              <span className="text-xs font-bold text-emerald-900">Change to Return to Customer:</span>
+              <span className="text-xl font-black font-mono text-emerald-700">{formatCurrency(change)}</span>
+            </div>
+          )}
         </div>
 
-        <DialogFooter className="border-t pt-4">
+        <DialogFooter className="border-t pt-3">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isWalkInCreditBlocked || isSubmitting}
-            className={`font-semibold shadow-sm flex items-center gap-2 ${
-              isWalkInCreditBlocked || isSubmitting
-                ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                : "bg-emerald-600 hover:bg-emerald-700 text-white"
-            }`}
+            disabled={isSubmitting || isWalkInCreditBlocked || (paymentMethod === "BANK_TRANSFER" && !bankName)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 shadow-sm flex items-center gap-2"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Processing Checkout...
+                <Loader2 className="w-4 h-4 animate-spin" /> Processing Sale...
               </>
             ) : (
-              "Confirm & Print Receipt"
+              <>
+                Confirm & Print Bill ({formatCurrency(netPayable)})
+              </>
             )}
           </Button>
         </DialogFooter>

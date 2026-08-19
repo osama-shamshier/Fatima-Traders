@@ -60,11 +60,11 @@ export default function DashboardPage() {
       subtext: `${stats?.salesTodayCount || 0} orders completed today`,
     },
     {
-      title: "Total Lifetime Revenue",
-      value: formatCurrency(stats?.totalRevenue || 0),
-      icon: TrendingUp,
+      title: "Customer Outstanding Credit",
+      value: formatCurrency(stats?.totalBuyerReceivables || 0),
+      icon: CreditCard,
       color: "bg-purple-600",
-      subtext: "System lifetime gross sales",
+      subtext: "Pending credit to be collected",
     },
     {
       title: "Active Operational Branches",

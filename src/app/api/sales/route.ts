@@ -232,6 +232,14 @@ export async function POST(request: NextRequest) {
                 discount: true,
                 lineTotal: true,
                 fifoCost: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    sku: true,
+                    unit: { select: { abbreviation: true } },
+                  },
+                },
               },
             },
           },

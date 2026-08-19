@@ -64,14 +64,29 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
               </tr>
             </thead>
             <tbody>
-              {sale.items.map((item: any, i: number) => (
-                <tr key={i} className="align-top">
-                  <td className="py-1">Product {item.productId.substring(0,4)}</td>
-                  <td className="text-right py-1">{Number(item.quantity)}</td>
-                  <td className="text-right py-1">{formatCurrency(Number(item.sellingPrice))}</td>
-                  <td className="text-right py-1">{formatCurrency(Number(item.lineTotal))}</td>
-                </tr>
-              ))}
+              {sale.items.map((item: any, i: number) => {
+                const productName = item.product?.name || item.name || "Product";
+                const unitAbbr = item.product?.unit?.abbreviation || "";
+                const itemDisc = Number(item.discount || 0);
+
+                return (
+                  <tr key={i} className="align-top border-b border-dashed border-slate-100">
+                    <td className="py-1">
+                      <div className="font-semibold text-slate-900 leading-tight">{productName}</div>
+                      {itemDisc > 0 && (
+                        <div className="text-[10px] text-rose-600 font-mono">
+                          (Disc: -{formatCurrency(itemDisc)})
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-right py-1 whitespace-nowrap">
+                      {Number(item.quantity)} {unitAbbr}
+                    </td>
+                    <td className="text-right py-1 whitespace-nowrap">{formatCurrency(Number(item.sellingPrice))}</td>
+                    <td className="text-right py-1 font-bold whitespace-nowrap">{formatCurrency(Number(item.lineTotal))}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
