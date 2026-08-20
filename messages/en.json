@@ -156,10 +156,16 @@
     "cash": "💵 Cash Payment",
     "bankTransfer": "🏦 Bank / Digital Wallet",
     "selectBank": "Select Pakistani Bank / Wallet",
-    "bankRef": "TRX / Bank Reference #",
     "notes": "Invoice Remarks / Notes",
     "processPayment": "Complete Sale & Print Bill",
-    "processing": "Processing Sale..."
+    "processing": "Processing Sale...",
+    "walkInCreditBlockedTitle": "Walk-in Customer Credit Not Allowed",
+    "walkInCreditBlockedMsg": "Walk-in cash customers must pay the full bill ({amount}). Select a registered buyer to issue partial credit.",
+    "expectedDueDate": "Expected Payment Due Date",
+    "roundOffAdjustment": "Round-Off Adjustment",
+    "quickRounding": "Quick Rounding",
+    "reset": "Reset",
+    "exact": "Exact"
   },
   "branches": {
     "title": "Store Branches",

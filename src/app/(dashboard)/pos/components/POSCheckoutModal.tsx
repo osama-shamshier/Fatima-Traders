@@ -144,7 +144,7 @@ export function POSCheckoutModal({
             {/* Round Off Input Field */}
             <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/80">
               <span className="font-bold text-slate-700 flex items-center gap-1">
-                <Calculator className="w-3.5 h-3.5 text-blue-600" /> Round-Off (+/-):
+                <Calculator className="w-3.5 h-3.5 text-blue-600" /> {t("roundOffAdjustment")} (+/-):
               </span>
               <div className="flex items-center gap-2">
                 <Input
@@ -161,7 +161,7 @@ export function POSCheckoutModal({
             {/* Quick Round Off Buttons */}
             {showSuggestions && (
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Rounding:</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">{t("quickRounding")}:</span>
                 <button
                   type="button"
                   onClick={() => handleRoundOffChange(lowerDiff)}
@@ -192,7 +192,7 @@ export function POSCheckoutModal({
                     onClick={() => handleRoundOffChange(0)}
                     className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-slate-600 underline"
                   >
-                    Reset
+                    {t("reset")}
                   </button>
                 )}
               </div>
@@ -276,7 +276,7 @@ export function POSCheckoutModal({
                   onClick={() => setAmountPaid(netPayable)}
                   className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-semibold text-slate-700"
                 >
-                  Exact ({formatCurrency(netPayable)})
+                  {t("exact")} ({formatCurrency(netPayable)})
                 </button>
                 {[500, 1000, 5000].map((note) => (
                   <button
@@ -307,8 +307,8 @@ export function POSCheckoutModal({
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-800">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="font-bold block">Walk-in Customer Credit Not Allowed</strong>
-                <span>Walk-in cash customers must pay the full bill ({formatCurrency(netPayable)}). Select a registered buyer to issue partial credit.</span>
+                <strong className="font-bold block">{t("walkInCreditBlockedTitle")}</strong>
+                <span>{t("walkInCreditBlockedMsg", { amount: formatCurrency(netPayable) })}</span>
               </div>
             </div>
           )}
@@ -325,7 +325,7 @@ export function POSCheckoutModal({
 
               <div>
                 <Label className="text-xs font-semibold text-amber-900 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> Expected Payment Due Date
+                  <Calendar className="w-3.5 h-3.5" /> {t("expectedDueDate")}
                 </Label>
                 <Input
                   type="date"
