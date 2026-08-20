@@ -33,7 +33,7 @@ export async function GET(
       }
     });
 
-    // Fetch Sales Returns (Credit/Received)
+    // Fetch Sales Returns
     const returns = await prisma.salesReturn.findMany({
       where: { buyerId: id, isDeleted: false },
       select: {
@@ -41,6 +41,7 @@ export async function GET(
         returnDate: true,
         totalRefund: true,
         refundMethod: true,
+        referenceNumber: true,
         notes: true,
       }
     });
@@ -75,14 +76,24 @@ export async function GET(
 
     // Format Returns
     returns.forEach(ret => {
+      const isAdjusted = ret.refundMethod === "ADJUSTMENT" || (ret as any).refundMethod === "BUYER_CREDIT";
+      const isCash = ret.refundMethod === "CASH";
+      const isBank = ret.refundMethod === "BANK_TRANSFER";
+
       ledger.push({
         id: ret.id,
         date: ret.returnDate,
         type: 'RETURN',
-        reference: ret.refundMethod,
-        description: `Sales Return ${ret.notes ? '- ' + ret.notes : ''}`,
+        reference: ret.referenceNumber || ret.refundMethod,
+        description: isAdjusted
+          ? `Sales Return (Adjusted in Pending Credit) ${ret.notes ? '- ' + ret.notes : ''}`
+          : isCash
+          ? `Sales Return (Cash Refund Payout - Debt Unaffected) ${ret.notes ? '- ' + ret.notes : ''}`
+          : `Sales Return (Bank Transfer Refund - Debt Unaffected) ${ret.notes ? '- ' + ret.notes : ''}`,
         debit: 0,
-        credit: Number(ret.totalRefund), // Receivable decreases
+        // Only credit (reduce debt) if the return was adjusted against credit!
+        // If refunded as physical cash, the customer's debt is unaffected.
+        credit: isAdjusted ? Number(ret.totalRefund) : 0,
       });
     });
 

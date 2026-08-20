@@ -16,7 +16,7 @@ export async function GET() {
         },
         salesReturns: {
           where: { isDeleted: false },
-          select: { totalRefund: true },
+          select: { totalRefund: true, refundMethod: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -35,14 +35,14 @@ export async function GET() {
         0
       );
 
-      // 3. Total Sales Returns (Credit)
-      const totalReturns = (buyer.salesReturns || []).reduce(
-        (sum, ret) => sum + Number(ret.totalRefund || 0),
-        0
-      );
+      // 3. Total Sales Returns Adjusted against Customer Debt (ADJUSTMENT only)
+      // When refund is given as physical CASH or BANK_TRANSFER, the customer's debt is NOT reduced!
+      const totalAdjustedReturns = (buyer.salesReturns || [])
+        .filter((ret: any) => ret.refundMethod === "ADJUSTMENT" || ret.refundMethod === "BUYER_CREDIT")
+        .reduce((sum, ret) => sum + Number(ret.totalRefund || 0), 0);
 
       // 4. Exact Double-Entry Accounting Ledger Outstanding Balance (Ground Truth)
-      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalReturns);
+      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalAdjustedReturns);
 
       return {
         id: buyer.id,
