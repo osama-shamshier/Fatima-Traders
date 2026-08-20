@@ -311,7 +311,7 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
             className="flex items-center gap-2 text-white transition-opacity hover:opacity-80"
           >
             <Store className="h-6 w-6 text-blue-500" />
-            <span className="text-base font-bold tracking-tight text-white">Fatima Traders</span>
+            <span className="text-base font-bold tracking-tight text-white">{t("storeName")}</span>
           </Link>
           <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white md:hidden">
             <X className="h-5 w-5" />

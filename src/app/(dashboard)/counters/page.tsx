@@ -5,11 +5,15 @@ import { CounterFormModal } from "@/components/counters/CounterFormModal";
 import { OpenSessionModal } from "@/components/counters/OpenSessionModal";
 import { CloseSessionModal } from "@/components/counters/CloseSessionModal";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2, KeyRound, LockKeyhole } from "lucide-react";
+import { Plus, Edit, Trash2, KeyRound, LockKeyhole, Monitor } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
+import { useTranslations } from "next-intl";
 
 export default function CountersPage() {
+  const t = useTranslations("counters");
+  const tc = useTranslations("common");
+
   const [counters, setCounters] = useState<any[]>([]);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isOpenSessionModalOpen, setIsOpenSessionModalOpen] = useState(false);
@@ -49,68 +53,73 @@ export default function CountersPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Cash Counters</h1>
-        <Button onClick={() => { setEditingCounter(null); setIsFormModalOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Counter
+    <div className="p-4 md:p-8 pt-6 max-w-6xl mx-auto space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+            <Monitor className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
+        </div>
+        <Button onClick={() => { setEditingCounter(null); setIsFormModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 font-bold gap-1.5 shadow-sm">
+          <Plus className="h-4 w-4" /> {t("addCounter")}
         </Button>
       </div>
 
-      <div className="border rounded-md">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-muted text-muted-foreground">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
             <tr>
-              <th className="px-4 py-3 font-medium">Counter Name</th>
-              <th className="px-4 py-3 font-medium">Branch</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Session Status</th>
-              <th className="px-4 py-3 font-medium">Active Cashier</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
+              <th className="px-4 py-3.5">{t("colCounterName")}</th>
+              <th className="px-4 py-3.5">{t("colBranch")}</th>
+              <th className="px-4 py-3.5">{t("colStatus")}</th>
+              <th className="px-4 py-3.5">{t("colSession")}</th>
+              <th className="px-4 py-3.5">{t("colCashier")}</th>
+              <th className="px-4 py-3.5 text-right">{t("colActions")}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100 font-medium">
             {isLoading ? (
               <TableLoader colSpan={6} text="Loading counters..." />
             ) : counters.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-4 text-center">No counters found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">{t("noCounters")}</td></tr>
             ) : (
               counters.map((counter) => {
                 const openSession = counter.sessions && counter.sessions.length > 0 ? counter.sessions[0] : null;
                 
                 return (
-                  <tr key={counter.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium">{counter.name}</td>
-                    <td className="px-4 py-3">{counter.branch?.name || "-"}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={counter.isActive ? "success" : "muted"}>
-                        {counter.isActive ? "Active" : "Inactive"}
+                  <tr key={counter.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3.5 font-bold text-slate-900">{counter.name}</td>
+                    <td className="px-4 py-3.5 text-slate-600">{counter.branch?.name || "-"}</td>
+                    <td className="px-4 py-3.5">
+                      <Badge variant={counter.isActive ? "success" : "outline"}>
+                        {counter.isActive ? tc("active") : tc("inactive")}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       {openSession ? (
-                        <Badge variant="success">OPEN</Badge>
+                        <Badge variant="success">{t("sessionOpen")}</Badge>
                       ) : (
-                        <Badge variant="muted">CLOSED</Badge>
+                        <Badge variant="outline">{t("sessionClosed")}</Badge>
                       )}
                     </td>
-                    <td className="px-4 py-3">{openSession?.user?.name || "-"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                    <td className="px-4 py-3.5 text-slate-700 font-bold">{openSession?.user?.name || "-"}</td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         {openSession ? (
-                          <Button variant="outline" size="sm" className="text-red-600" onClick={() => { setSessionCounter({ ...counter, sessionId: openSession.id }); setIsCloseSessionModalOpen(true); }}>
-                            <LockKeyhole className="h-4 w-4 mr-1" /> Close Session
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => { setSessionCounter({ ...counter, sessionId: openSession.id }); setIsCloseSessionModalOpen(true); }}>
+                            <LockKeyhole className="h-3.5 w-3.5 mr-1" /> {t("closeSession")}
                           </Button>
                         ) : (
-                          <Button variant="outline" size="sm" className="text-green-600" onClick={() => { setSessionCounter(counter); setIsOpenSessionModalOpen(true); }}>
-                            <KeyRound className="h-4 w-4 mr-1" /> Open Session
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50" onClick={() => { setSessionCounter(counter); setIsOpenSessionModalOpen(true); }}>
+                            <KeyRound className="h-3.5 w-3.5 mr-1" /> {t("openSession")}
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingCounter(counter); setIsFormModalOpen(true); }}>
-                          <Edit className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" onClick={() => { setEditingCounter(counter); setIsFormModalOpen(true); }} className="h-7 w-7 p-0">
+                          <Edit className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(counter.id)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600" onClick={() => handleDelete(counter.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </td>

@@ -6,6 +6,7 @@
     "switchTo": "Switch language"
   },
   "header": {
+    "storeName": "Fatima Traders",
     "logout": "Logout",
     "signOut": "Sign Out",
     "mainBranch": "Main Branch",
@@ -13,6 +14,7 @@
     "openMenu": "Open menu"
   },
   "sidebar": {
+    "storeName": "Fatima Traders",
     "sections": {
       "main": "Main",
       "organization": "Organization",
@@ -158,6 +160,37 @@
     "notes": "Invoice Remarks / Notes",
     "processPayment": "Complete Sale & Print Bill",
     "processing": "Processing Sale..."
+  },
+  "branches": {
+    "title": "Store Branches",
+    "subtitle": "Manage multi-branch locations, addresses, and assign staff.",
+    "addBranch": "Add Branch",
+    "colBranchName": "Branch Name",
+    "colAddress": "Address",
+    "colPhone": "Phone",
+    "colUsers": "Users",
+    "colCounters": "Cash Counters",
+    "colStatus": "Status",
+    "colActions": "Actions",
+    "noBranches": "No branches registered.",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "counters": {
+    "title": "Cash Counters & Sessions",
+    "subtitle": "Manage physical cash registers, open/close daily shifts, and reconcile cash.",
+    "addCounter": "Add Counter",
+    "colCounterName": "Counter Name",
+    "colBranch": "Branch",
+    "colStatus": "Status",
+    "colSession": "Session Status",
+    "colCashier": "Active Cashier",
+    "colActions": "Actions",
+    "openSession": "Open Session",
+    "closeSession": "Close Session",
+    "sessionOpen": "OPEN",
+    "sessionClosed": "CLOSED",
+    "noCounters": "No cash counters registered."
   },
   "common": {
     "add": "Add",

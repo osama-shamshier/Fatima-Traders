@@ -6,6 +6,7 @@
     "switchTo": "زبان تبدیل کریں"
   },
   "header": {
+    "storeName": "فاطمہ ٹریڈرز",
     "logout": "لاگ آؤٹ",
     "signOut": "لاگ آؤٹ",
     "mainBranch": "مرکزی برانچ",
@@ -13,6 +14,7 @@
     "openMenu": "مینو کھولیں"
   },
   "sidebar": {
+    "storeName": "فاطمہ ٹریڈرز",
     "sections": {
       "main": "مین",
       "organization": "ادارہ",
@@ -158,6 +160,37 @@
     "notes": "بل کے نوٹس / تفصیل",
     "processPayment": "بل مکمل کریں اور پرنٹ کریں",
     "processing": "پروسیس ہو رہا ہے..."
+  },
+  "branches": {
+    "title": "اسٹور برانچز",
+    "subtitle": "مختلف برانچز کے پتے، فون نمبر اور کاؤنٹرز کا انتظام کریں۔",
+    "addBranch": "نئی برانچ شامل کریں",
+    "colBranchName": "برانچ کا نام",
+    "colAddress": "پتہ",
+    "colPhone": "فون نمبر",
+    "colUsers": "یوزرز",
+    "colCounters": "کیش کاؤنٹرز",
+    "colStatus": "حالت",
+    "colActions": "کارروائی",
+    "noBranches": "کوئی برانچ درج نہیں ہے۔",
+    "active": "فعال",
+    "inactive": "غیر فعال"
+  },
+  "counters": {
+    "title": "کیش کاؤنٹرز اور سیشنز",
+    "subtitle": "کاؤنٹر شفٹیں کھولیں/بند کریں اور روزانہ کیش کا حساب ملائیں۔",
+    "addCounter": "نیا کاؤنٹر شامل کریں",
+    "colCounterName": "کاؤنٹر کا نام",
+    "colBranch": "برانچ",
+    "colStatus": "حالت",
+    "colSession": "سیشن کی حالت",
+    "colCashier": "موجودہ کیشیئر",
+    "colActions": "کارروائی",
+    "openSession": "سیشن کھولیں",
+    "closeSession": "سیشن بند کریں",
+    "sessionOpen": "اوپن",
+    "sessionClosed": "بند",
+    "noCounters": "کوئی کیش کاؤنٹر درج نہیں ہے۔"
   },
   "common": {
     "add": "شامل کریں",

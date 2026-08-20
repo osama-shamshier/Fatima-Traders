@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { BranchFormModal } from "@/components/branches/BranchFormModal";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
+import { useTranslations } from "next-intl";
 
 export default function BranchesPage() {
+  const t = useTranslations("branches");
+  const tc = useTranslations("common");
+
   const [branches, setBranches] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any>(null);
@@ -44,52 +48,57 @@ export default function BranchesPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Branches</h1>
-        <Button onClick={() => { setEditingBranch(null); setIsModalOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Branch
+    <div className="p-4 md:p-8 pt-6 max-w-6xl mx-auto space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+            <Building2 className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
+        </div>
+        <Button onClick={() => { setEditingBranch(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 font-bold gap-1.5 shadow-sm">
+          <Plus className="h-4 w-4" /> {t("addBranch")}
         </Button>
       </div>
 
-      <div className="border rounded-md">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-muted text-muted-foreground">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
             <tr>
-              <th className="px-4 py-3 font-medium">Branch Name</th>
-              <th className="px-4 py-3 font-medium">Address</th>
-              <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">Users</th>
-              <th className="px-4 py-3 font-medium">Counters</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
+              <th className="px-4 py-3.5">{t("colBranchName")}</th>
+              <th className="px-4 py-3.5">{t("colAddress")}</th>
+              <th className="px-4 py-3.5">{t("colPhone")}</th>
+              <th className="px-4 py-3.5">{t("colUsers")}</th>
+              <th className="px-4 py-3.5">{t("colCounters")}</th>
+              <th className="px-4 py-3.5">{t("colStatus")}</th>
+              <th className="px-4 py-3.5 text-right">{t("colActions")}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100 font-medium">
             {isLoading ? (
               <TableLoader colSpan={7} text="Loading branches..." />
             ) : branches.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-4 text-center">No branches found.</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-slate-400">{t("noBranches")}</td></tr>
             ) : (
               branches.map((branch) => (
-                <tr key={branch.id} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className="px-4 py-3 font-medium">{branch.name}</td>
-                  <td className="px-4 py-3">{branch.address || "-"}</td>
-                  <td className="px-4 py-3">{branch.phone || "-"}</td>
-                  <td className="px-4 py-3">{branch._count?.users || 0}</td>
-                  <td className="px-4 py-3">{branch._count?.cashCounters || 0}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={branch.isActive ? "success" : "muted"}>
-                      {branch.isActive ? "Active" : "Inactive"}
+                <tr key={branch.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="px-4 py-3.5 font-bold text-slate-900">{branch.name}</td>
+                  <td className="px-4 py-3.5 text-slate-600">{branch.address || "-"}</td>
+                  <td className="px-4 py-3.5 font-mono text-slate-600">{branch.phone || "-"}</td>
+                  <td className="px-4 py-3.5 font-mono font-bold text-blue-600">{branch._count?.users || 0}</td>
+                  <td className="px-4 py-3.5 font-mono font-bold text-purple-600">{branch._count?.cashCounters || 0}</td>
+                  <td className="px-4 py-3.5">
+                    <Badge variant={branch.isActive ? "success" : "outline"}>
+                      {branch.isActive ? t("active") : t("inactive")}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => { setEditingBranch(branch); setIsModalOpen(true); }}>
-                        <Edit className="h-4 w-4" />
+                  <td className="px-4 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingBranch(branch); setIsModalOpen(true); }} className="h-7 w-7 p-0">
+                        <Edit className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(branch.id)}>
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600" onClick={() => handleDelete(branch.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </td>
