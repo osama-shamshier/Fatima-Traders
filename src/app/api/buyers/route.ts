@@ -8,53 +8,41 @@ export async function GET() {
       include: {
         sales: {
           where: { isDeleted: false },
-          select: { grandTotal: true, subtotal: true, amountPaid: true },
+          select: { grandTotal: true, subtotal: true },
         },
         buyerPayments: {
           where: { isDeleted: false },
           select: { amount: true },
         },
         salesReturns: {
-          where: { 
-            isDeleted: false,
-            refundMethod: "ADJUSTMENT",
-          },
+          where: { isDeleted: false },
           select: { totalRefund: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const formattedBuyers = buyers.map((buyer: any) => {
+    const formattedBuyers = buyers.map((buyer) => {
       // 1. Total Invoiced Sales (Debit)
       const totalSales = (buyer.sales || []).reduce(
-        (sum: number, sale: any) => sum + Number(sale.grandTotal || sale.subtotal || 0),
+        (sum, sale) => sum + Number(sale.grandTotal || sale.subtotal || 0),
         0
       );
 
-      // 2. Total Initial Paid at POS Checkout (Credit)
-      const totalPaidAtCheckout = (buyer.sales || []).reduce(
-        (sum: number, sale: any) => sum + Number(sale.amountPaid || 0),
+      // 2. Total Payments Received (Credit)
+      const totalPayments = (buyer.buyerPayments || []).reduce(
+        (sum, payment) => sum + Number(payment.amount || 0),
         0
       );
 
-      // 3. Total Subsequent Ledger Payments (Credit)
-      const totalSubsequentPayments = (buyer.buyerPayments || []).reduce(
-        (sum: number, payment: any) => sum + Number(payment.amount || 0),
+      // 3. Total Sales Returns (Credit)
+      const totalReturns = (buyer.salesReturns || []).reduce(
+        (sum, ret) => sum + Number(ret.totalRefund || 0),
         0
       );
 
-      // 4. Total Sales Returns Adjusted in Pending Credit (Credit)
-      const totalAdjustedReturns = (buyer.salesReturns || []).reduce(
-        (sum: number, ret: any) => sum + Number(ret.totalRefund || 0),
-        0
-      );
-
-      // 5. Exact Double-Entry Outstanding Balance (100% consistent with ledger)
-      const totalOutstanding = Math.max(
-        0,
-        totalSales - totalPaidAtCheckout - totalSubsequentPayments - totalAdjustedReturns
-      );
+      // 4. Exact Double-Entry Accounting Ledger Outstanding Balance (Ground Truth)
+      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalReturns);
 
       return {
         id: buyer.id,
