@@ -36,22 +36,22 @@ export function generatePartiesPDF({
   const isCustomer = partyType === "Customers";
   const amountHeader = isCustomer ? "Remaining Due (PKR)" : "Payable Due (PKR)";
   const reportTitle = isCustomer
-    ? "Customer Accounts & Balances Report"
-    : "Supplier Accounts & Payables Report";
+    ? "Customer Accounts & Balances Directory"
+    : "Supplier Accounts & Payables Directory";
 
   // Document Title Header
   doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, 210, 26, "F");
+  doc.rect(0, 0, 210, 24, "F");
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text(storeName.toUpperCase(), 14, 11);
+  doc.setFontSize(15);
+  doc.text(storeName.toUpperCase(), 14, 10);
 
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(203, 213, 225); // slate-300
-  doc.text(reportTitle, 14, 18);
+  doc.text(reportTitle, 14, 17);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-PK", {
@@ -64,42 +64,9 @@ export function generatePartiesPDF({
     minute: "2-digit",
   });
 
-  doc.setFontSize(8.5);
-  doc.text(`Generated: ${dateStr} at ${timeStr}`, 196, 11, { align: "right" });
-  doc.text(`Total Records: ${items.length}`, 196, 18, { align: "right" });
-
-  // Filter Info Card
-  doc.setDrawColor(226, 232, 240); // slate-200
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.roundedRect(14, 31, 182, 16, 2, 2, "FD");
-
-  doc.setTextColor(51, 65, 85); // slate-700
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("Filter Criteria:", 18, 38);
-
-  doc.setFont("helvetica", "normal");
-  const areaLabel = areaQuery.trim() ? `"${areaQuery.trim()}"` : "All Areas / Locations";
-  const balanceLabel =
-    filterType === "OUTSTANDING"
-      ? "Outstanding Balances Only (> 0 PKR)"
-      : "All Balances";
-
-  doc.text(`Area / Address: ${areaLabel}`, 45, 38);
-  doc.text(`Balance Filter: ${balanceLabel}`, 45, 43);
-
-  // Total Outstanding summary on top right of the card
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(225, 29, 72); // rose-600
-  doc.text(
-    `Total Remaining: Rs. ${Number(totalOutstanding || 0).toLocaleString("en-PK", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`,
-    192,
-    40.5,
-    { align: "right" }
-  );
+  doc.setFontSize(8);
+  doc.text(`Generated: ${dateStr} at ${timeStr}`, 196, 10, { align: "right" });
+  doc.text(`Total Records: ${items.length}`, 196, 17, { align: "right" });
 
   // Table Data Preparation
   const tableRows = items.map((item, index) => {
@@ -117,9 +84,9 @@ export function generatePartiesPDF({
     ];
   });
 
-  // Generate Table
+  // Generate Table directly below header without filter criteria box
   autoTable(doc, {
-    startY: 51,
+    startY: 29,
     head: [
       [
         "#",
