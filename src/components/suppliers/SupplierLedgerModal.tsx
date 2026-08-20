@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Truck, Download, Calendar, X, FileText } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
+import { useTranslations } from "next-intl";
 
 interface SupplierLedgerModalProps {
   isOpen: boolean;
@@ -17,6 +18,9 @@ interface SupplierLedgerModalProps {
 }
 
 export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName }: SupplierLedgerModalProps) {
+  const t = useTranslations("supplierLedger");
+  const tc = useTranslations("common");
+
   const [ledger, setLedger] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState<string>("");
@@ -138,44 +142,39 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
   };
 
   const setPresetRange = (type: "THIS_MONTH" | "LAST_30" | "ALL") => {
-    if (type === "ALL") {
-      setStartDate("");
-      setEndDate("");
-      return;
-    }
-
     const now = new Date();
-    const endStr = now.toISOString().split("T")[0];
-
     if (type === "THIS_MONTH") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       setStartDate(firstDay.toISOString().split("T")[0]);
-      setEndDate(endStr);
+      setEndDate(now.toISOString().split("T")[0]);
     } else if (type === "LAST_30") {
       const past30 = new Date();
       past30.setDate(past30.getDate() - 30);
       setStartDate(past30.toISOString().split("T")[0]);
-      setEndDate(endStr);
+      setEndDate(now.toISOString().split("T")[0]);
+    } else {
+      setStartDate("");
+      setEndDate("");
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl w-full sm:max-w-6xl max-h-[94vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
-        {/* Modal Header */}
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-full sm:max-w-5xl max-h-[92vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
+        {/* Header (Hidden in Print) */}
         <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between print:hidden">
           <div>
             <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Truck className="w-5 h-5 text-blue-600" /> Supplier Financial Ledger — {supplierName}
+              <Truck className="w-5 h-5 text-blue-600" /> {t("title")} — {supplierName}
             </DialogTitle>
-            <p className="text-xs text-slate-500">
-              Filter by date, view opening balance, and download official PDF statements or Excel spreadsheets.
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t("subtitle", { name: supplierName })}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Closing Balance Due</span>
+            <div className="text-end">
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">{t("closingBalance")}</span>
               <span className={`text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                 {formatCurrency(closingBalance)}
               </span>
@@ -189,7 +188,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 border-slate-300 hover:bg-slate-50"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" /> Export CSV / Excel
+                <Download className="w-3.5 h-3.5 text-blue-600" /> Excel (CSV)
               </Button>
 
               <Button
@@ -198,14 +197,14 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
               >
-                <FileText className="w-3.5 h-3.5" /> Download PDF Statement
+                <FileText className="w-3.5 h-3.5" /> PDF Statement
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Date Filter Bar (Hidden in Print) */}
-        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200 mt-3 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
+        {/* Date Filter Controls (Hidden in Print) */}
+        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200 mt-2 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-slate-700 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date Range:
@@ -244,7 +243,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
             )}
           </div>
 
-          {/* Quick Filter Presets */}
+          {/* Preset Buttons */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setPresetRange("THIS_MONTH")}
@@ -271,9 +270,9 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
           </div>
         </div>
 
-        {/* Printable / Viewable Ledger Content */}
+        {/* Printable Area */}
         <div id="supplier-ledger-print-area" className="flex-1 overflow-y-auto mt-2 p-1">
-          {/* Official Letterhead (Visible in Print / PDF) */}
+          {/* Printable Letterhead */}
           <div className="hidden print:block mb-6 border-b pb-4">
             <div className="flex justify-between items-start">
               <div>
@@ -281,10 +280,10 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 <p className="text-xs text-slate-600">Chemical & Packing Materials Store</p>
                 <p className="text-xs text-slate-600">Purani Ghalla Mandi, Ahmad Pur East | Tel: 0334-7776934</p>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <h2 className="text-lg font-bold text-slate-900 uppercase">Supplier Account Statement</h2>
                 <p className="text-xs text-slate-500 font-mono">Date Generated: {formatDate(new Date())}</p>
-                <p className="text-xs font-bold text-slate-800 mt-1">Supplier: {supplierName}</p>
+                <p className="text-xs font-bold text-slate-800 mt-1">Vendor: {supplierName}</p>
                 <p className="text-[11px] text-blue-700 font-semibold font-mono mt-0.5">
                   Period: {startDate ? formatDate(startDate) : "Beginning"} — {endDate ? formatDate(endDate) : "Today"}
                 </p>
@@ -294,25 +293,25 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
             {/* Print Summary Metrics */}
             <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t text-xs">
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Opening Balance:</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("openingBalance")}:</span>
                 <strong className="text-slate-900 font-mono">{formatCurrency(openingBalance)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Period Purchases (Debit):</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("periodDebit")}:</span>
                 <strong className="text-rose-700 font-mono">{formatCurrency(periodDebit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Period Payments (Credit):</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("periodCredit")}:</span>
                 <strong className="text-emerald-700 font-mono">{formatCurrency(periodCredit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Closing Balance Due:</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("closingBalance")}:</span>
                 <strong className="text-rose-700 font-mono font-black">{formatCurrency(closingBalance)}</strong>
               </div>
             </div>
           </div>
 
-          {/* Table */}
+          {/* Ledger Table */}
           <div className="border rounded-xl bg-white shadow-xs overflow-hidden">
             {loading ? (
               <Loader text="Loading supplier ledger..." className="py-12" />
@@ -320,13 +319,13 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
               <table className="w-full text-xs text-left border-collapse table-fixed">
                 <thead className="bg-slate-50 sticky top-0 font-semibold border-b text-slate-700 uppercase tracking-wider">
                   <tr>
-                    <th className="p-3 w-28">Date</th>
-                    <th className="p-3 w-28">Type</th>
-                    <th className="p-3 w-32">Ref / Invoice #</th>
-                    <th className="p-3">Description</th>
-                    <th className="p-3 text-right w-36">Debit (Bill Added)</th>
-                    <th className="p-3 text-right w-36">Credit (Paid)</th>
-                    <th className="p-3 text-right w-40">Running Balance</th>
+                    <th className="p-3 w-28">{t("colDate")}</th>
+                    <th className="p-3 w-24">{t("colType")}</th>
+                    <th className="p-3 w-32">{t("colRef")}</th>
+                    <th className="p-3">{t("colDescription")}</th>
+                    <th className="p-3 text-right w-36">{t("colDebit")}</th>
+                    <th className="p-3 text-right w-36">{t("colCredit")}</th>
+                    <th className="p-3 text-right w-40">{t("colBalance")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -340,7 +339,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                         </span>
                       </td>
                       <td className="p-3 font-mono text-slate-400">-</td>
-                      <td className="p-3 text-slate-800">Opening Balance Brought Forward</td>
+                      <td className="p-3 text-slate-800">{t("openingBalance")}</td>
                       <td className="p-3 text-right font-mono">-</td>
                       <td className="p-3 text-right font-mono">-</td>
                       <td className="p-3 text-right font-mono font-extrabold text-slate-900">
@@ -349,11 +348,20 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                     </tr>
                   )}
 
-                  {filteredLedger.map((entry, idx) => (
-                    <tr key={`${entry.id}-${idx}`} className="hover:bg-slate-50">
-                      <td className="p-3 font-mono text-slate-600 whitespace-nowrap">{formatDate(entry.date)}</td>
+                  {filteredLedger.map((entry, index) => (
+                    <tr key={`${entry.id}-${index}`} className="hover:bg-slate-50">
+                      <td className="p-3 text-slate-600 font-mono whitespace-nowrap">{formatDate(entry.date)}</td>
                       <td className="p-3">
-                        <Badge variant={entry.type === "PURCHASE" ? "outline" : "success"} className="text-[11px] font-bold">
+                        <Badge
+                          variant={
+                            entry.type === "PURCHASE"
+                              ? "outline"
+                              : entry.type === "PAYMENT"
+                              ? "success"
+                              : "warning"
+                          }
+                          className="text-[11px] font-bold"
+                        >
                           {entry.type}
                         </Badge>
                       </td>
@@ -365,7 +373,11 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                       <td className="p-3 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
                         {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
                       </td>
-                      <td className="p-3 text-right font-mono font-extrabold text-sm text-slate-900 whitespace-nowrap">
+                      <td
+                        className={`p-3 text-right font-mono font-extrabold text-sm whitespace-nowrap ${
+                          entry.calculatedBalance > 0 ? "text-slate-900" : "text-emerald-700"
+                        }`}
+                      >
                         {formatCurrency(entry.calculatedBalance)}
                       </td>
                     </tr>
@@ -374,7 +386,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                   {filteredLedger.length === 0 && openingBalance === 0 && (
                     <tr>
                       <td colSpan={7} className="p-12 text-center text-slate-400">
-                        No ledger transactions found for the selected date range.
+                        {t("noEntries")}
                       </td>
                     </tr>
                   )}
@@ -389,7 +401,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
               <p className="border-t border-slate-400 pt-1 w-44 text-center font-bold">Prepared By</p>
             </div>
             <div>
-              <p className="border-t border-slate-400 pt-1 w-44 text-center font-bold">Supplier Signature</p>
+              <p className="border-t border-slate-400 pt-1 w-44 text-center font-bold">Vendor Signature</p>
             </div>
             <div>
               <p className="border-t border-slate-400 pt-1 w-44 text-center font-bold">Authorized Signatory</p>
@@ -397,12 +409,13 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
           </div>
         </div>
 
+        {/* Dialog Footer */}
         <DialogFooter className="mt-4 border-t pt-3 flex justify-between items-center shrink-0 print:hidden">
           <Button variant="outline" onClick={fetchLedger} size="sm">
-            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh Ledger
+            <RefreshCw className="w-3.5 h-3.5 me-1" /> {tc("refresh")}
           </Button>
           <Button variant="outline" onClick={onClose} size="sm">
-            Close
+            {tc("cancel")}
           </Button>
         </DialogFooter>
 

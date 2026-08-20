@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { TableLoader } from "@/components/ui/loader";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, Plus, Truck, RefreshCw, Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function SupplierPaymentsPage() {
+  const t = useTranslations("supplierPayments");
+  const tc = useTranslations("common");
+
   const [payments, setPayments] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -152,34 +155,32 @@ export default function SupplierPaymentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
-            <CreditCard className="w-7 h-7 text-blue-600" /> Supplier Payments & Disbursements
+            <CreditCard className="w-7 h-7 text-blue-600" /> {t("title")}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Record payments to vendors for inventory purchase bills and payables settlement.
-          </p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
         </div>
         <Button
           onClick={() => setIsModalOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-sm"
         >
-          <Plus className="w-4 h-4" /> Record Supplier Payment
+          <Plus className="w-4 h-4" /> {t("recordPayment")}
         </Button>
       </div>
 
       {/* Search Bar & Method Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
         <div className="sm:col-span-7 relative">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+          <Search className="absolute start-3.5 top-3 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search payments by supplier name, bill #, bank TRX ref, notes..."
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-9 text-xs bg-white border-slate-200 shadow-xs h-10 rounded-xl"
+            className="ps-10 pe-9 text-xs bg-white border-slate-200 shadow-xs h-10 rounded-xl"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+              className="absolute end-3 top-3 text-slate-400 hover:text-slate-600"
             >
               <X className="w-4 h-4" />
             </button>
@@ -189,9 +190,9 @@ export default function SupplierPaymentsPage() {
         {/* Method Filter Pills */}
         <div className="sm:col-span-5 flex gap-1.5 overflow-x-auto justify-start sm:justify-end">
           {[
-            { id: "ALL", label: "All Payments" },
-            { id: "CASH", label: "💵 Cash" },
-            { id: "BANK_TRANSFER", label: "🏦 Bank / Wallet" },
+            { id: "ALL", label: t("allPayments") },
+            { id: "CASH", label: t("cash") },
+            { id: "BANK_TRANSFER", label: t("bank") },
           ].map((pill) => (
             <button
               key={pill.id}
@@ -211,15 +212,15 @@ export default function SupplierPaymentsPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
-          <span className="text-slate-500 font-semibold">Total Paid to Suppliers:</span>
+          <span className="text-slate-500 font-semibold">{t("totalDisbursed")}:</span>
           <span className="text-base font-extrabold font-mono text-rose-600">
             {formatCurrency(totalDisbursed)}
           </span>
         </div>
         <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
-          <span className="text-slate-500 font-semibold">Total Payment Transactions:</span>
+          <span className="text-slate-500 font-semibold">{t("totalCount")}:</span>
           <span className="text-base font-extrabold font-mono text-blue-700">
-            {payments.length} Transactions
+            {payments.length}
           </span>
         </div>
       </div>
@@ -228,10 +229,10 @@ export default function SupplierPaymentsPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center bg-slate-50/80">
           <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-            Payment History Log ({filteredPayments.length})
+            {t("historyTitle")} ({filteredPayments.length})
           </h3>
           <Button variant="outline" size="sm" onClick={fetchPayments} className="h-7 text-xs">
-            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+            <RefreshCw className="w-3.5 h-3.5 me-1" /> {tc("refresh")}
           </Button>
         </div>
 
@@ -239,13 +240,13 @@ export default function SupplierPaymentsPage() {
           <table className="w-full caption-bottom text-xs text-left">
             <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
               <tr>
-                <th className="h-11 px-4">Date</th>
-                <th className="h-11 px-4">Supplier Name</th>
-                <th className="h-11 px-4">Purchase Bill #</th>
-                <th className="h-11 px-4">Payment Method</th>
-                <th className="h-11 px-4">Bank / TRX Reference</th>
-                <th className="h-11 px-4 text-right">Amount Paid</th>
-                <th className="h-11 px-4">Notes</th>
+                <th className="h-11 px-4">{t("colDate")}</th>
+                <th className="h-11 px-4">{t("colSupplier")}</th>
+                <th className="h-11 px-4">{t("colBill")}</th>
+                <th className="h-11 px-4">{t("colMethod")}</th>
+                <th className="h-11 px-4">{t("colBankRef")}</th>
+                <th className="h-11 px-4 text-right">{t("colAmount")}</th>
+                <th className="h-11 px-4">{t("colNotes")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -256,14 +257,14 @@ export default function SupplierPaymentsPage() {
                   <td colSpan={7} className="p-12 text-center text-slate-400">
                     <Truck className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     {search || methodFilter !== "ALL"
-                      ? "No supplier payments found matching current filters."
-                      : "No supplier payments recorded yet."}
+                      ? t("noPayments")
+                      : t("noPayments")}
                   </td>
                 </tr>
               ) : (
                 filteredPayments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-4 whitespace-nowrap text-slate-600">
+                    <td className="p-4 whitespace-nowrap text-slate-600 font-mono">
                       {formatDate(p.createdAt || p.paymentDate)}
                     </td>
                     <td className="p-4 font-bold text-slate-900">
@@ -275,7 +276,7 @@ export default function SupplierPaymentsPage() {
                       )}
                     </td>
                     <td className="p-4 font-bold font-mono text-blue-600">
-                      {p.purchase?.invoiceNumber ? `#${p.purchase.invoiceNumber}` : "General Account"}
+                      {p.purchase?.invoiceNumber ? `#${p.purchase.invoiceNumber}` : t("generalAccount")}
                     </td>
                     <td className="p-4">
                       <Badge variant="outline" className="text-[11px] font-bold">
@@ -297,19 +298,19 @@ export default function SupplierPaymentsPage() {
 
       {/* Record Supplier Payment Modal */}
       {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content max-w-md p-6 bg-white rounded-2xl shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Record Supplier Payment</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="modal-content max-w-md w-full p-6 bg-white rounded-2xl shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b">{t("modalTitle")}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
-                <Label>Select Supplier *</Label>
+                <Label className="text-xs font-semibold">{t("selectSupplier")} *</Label>
                 <select
                   required
                   value={formData.supplierId}
                   onChange={(e) => setFormData({ ...formData, supplierId: e.target.value, purchaseId: "" })}
-                  className="input text-sm bg-white mt-1"
+                  className="input text-xs bg-white mt-1 w-full"
                 >
-                  <option value="">Choose Supplier</option>
+                  <option value="">-- {t("selectSupplier")} --</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.companyName || "Individual"})
@@ -320,16 +321,16 @@ export default function SupplierPaymentsPage() {
 
               {formData.supplierId && filteredPurchases.length > 0 && (
                 <div>
-                  <Label>Outstanding Purchase Bill (Optional)</Label>
+                  <Label className="text-xs font-semibold">{t("outstandingBill")}</Label>
                   <select
                     value={formData.purchaseId}
                     onChange={(e) => setFormData({ ...formData, purchaseId: e.target.value })}
-                    className="input text-xs bg-white mt-1"
+                    className="input text-xs bg-white mt-1 w-full"
                   >
-                    <option value="">General Account Payment</option>
+                    <option value="">{t("generalAccount")}</option>
                     {filteredPurchases.map((p) => (
                       <option key={p.id} value={p.id}>
-                        Bill #{p.invoiceNumber} - Outstanding: {formatCurrency(p.outstandingAmount)}
+                        Bill #{p.invoiceNumber} - {tc("pending")}: {formatCurrency(p.outstandingAmount)}
                       </option>
                     ))}
                   </select>
@@ -337,7 +338,7 @@ export default function SupplierPaymentsPage() {
               )}
 
               <div>
-                <Label>Payment Amount (PKR) *</Label>
+                <Label className="text-xs font-semibold">{t("amountPaid")} *</Label>
                 <Input
                   type="number"
                   step="any"
@@ -345,33 +346,33 @@ export default function SupplierPaymentsPage() {
                   min="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="font-bold text-rose-600 text-base mt-1"
+                  className="font-bold text-rose-600 text-base mt-1 bg-white"
                 />
               </div>
 
               <div>
-                <Label>Payment Method *</Label>
+                <Label className="text-xs font-semibold">{t("colMethod")} *</Label>
                 <select
                   value={formData.paymentMethod}
                   onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="input text-sm bg-white mt-1"
+                  className="input text-xs bg-white mt-1 w-full"
                 >
-                  <option value="CASH">💵 Cash Payment</option>
-                  <option value="BANK_TRANSFER">🏦 Bank Transfer / Digital Wallet</option>
+                  <option value="CASH">{t("cash")}</option>
+                  <option value="BANK_TRANSFER">{t("bank")}</option>
                 </select>
               </div>
 
               {formData.paymentMethod === "BANK_TRANSFER" && (
                 <div className="space-y-3 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
                   <div>
-                    <Label className="text-xs">Pakistani Bank / Digital Wallet *</Label>
+                    <Label className="text-xs font-semibold">{tc("selectBank") || "Pakistani Bank / Wallet"} *</Label>
                     <select
                       value={formData.bankName}
                       onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                      className="input text-xs bg-white mt-1"
+                      className="input text-xs bg-white mt-1 w-full"
                       required={formData.paymentMethod === "BANK_TRANSFER"}
                     >
-                      <option value="">Select Bank / Wallet</option>
+                      <option value="">-- Select Bank / Wallet --</option>
                       {PAKISTANI_BANKS.map((b) => (
                         <option key={b.id} value={b.name}>
                           {b.name}
@@ -381,7 +382,7 @@ export default function SupplierPaymentsPage() {
                   </div>
 
                   <div>
-                    <Label className="text-xs">TRX / Reference #</Label>
+                    <Label className="text-xs font-semibold">{t("colBankRef")}</Label>
                     <Input
                       placeholder="TRX-123456"
                       value={formData.bankReference}
@@ -393,21 +394,21 @@ export default function SupplierPaymentsPage() {
               )}
 
               <div>
-                <Label>Notes / Receipt Reference</Label>
+                <Label className="text-xs font-semibold">{t("colNotes")}</Label>
                 <Input
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="e.g. Bank cheque # / Transfer receipt"
-                  className="mt-1 text-xs"
+                  className="mt-1 text-xs bg-white"
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                  Cancel
+                  {tc("cancel")}
                 </Button>
-                <Button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white font-semibold">
-                  {isSubmitting ? "Saving..." : "Confirm Supplier Payment"}
+                <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                  {isSubmitting ? tc("saving") : t("savePayment")}
                 </Button>
               </div>
             </form>
