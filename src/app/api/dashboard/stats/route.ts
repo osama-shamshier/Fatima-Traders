@@ -32,6 +32,7 @@ export async function GET() {
         },
         select: {
           id: true,
+          buyerId: true,
           invoiceNumber: true,
           amountPaid: true,
           outstandingAmount: true,
@@ -50,6 +51,7 @@ export async function GET() {
         },
         select: {
           id: true,
+          buyerId: true,
           saleId: true,
           amount: true,
           paymentMethod: true,
@@ -113,55 +115,58 @@ export async function GET() {
     const salesTodayRevenue = salesToday.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
     const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || totalRevenueAgg._sum.amountPaid || 0);
 
-    // Today's Sales Payment Breakdown
+    // Today's Sales Payment Breakdown (Airtight Single-Entry Calculation)
     let todayCashSales = 0;
     let todayBankSales = 0;
     let todayPendingCredit = 0;
     const bankDetailsList: any[] = [];
 
-    // 1. Direct POS Sales Today
+    // 1. Walk-in / Guest Sales Today (no registered buyerId account)
     salesToday.forEach((sale) => {
-      const paid = Number(sale.amountPaid || 0);
       const outstanding = Number(sale.outstandingAmount || 0);
-
       todayPendingCredit += outstanding;
 
-      if (sale.paymentMethod === "BANK_TRANSFER") {
+      // Only count direct checkout amounts for walk-in sales without registered buyer
+      // (Registered buyer checkout payments are already recorded in buyerPayment)
+      if (!sale.buyerId) {
+        const paid = Number(sale.amountPaid || 0);
+        if (sale.paymentMethod === "BANK_TRANSFER") {
+          todayBankSales += paid;
+          if (paid > 0) {
+            bankDetailsList.push({
+              id: sale.id,
+              invoiceNumber: sale.invoiceNumber,
+              customerName: "Walk-in Customer",
+              amount: paid,
+              paymentMethod: "Bank Transfer",
+              reference: sale.notes || "Bank Transfer Sale",
+              createdAt: sale.createdAt,
+            });
+          }
+        } else {
+          todayCashSales += paid;
+        }
+      }
+    });
+
+    // 2. All Registered Customer Payments Received Today (Checkout Payments + Debt Settlements)
+    buyerPaymentsToday.forEach((bp) => {
+      const paid = Number(bp.amount || 0);
+      if (bp.paymentMethod === "BANK_TRANSFER") {
         todayBankSales += paid;
         if (paid > 0) {
           bankDetailsList.push({
-            id: sale.id,
-            invoiceNumber: sale.invoiceNumber,
-            customerName: sale.buyer?.name || "Walk-in Customer",
+            id: bp.id,
+            invoiceNumber: bp.sale?.invoiceNumber || (bp.saleId ? `Sale #${bp.saleId.slice(0, 6)}` : "Credit Settlement"),
+            customerName: bp.buyer?.name || "Customer",
             amount: paid,
-            paymentMethod: "Bank Transfer",
-            reference: sale.notes || "Bank Transfer Sale",
-            createdAt: sale.createdAt,
+            paymentMethod: bp.saleId ? "Bank Payment (Checkout)" : "Bank Transfer Settlement",
+            reference: bp.bankReference || bp.notes || "Bank Transfer",
+            createdAt: bp.createdAt,
           });
         }
       } else {
         todayCashSales += paid;
-      }
-    });
-
-    // 2. Only standalone customer credit settlements today (exclude checkout payments with saleId to prevent duplicate counting)
-    buyerPaymentsToday.forEach((bp) => {
-      if (!bp.saleId) {
-        const paid = Number(bp.amount || 0);
-        if (bp.paymentMethod === "BANK_TRANSFER") {
-          todayBankSales += paid;
-          bankDetailsList.push({
-            id: bp.id,
-            invoiceNumber: bp.sale?.invoiceNumber || "Credit Settlement",
-            customerName: bp.buyer?.name || "Customer",
-            amount: paid,
-            paymentMethod: "Bank Transfer Settlement",
-            reference: bp.bankReference || bp.notes || "Bank Payment",
-            createdAt: bp.createdAt,
-          });
-        } else {
-          todayCashSales += paid;
-        }
       }
     });
 
@@ -238,8 +243,8 @@ export async function GET() {
       recentSales,
       outstandingDebtors,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Dashboard stats error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 }
