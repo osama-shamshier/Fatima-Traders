@@ -760,7 +760,17 @@
     "colStatus": "Status",
     "statusProfitable": "Profitable",
     "statusLoss": "Selling at Loss",
-    "noItems": "No product sales records found."
+    "noItems": "No product sales records found.",
+    "billedBeforeReturns": "Billed orders before returns",
+    "returnedRefunds": "Returned items and customer refunds",
+    "grossMinusReturns": "Gross Sales - Sales Returns",
+    "fifoCostSub": "FIFO inventory layer purchase cost",
+    "margin": "Margin",
+    "rentUtilitiesBills": "Rent, utilities, packaging & bills",
+    "netMargin": "Net Margin",
+    "sellingBelowCost": "Selling below FIFO unit cost!",
+    "showAllProducts": "Show All Products",
+    "filterLossItems": "Filter {count} Loss Items"
   },
   "financials": {
     "title": "Financials & Accounting Hub",
@@ -833,12 +843,24 @@
     "branch": "Branch",
     "customer": "Customer",
     "supplier": "Supplier",
+    "product": "Product",
     "quantity": "Quantity",
     "price": "Price",
     "total": "Total",
     "loading": "Loading...",
     "noData": "No data found",
     "refresh": "Refresh",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "apply": "Apply",
+    "allTime": "All Time",
+    "today": "Today",
+    "thisWeek": "This Week",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "customRange": "Custom Range",
+    "notes": "Notes",
+    "close": "Close"
   }
 }

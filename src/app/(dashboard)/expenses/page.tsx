@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, translateExpenseCategory } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,13 @@ import { TableLoader } from "@/components/ui/loader";
 import { ExpenseFormModal } from "@/components/expenses/ExpenseFormModal";
 import { ExpenseCategoryModal } from "@/components/expenses/ExpenseCategoryModal";
 import { PlusCircle, Tags, Trash2, Filter, Receipt } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 export default function ExpensesPage() {
   const t = useTranslations("expenses");
   const tc = useTranslations("common");
+  const locale = useLocale();
+  const isUrdu = locale === "ur";
 
   const [expenses, setExpenses] = useState<any[]>([]);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -98,12 +100,12 @@ export default function ExpensesPage() {
           {/* Filter Quick Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              { id: "all", label: "All Time" },
-              { id: "today", label: "Today" },
-              { id: "this_week", label: "This Week" },
-              { id: "this_month", label: "This Month" },
-              { id: "last_month", label: "Last Month" },
-              { id: "custom", label: "Custom Range" },
+              { id: "all", label: tc("allTime") },
+              { id: "today", label: tc("today") },
+              { id: "this_week", label: tc("thisWeek") },
+              { id: "this_month", label: tc("thisMonth") },
+              { id: "last_month", label: tc("lastMonth") },
+              { id: "custom", label: tc("customRange") },
             ].map((p) => (
               <button
                 key={p.id}
@@ -124,7 +126,7 @@ export default function ExpensesPage() {
         {period === "custom" && (
           <form onSubmit={handleCustomApply} className="flex flex-wrap items-end gap-3 pt-1">
             <div>
-              <Label className="text-[11px] font-semibold text-slate-600">Start Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">{tc("startDate")}</Label>
               <Input
                 type="date"
                 value={startDate}
@@ -134,7 +136,7 @@ export default function ExpensesPage() {
               />
             </div>
             <div>
-              <Label className="text-[11px] font-semibold text-slate-600">End Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">{tc("endDate")}</Label>
               <Input
                 type="date"
                 value={endDate}
@@ -144,7 +146,7 @@ export default function ExpensesPage() {
               />
             </div>
             <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs font-semibold">
-              Apply Date
+              {tc("apply")}
             </Button>
           </form>
         )}
@@ -152,7 +154,7 @@ export default function ExpensesPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-slate-500 text-xs font-medium uppercase">{t("totalExpenses")}</span>
             <span className="text-2xl font-bold font-mono text-rose-600 block mt-1">
@@ -164,7 +166,7 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-slate-500 text-xs font-medium uppercase">{t("totalTransactions")}</span>
             <span className="text-2xl font-bold font-mono text-slate-900 block mt-1">
@@ -178,7 +180,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Expense Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
@@ -208,7 +210,7 @@ export default function ExpensesPage() {
                     <td className="p-3.5 font-mono text-slate-500 whitespace-nowrap">{formatDate(expense.createdAt || expense.expenseDate)}</td>
                     <td className="p-3.5">
                       <Badge variant="outline" className="text-[10px] font-bold text-slate-800">
-                        {expense.category?.name || "General"}
+                        {translateExpenseCategory(expense.category?.name, isUrdu)}
                       </Badge>
                     </td>
                     <td className="p-3.5 text-slate-600">{expense.branch?.name || "-"}</td>

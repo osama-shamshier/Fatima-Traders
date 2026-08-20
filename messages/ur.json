@@ -761,7 +761,17 @@
     "colStatus": "حالت",
     "statusProfitable": "منافع بخش",
     "statusLoss": "نقصان میں فروخت",
-    "noItems": "کوئی سیلز پروڈکٹ ریکارڈ نہیں ملا۔"
+    "noItems": "کوئی سیلز پروڈکٹ ریکارڈ نہیں ملا۔",
+    "billedBeforeReturns": "واپسی سے قبل کل سیلز",
+    "returnedRefunds": "واپس شدہ سامان اور کیش ریفنڈز",
+    "grossMinusReturns": "کل سیلز منہا سیلز واپسی",
+    "fifoCostSub": "خریداری بیچز کے مطابق لاگت",
+    "margin": "مارجن",
+    "rentUtilitiesBills": "کرایہ، بجلی بل، پیکنگ و دیگر اخراجات",
+    "netMargin": "خالص مارجن",
+    "sellingBelowCost": "خریداری لاگت سے کم ریٹ پر فروخت!",
+    "showAllProducts": "تمام پروڈکٹس دکھائیں",
+    "filterLossItems": "صرف {count} نقصان والے آئٹمز دکھائیں"
   },
   "financials": {
     "title": "اکاؤنٹنگ اور مالیاتی لیجرز",
@@ -834,12 +844,24 @@
     "branch": "برانچ",
     "customer": "کسٹمر",
     "supplier": "سپلائر",
+    "product": "پروڈکٹ",
     "quantity": "مقدار",
     "price": "قیمت",
     "total": "کل",
     "loading": "لوڈ ہو رہا ہے...",
     "noData": "کوئی ڈیٹا نہیں ملا",
-    "refresh": "ریفریش",
-    "saving": "محفوظ ہو رہا ہے..."
+    "refresh": "تازہ کریں",
+    "saving": "محفوظ ہو رہا ہے...",
+    "startDate": "ابتدائی تاریخ",
+    "endDate": "آخری تاریخ",
+    "apply": "لاگو کریں",
+    "allTime": "شروع سے اب تک",
+    "today": "آج",
+    "thisWeek": "اس ہفتے",
+    "thisMonth": "اس مہینے",
+    "lastMonth": "گزشتہ مہینہ",
+    "customRange": "تاریخ منتخب کریں",
+    "notes": "نوٹس",
+    "close": "بند کریں"
   }
 }

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
-import { useTranslations } from "next-intl";
+import { translateExpenseCategory } from "@/lib/utils";
+import { useTranslations, useLocale } from "next-intl";
 
 interface Props {
   isOpen: boolean;
@@ -18,6 +19,8 @@ interface Props {
 export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
   const t = useTranslations("expenses");
   const tc = useTranslations("common");
+  const locale = useLocale();
+  const isUrdu = locale === "ur";
 
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
@@ -139,7 +142,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
                 <option value="">{t("chooseCategory")}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {translateExpenseCategory(c.name, isUrdu)}
                   </option>
                 ))}
               </select>

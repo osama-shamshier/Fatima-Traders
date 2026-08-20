@@ -53,3 +53,28 @@ export function generateInvoiceNumber(): string {
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
   return `${prefix}-${year}${month}-${random}`;
 }
+
+export function translateExpenseCategory(name: string | null | undefined, isUrdu: boolean): string {
+  if (!name) return "-";
+  if (!isUrdu) return name;
+
+  const map: Record<string, string> = {
+    "Rent & Lease": "دکان / گودام کرایہ",
+    "Utilities (Electricity, Water, Gas)": "بجلی، پانی، گیس (یوٹیلیٹیز)",
+    "Salaries & Wages": "ملازمین تنخواہیں و اجرت",
+    "Transport & Freight": "ٹرانسپورٹ و مال کرایہ",
+    "Packaging Supplies": "پیکنگ میٹریل و سامان",
+    "Repairs & Maintenance": "مرمت و دیکھ بھال",
+    "Office Supplies": "اسٹیشنری و دفتری سامان",
+    "Miscellaneous Overhead": "متفرق اخراجات",
+    "Rent": "کرایہ",
+    "Utilities": "یوٹیلیٹی بلز",
+    "Salaries": "تنخواہیں",
+    "Transport": "ٹرانسپورٹ",
+    "Packaging": "پیکنگ میٹریل",
+    "Maintenance": "مرمت و دیکھ بھال",
+    "General": "عام اخراجات",
+  };
+
+  return map[name] || name;
+}

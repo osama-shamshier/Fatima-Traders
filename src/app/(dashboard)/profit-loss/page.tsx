@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
-import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, CheckCircle, Calendar, RotateCcw } from "lucide-react";
+import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
@@ -110,12 +110,12 @@ export default function ProfitLossPage() {
           {/* Filter Quick Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              { id: "all", label: "All Time" },
-              { id: "today", label: "Today" },
-              { id: "this_week", label: "This Week" },
-              { id: "this_month", label: "This Month" },
-              { id: "last_month", label: "Last Month" },
-              { id: "custom", label: "Custom Range" },
+              { id: "all", label: tc("allTime") },
+              { id: "today", label: tc("today") },
+              { id: "this_week", label: tc("thisWeek") },
+              { id: "this_month", label: tc("thisMonth") },
+              { id: "last_month", label: tc("lastMonth") },
+              { id: "custom", label: tc("customRange") },
             ].map((p) => (
               <button
                 key={p.id}
@@ -151,7 +151,7 @@ export default function ProfitLossPage() {
           </div>
 
           <div>
-            <Label className="text-[11px] font-semibold text-slate-600">{tc("product") || "Product"}</Label>
+            <Label className="text-[11px] font-semibold text-slate-600">{tc("product")}</Label>
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
@@ -169,7 +169,7 @@ export default function ProfitLossPage() {
           {period === "custom" && (
             <>
               <div>
-                <Label className="text-[11px] font-semibold text-slate-600">Start Date</Label>
+                <Label className="text-[11px] font-semibold text-slate-600">{tc("startDate")}</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -178,7 +178,7 @@ export default function ProfitLossPage() {
                 />
               </div>
               <div>
-                <Label className="text-[11px] font-semibold text-slate-600">End Date</Label>
+                <Label className="text-[11px] font-semibold text-slate-600">{tc("endDate")}</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
                     type="date"
@@ -187,7 +187,7 @@ export default function ProfitLossPage() {
                     className="text-xs py-1 px-2 bg-slate-50"
                   />
                   <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs font-semibold shrink-0">
-                    {t("applyFilters")}
+                    {tc("apply")}
                   </Button>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export default function ProfitLossPage() {
               showLossOnly ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-white"
             }`}
           >
-            {showLossOnly ? "Showing Loss Items" : t("showLossOnly")}
+            {showLossOnly ? t("showAllProducts") : t("filterLossItems", { count: lossCount })}
           </Button>
         </div>
       )}
@@ -224,7 +224,7 @@ export default function ProfitLossPage() {
       {/* Top Level Financial Performance Cards */}
       <div className="grid gap-3 md:grid-cols-4">
         {/* Gross Revenue */}
-        <Card className="shadow-2xs">
+        <Card className="shadow-2xs bg-white border border-slate-200 rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-slate-500">{t("grossSales")}</CardTitle>
             <DollarSign className="h-4 w-4 text-blue-500" />
@@ -233,12 +233,12 @@ export default function ProfitLossPage() {
             <div className="text-xl font-extrabold font-mono text-slate-900">
               {formatCurrency(plData?.totalSalesRevenue || 0)}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Billed orders before returns</p>
+            <p className="text-[10px] text-slate-400 mt-1">{t("billedBeforeReturns")}</p>
           </CardContent>
         </Card>
 
         {/* Sales Returns Impact */}
-        <Card className="shadow-2xs">
+        <Card className="shadow-2xs bg-white border border-slate-200 rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-slate-500">{t("salesReturns")}</CardTitle>
             <RotateCcw className="h-4 w-4 text-rose-500" />
@@ -247,12 +247,12 @@ export default function ProfitLossPage() {
             <div className="text-xl font-extrabold font-mono text-rose-600">
               -{formatCurrency(plData?.totalSalesReturns || 0)}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Returned items and customer refunds</p>
+            <p className="text-[10px] text-slate-400 mt-1">{t("returnedRefunds")}</p>
           </CardContent>
         </Card>
 
         {/* Net Revenue */}
-        <Card className="shadow-2xs">
+        <Card className="shadow-2xs bg-white border border-slate-200 rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-slate-500">{t("netRevenue")}</CardTitle>
             <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -261,12 +261,12 @@ export default function ProfitLossPage() {
             <div className="text-xl font-extrabold font-mono text-emerald-600">
               {formatCurrency(plData?.netRevenue || 0)}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Gross Sales - Sales Returns</p>
+            <p className="text-[10px] text-slate-400 mt-1">{t("grossMinusReturns")}</p>
           </CardContent>
         </Card>
 
         {/* FIFO COGS */}
-        <Card className="shadow-2xs">
+        <Card className="shadow-2xs bg-white border border-slate-200 rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-slate-500">{t("cogs")}</CardTitle>
             <ArrowDownRight className="h-4 w-4 text-orange-500" />
@@ -275,7 +275,7 @@ export default function ProfitLossPage() {
             <div className="text-xl font-extrabold font-mono text-orange-600">
               {formatCurrency(plData?.totalCOGS || 0)}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">FIFO inventory layer purchase cost</p>
+            <p className="text-[10px] text-slate-400 mt-1">{t("fifoCostSub")}</p>
           </CardContent>
         </Card>
       </div>
@@ -283,14 +283,14 @@ export default function ProfitLossPage() {
       {/* Profit Margin Summary Cards */}
       <div className="grid gap-3 md:grid-cols-3">
         {/* Gross Profit */}
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-slate-500 text-xs font-bold uppercase">{t("grossProfit")}</span>
             <div className="text-2xl font-black font-mono text-emerald-600 mt-1">
               {formatCurrency(plData?.grossProfit || 0)}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
-              Margin: <strong>{Number(plData?.grossProfitMargin || 0).toFixed(1)}%</strong>
+              {t("margin")}: <strong>{Number(plData?.grossProfitMargin || 0).toFixed(1)}%</strong>
             </span>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -299,40 +299,40 @@ export default function ProfitLossPage() {
         </div>
 
         {/* Operating Expenses */}
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-slate-500 text-xs font-bold uppercase">{t("operatingExpenses")}</span>
             <div className="text-2xl font-black font-mono text-rose-600 mt-1">
               {formatCurrency(plData?.operatingExpenses || 0)}
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">Rent, utilities, packaging & bills</span>
+            <span className="text-[11px] font-semibold text-slate-500">{t("rentUtilitiesBills")}</span>
           </div>
           <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
             <ArrowDownRight className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Net Operating Profit */}
-        <div className="p-4 bg-slate-900 text-white rounded-xl shadow-2xs flex items-center justify-between">
+        {/* Net Operating Profit (Clean Consistent Light Theme) */}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-slate-400 text-xs font-bold uppercase">{t("netProfit")}</span>
+            <span className="text-slate-500 text-xs font-bold uppercase">{t("netProfit")}</span>
             <div className={`text-2xl font-black font-mono mt-1 ${
-              Number(plData?.netProfit || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+              Number(plData?.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}>
               {formatCurrency(plData?.netProfit || 0)}
             </div>
-            <span className="text-[11px] font-semibold text-slate-400">
-              Net Margin: <strong>{Number(plData?.netProfitMargin || 0).toFixed(1)}%</strong>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {t("netMargin")}: <strong>{Number(plData?.netProfitMargin || 0).toFixed(1)}%</strong>
             </span>
           </div>
-          <div className={`p-3 rounded-xl ${Number(plData?.netProfit || 0) >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+          <div className={`p-3 rounded-xl ${Number(plData?.netProfit || 0) >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
             <TrendingUp className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* Itemized Profitability & Margins Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="p-4 border-b bg-slate-50/80 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-blue-600" />
@@ -345,7 +345,7 @@ export default function ProfitLossPage() {
               onClick={() => setShowLossOnly(!showLossOnly)}
               className="text-xs font-semibold text-rose-600 hover:text-rose-800"
             >
-              {showLossOnly ? "Show All Products" : `Filter ${lossCount} Loss Items`}
+              {showLossOnly ? t("showAllProducts") : t("filterLossItems", { count: lossCount })}
             </button>
           )}
         </div>
@@ -384,7 +384,7 @@ export default function ProfitLossPage() {
                       {item.productName}
                       {item.isLoss && (
                         <span className="text-[10px] text-rose-600 font-normal block">
-                          Selling below FIFO unit cost!
+                          {t("sellingBelowCost")}
                         </span>
                       )}
                     </td>
@@ -401,7 +401,7 @@ export default function ProfitLossPage() {
                         {formatCurrency(item.grossProfit)}
                       </div>
                       <span className={`text-[10px] font-semibold ${item.isLoss ? "text-rose-500" : "text-slate-400"}`}>
-                        {Number(item.marginPercent).toFixed(1)}% margin
+                        {Number(item.marginPercent).toFixed(1)}% {t("margin")}
                       </span>
                     </td>
                     <td className="p-3.5 text-center">
