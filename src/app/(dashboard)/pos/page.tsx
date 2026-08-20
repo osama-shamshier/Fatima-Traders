@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { POSCheckoutModal } from "./components/POSCheckoutModal";
 import { ReceiptModal } from "./components/ReceiptModal";
 import { CustomerSearchSelect } from "@/components/pos/CustomerSearchSelect";
+import { useTranslations } from "next-intl";
 
 interface Product {
   id: string;
@@ -27,6 +28,7 @@ interface CartItem extends Product {
 }
 
 export default function POSPage() {
+  const t = useTranslations("pos");
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -103,7 +105,7 @@ export default function POSPage() {
     setErrorMessage(null);
     const available = Number(product.availableStock || 0);
     if (available <= 0) {
-      setErrorMessage(`⚠️ Product "${product.name}" is OUT OF STOCK!`);
+      setErrorMessage(`⚠️ "${product.name}" ${t("outOfStock")}!`);
       return;
     }
     setSelectedProductForQty(product);
@@ -120,28 +122,26 @@ export default function POSPage() {
     const itemDisc = Math.max(0, Number(inputItemDiscount || 0));
 
     if (isNaN(qty) || qty <= 0) {
-      setErrorMessage("Please enter a valid positive quantity.");
+      alert("Please enter a valid positive quantity");
       return;
     }
 
-    // Check existing quantity in cart
     const existingIndex = cart.findIndex((item) => item.id === selectedProductForQty.id);
-    const currentCartQty = existingIndex > -1 ? cart[existingIndex].cartQuantity : 0;
-    const totalRequested = currentCartQty + qty;
+    const currentInCart = existingIndex > -1 ? cart[existingIndex].cartQuantity : 0;
+    const newTotal = currentInCart + qty;
 
-    if (totalRequested > available) {
+    if (newTotal > available) {
       setErrorMessage(
-        `⚠️ Stock Limit Exceeded! Only ${available} ${selectedProductForQty.unit?.abbreviation || "units"} available in stock (Currently in cart: ${currentCartQty}).`
+        `❌ Cannot add ${qty} units. Only ${available} units available in stock (${currentInCart} already in cart).`
       );
+      setSelectedProductForQty(null);
       return;
     }
 
     if (existingIndex > -1) {
       const updated = [...cart];
-      updated[existingIndex].cartQuantity = totalRequested;
-      if (itemDisc > 0) {
-        updated[existingIndex].itemDiscount = itemDisc;
-      }
+      updated[existingIndex].cartQuantity = newTotal;
+      updated[existingIndex].itemDiscount = (updated[existingIndex].itemDiscount || 0) + itemDisc;
       setCart(updated);
     } else {
       setCart([
@@ -157,55 +157,56 @@ export default function POSPage() {
     setSelectedProductForQty(null);
     setInputQty("1");
     setInputItemDiscount("0");
-    setErrorMessage(null);
   };
 
-  const updateCartQuantity = (id: string, newQty: number) => {
-    setErrorMessage(null);
-    const targetItem = cart.find((item) => item.id === id);
-    if (!targetItem) return;
+  const updateCartQuantity = (productId: string, newQty: number) => {
+    const product = products.find((p) => p.id === productId);
+    const available = product ? Number(product.availableStock || 0) : 999999;
+
+    if (newQty > available) {
+      setErrorMessage(`❌ Cannot exceed available stock of ${available} units.`);
+      return;
+    }
 
     if (newQty <= 0) {
-      removeFromCart(id);
+      removeFromCart(productId);
       return;
     }
 
-    const available = Number(targetItem.availableStock || 0);
-    if (newQty > available) {
-      setErrorMessage(
-        `⚠️ Stock Limit Exceeded for "${targetItem.name}"! Only ${available} ${targetItem.unit?.abbreviation || "units"} available.`
-      );
-      return;
-    }
-
-    setCart((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, cartQuantity: newQty } : item))
+    setCart(
+      cart.map((item) =>
+        item.id === productId ? { ...item, cartQuantity: newQty } : item
+      )
     );
   };
 
-  const updateCartItemDiscount = (id: string, discount: number) => {
-    const val = isNaN(discount) ? 0 : Math.max(0, discount);
-    setCart((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, itemDiscount: val } : item))
+  const updateCartItemDiscount = (productId: string, discountAmount: number) => {
+    setCart(
+      cart.map((item) =>
+        item.id === productId
+          ? { ...item, itemDiscount: Math.max(0, discountAmount || 0) }
+          : item
+      )
     );
   };
 
-  const removeFromCart = (id: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
+  const removeFromCart = (productId: string) => {
+    setCart(cart.filter((item) => item.id !== productId));
   };
 
-  // Accurate Multi-Level Discount Calculations
+  // Financial Calculations
   const itemsGrossTotal = cart.reduce(
-    (sum, item) => sum + Number(item.sellingPrice) * item.cartQuantity,
+    (sum, item) => sum + Number(item.sellingPrice) * Number(item.cartQuantity),
     0
   );
+
   const itemsDiscountTotal = cart.reduce(
     (sum, item) => sum + Number(item.itemDiscount || 0),
     0
   );
+
   const subtotal = Math.max(0, itemsGrossTotal - itemsDiscountTotal);
-  const rawGrandTotal = Math.max(0, subtotal - globalDiscount);
-  const grandTotal = Math.max(0, rawGrandTotal + roundOff);
+  const grandTotal = Math.max(0, subtotal - globalDiscount + roundOff);
 
   const handleCheckoutSubmit = async (
     amountPaid: number,
@@ -213,26 +214,27 @@ export default function POSPage() {
     bankName?: string,
     bankReference?: string,
     dueDate?: string,
-    modalRoundOff?: number
+    appliedRoundOff?: number
   ) => {
+    if (cart.length === 0) return;
+
     try {
-      const finalRoundOff = modalRoundOff !== undefined ? modalRoundOff : roundOff;
       const payload = {
-        branchId: selectedBranchId,
         buyerId: selectedBuyerId || undefined,
+        branchId: selectedBranchId,
         discount: globalDiscount,
-        roundOff: finalRoundOff,
-        amountPaid,
-        paymentMethod,
-        bankName,
-        bankReference,
-        dueDate,
+        roundOff: appliedRoundOff || roundOff,
         items: cart.map((item) => ({
           productId: item.id,
           quantity: item.cartQuantity,
           sellingPrice: item.sellingPrice,
           discount: item.itemDiscount || 0,
         })),
+        amountPaid,
+        paymentMethod,
+        bankName,
+        bankReference,
+        dueDate,
       };
 
       const res = await fetch("/api/sales", {
@@ -266,7 +268,7 @@ export default function POSPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-white rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-3">
           <Store className="w-5 h-5 text-blue-600" />
-          <h1 className="text-base font-bold text-slate-900">POS Sales Terminal</h1>
+          <h1 className="text-base font-bold text-slate-900">{t("title")}</h1>
           <select
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
@@ -313,13 +315,13 @@ export default function POSPage() {
           {/* Search & Category Tabs */}
           <div className="p-3 border-b border-slate-100 space-y-2">
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <Search className="absolute start-3 top-2.5 w-4 h-4 text-slate-400" />
               <Input
                 ref={searchInputRef}
-                placeholder="Search products by Name or SKU..."
+                placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 text-xs bg-slate-50 border-slate-200"
+                className="ps-9 text-xs bg-slate-50 border-slate-200"
               />
             </div>
 
@@ -333,7 +335,7 @@ export default function POSPage() {
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                All Categories
+                {t("allCategories")}
               </button>
               {categories.map((c) => (
                 <button
@@ -356,11 +358,11 @@ export default function POSPage() {
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10">
                 <tr>
-                  <th className="p-3">Product Name</th>
-                  <th className="p-3">SKU</th>
-                  <th className="p-3 text-center">Available Stock</th>
-                  <th className="p-3 text-right">Price</th>
-                  <th className="p-3 text-right">Action</th>
+                  <th className="p-3">{t("colProductName")}</th>
+                  <th className="p-3">{t("colSku")}</th>
+                  <th className="p-3 text-center">{t("colStock")}</th>
+                  <th className="p-3 text-right">{t("colPrice")}</th>
+                  <th className="p-3 text-right">{t("colAction")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -412,7 +414,7 @@ export default function POSPage() {
                               : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-0"
                           }`}
                         >
-                          {inCart ? `In Cart (${inCart.cartQuantity})` : "Add"}
+                          {inCart ? `${t("addToCart")} (${inCart.cartQuantity})` : t("addToCart")}
                         </Button>
                       </td>
                     </tr>
@@ -421,7 +423,7 @@ export default function POSPage() {
                 {products.length === 0 && (
                   <tr>
                     <td colSpan={5} className="text-center py-12 text-slate-400 text-xs">
-                      No products found matching filters.
+                      {t("noProductsFound")}
                     </td>
                   </tr>
                 )}
@@ -436,7 +438,7 @@ export default function POSPage() {
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-blue-600" />
               <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                Cart Items ({cart.length})
+                {t("cartTitle")} ({cart.length})
               </h3>
             </div>
             {cart.length > 0 && (
@@ -444,7 +446,7 @@ export default function POSPage() {
                 onClick={() => setCart([])}
                 className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold"
               >
-                Clear Cart
+                {t("clearCart")}
               </button>
             )}
           </div>
@@ -495,7 +497,7 @@ export default function POSPage() {
                       <button
                         type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="w-6 h-6 rounded bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center text-xs ml-1"
+                        className="w-6 h-6 rounded bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center text-xs ms-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -505,9 +507,9 @@ export default function POSPage() {
                   {/* Discount Per Item & Net Line Total */}
                   <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] font-bold text-rose-600 uppercase">Item Disc:</span>
+                      <span className="text-[10px] font-bold text-rose-600 uppercase">{t("colDisc")}:</span>
                       <div className="flex items-center">
-                        <span className="text-[10px] text-slate-400 mr-0.5">Rs.</span>
+                        <span className="text-[10px] text-slate-400 me-0.5">Rs.</span>
                         <input
                           type="number"
                           min="0"
@@ -522,7 +524,7 @@ export default function POSPage() {
 
                     <div className="text-right">
                       {Number(item.itemDiscount || 0) > 0 && (
-                        <span className="text-[10px] text-slate-400 line-through mr-1.5 font-mono">
+                        <span className="text-[10px] text-slate-400 line-through me-1.5 font-mono">
                           {formatCurrency(lineGross)}
                         </span>
                       )}
@@ -537,8 +539,8 @@ export default function POSPage() {
             {cart.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
                 <ShoppingCart className="w-10 h-10 mb-2 opacity-30" />
-                <p className="text-xs font-medium">Cart is empty</p>
-                <p className="text-[11px] text-slate-400">Click "Add" on products to build order</p>
+                <p className="text-xs font-medium">{t("emptyCartTitle")}</p>
+                <p className="text-[11px] text-slate-400">{t("emptyCartSub")}</p>
               </div>
             )}
           </div>
@@ -546,19 +548,19 @@ export default function POSPage() {
           {/* Cart Totals & Checkout Button */}
           <div className="p-3.5 border-t border-slate-200 bg-slate-50/50 space-y-2">
             <div className="flex justify-between text-xs text-slate-600 font-medium">
-              <span>Items Gross Total:</span>
+              <span>{t("grossSubtotal")}:</span>
               <span className="font-bold font-mono">{formatCurrency(itemsGrossTotal)}</span>
             </div>
 
             {itemsDiscountTotal > 0 && (
               <div className="flex justify-between text-xs text-rose-600 font-medium">
-                <span>Item-wise Discounts (-):</span>
+                <span>{t("itemDiscounts")} (-):</span>
                 <span className="font-bold font-mono">-{formatCurrency(itemsDiscountTotal)}</span>
               </div>
             )}
 
             <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-              <span>Order-level Discount (-):</span>
+              <span>{t("orderDiscount")} (-):</span>
               <Input
                 type="number"
                 min="0"
@@ -570,7 +572,7 @@ export default function POSPage() {
             </div>
 
             <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
-              <span>Grand Total:</span>
+              <span>{t("grandTotal")}:</span>
               <span className="text-blue-700 font-mono font-extrabold">{formatCurrency(grandTotal)}</span>
             </div>
 
@@ -579,7 +581,7 @@ export default function POSPage() {
               onClick={() => setIsCheckoutOpen(true)}
               className="w-full py-3 mt-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 uppercase tracking-wider"
             >
-              <CreditCard className="w-4 h-4 mr-2" /> Pay {formatCurrency(grandTotal)}
+              <CreditCard className="w-4 h-4 me-2" /> {t("checkoutButton")} ({formatCurrency(grandTotal)})
             </Button>
           </div>
         </div>
@@ -589,21 +591,21 @@ export default function POSPage() {
       {selectedProductForQty && (
         <div className="modal-overlay">
           <div className="modal-content max-w-sm p-5 bg-white rounded-2xl shadow-2xl">
-            <h3 className="text-base font-bold text-slate-900 mb-1">Add Product to Cart</h3>
+            <h3 className="text-base font-bold text-slate-900 mb-1">{t("qtyModalTitle")}</h3>
             <p className="text-xs text-slate-500 mb-3">
               {selectedProductForQty.name} ({selectedProductForQty.sku})
             </p>
 
             <form onSubmit={handleAddWithQty} className="space-y-3.5">
               <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex justify-between items-center text-xs">
-                <span className="text-slate-600 font-medium">Available Stock:</span>
+                <span className="text-slate-600 font-medium">{t("availableStockLabel")}:</span>
                 <span className="font-bold text-blue-700">
                   {selectedProductForQty.availableStock} {selectedProductForQty.unit?.abbreviation || ""}
                 </span>
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Quantity to Sell *</Label>
+                <Label className="text-xs font-semibold">{t("enterQty")} *</Label>
                 <Input
                   type="number"
                   min="0.001"
@@ -617,7 +619,7 @@ export default function POSPage() {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold text-rose-600">Discount on this Item (PKR)</Label>
+                <Label className="text-xs font-semibold text-rose-600">{t("itemDiscLabel")}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -630,7 +632,7 @@ export default function POSPage() {
               </div>
 
               <div className="flex justify-between items-center text-xs font-bold text-slate-800 border-t pt-2">
-                <span>Net Line Total:</span>
+                <span>{t("calculatedTotal")}:</span>
                 <span className="text-emerald-700 font-mono text-sm">
                   {formatCurrency(
                     Math.max(
@@ -644,10 +646,10 @@ export default function POSPage() {
 
               <div className="flex justify-end gap-2 pt-3 border-t">
                 <Button type="button" variant="outline" size="sm" onClick={() => setSelectedProductForQty(null)}>
-                  Cancel
+                  {t("cancel")}
                 </Button>
                 <Button type="submit" size="sm" className="bg-blue-600 text-white font-semibold">
-                  Add to Cart
+                  {t("confirmAdd")}
                 </Button>
               </div>
             </form>

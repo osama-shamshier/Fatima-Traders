@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { Calendar, AlertTriangle, Calculator, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface POSCheckoutModalProps {
   isOpen: boolean;
@@ -39,6 +40,9 @@ export function POSCheckoutModal({
   isWalkInCustomer = true,
   onCompleteSale,
 }: POSCheckoutModalProps) {
+  const t = useTranslations("pos");
+  const tc = useTranslations("common");
+
   const [roundOff, setRoundOff] = useState<number>(0);
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK_TRANSFER">("CASH");
@@ -105,7 +109,7 @@ export function POSCheckoutModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
       <DialogContent className="sm:max-w-[500px] bg-white rounded-2xl p-6 shadow-2xl">
         <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-xl font-bold text-slate-900">Complete Payment Checkout</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-slate-900">{t("checkoutModalTitle")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-3">
@@ -113,26 +117,26 @@ export function POSCheckoutModal({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
             {itemsGrossTotal !== undefined && itemsGrossTotal > subtotal && (
               <div className="flex justify-between items-center text-xs text-slate-600 font-medium">
-                <span>Items Gross Total:</span>
+                <span>{t("grossSubtotal")}:</span>
                 <span className="font-bold font-mono">{formatCurrency(itemsGrossTotal)}</span>
               </div>
             )}
 
             {itemsDiscountTotal > 0 && (
               <div className="flex justify-between items-center text-xs text-rose-600 font-medium">
-                <span>Item-wise Discounts:</span>
+                <span>{t("itemDiscounts")} (-):</span>
                 <span className="font-bold font-mono">- {formatCurrency(itemsDiscountTotal)}</span>
               </div>
             )}
 
             <div className="flex justify-between items-center text-xs text-slate-700 font-medium">
-              <span>Items Subtotal:</span>
+              <span>{t("grossSubtotal")}:</span>
               <span className="font-bold font-mono">{formatCurrency(subtotal)}</span>
             </div>
 
             {discount > 0 && (
               <div className="flex justify-between items-center text-xs text-amber-700 font-medium">
-                <span>Order-Level Discount:</span>
+                <span>{t("orderDiscount")} (-):</span>
                 <span className="font-bold font-mono">- {formatCurrency(discount)}</span>
               </div>
             )}
@@ -140,7 +144,7 @@ export function POSCheckoutModal({
             {/* Round Off Input Field */}
             <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/80">
               <span className="font-bold text-slate-700 flex items-center gap-1">
-                <Calculator className="w-3.5 h-3.5 text-blue-600" /> Round-Off Adjustment:
+                <Calculator className="w-3.5 h-3.5 text-blue-600" /> Round-Off (+/-):
               </span>
               <div className="flex items-center gap-2">
                 <Input
@@ -157,7 +161,7 @@ export function POSCheckoutModal({
             {/* Quick Round Off Buttons */}
             {showSuggestions && (
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Quick Rounding:</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Rounding:</span>
                 <button
                   type="button"
                   onClick={() => handleRoundOffChange(lowerDiff)}
@@ -195,14 +199,14 @@ export function POSCheckoutModal({
             )}
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-              <span className="font-bold text-slate-800 text-sm">Net Bill Payable:</span>
+              <span className="font-bold text-slate-800 text-sm">{t("grandTotal")}:</span>
               <span className="text-2xl font-extrabold font-mono text-blue-700">{formatCurrency(netPayable)}</span>
             </div>
           </div>
 
           {/* Payment Method Toggle (Cash vs Bank Transfer) */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Method *</Label>
+            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("paymentMethod")} *</Label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -213,7 +217,7 @@ export function POSCheckoutModal({
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <span className="text-base">💵</span> Cash Payment
+                {t("cash")}
               </button>
 
               <button
@@ -225,7 +229,7 @@ export function POSCheckoutModal({
                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <span className="text-base">🏦</span> Bank / Digital Wallet
+                {t("bankTransfer")}
               </button>
             </div>
           </div>
@@ -234,14 +238,14 @@ export function POSCheckoutModal({
           {paymentMethod === "BANK_TRANSFER" && (
             <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 space-y-3">
               <div>
-                <Label className="text-xs font-semibold text-blue-900">Select Bank / Wallet *</Label>
+                <Label className="text-xs font-semibold text-blue-900">{t("selectBank")} *</Label>
                 <select
                   required
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   className="input text-xs bg-white mt-1 w-full"
                 >
-                  <option value="">-- Choose Pakistani Bank / Digital Wallet --</option>
+                  <option value="">-- {t("selectBank")} --</option>
                   {PAKISTANI_BANKS.map((b) => (
                     <option key={b.id} value={b.name}>
                       {b.name}
@@ -251,7 +255,7 @@ export function POSCheckoutModal({
               </div>
 
               <div>
-                <Label className="text-xs font-semibold text-blue-900">Transaction ID / Reference #</Label>
+                <Label className="text-xs font-semibold text-blue-900">{t("bankRef")}</Label>
                 <Input
                   placeholder="e.g. TRX-982341 or Cheque #"
                   value={bankReference}
@@ -265,7 +269,7 @@ export function POSCheckoutModal({
           {/* Amount Paid & Quick Cash Pills */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
-              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Amount Paid (PKR) *</Label>
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("amountPaid")} *</Label>
               <div className="flex gap-1.5">
                 <button
                   type="button"
@@ -313,7 +317,7 @@ export function POSCheckoutModal({
           {isPartial && !isWalkInCustomer && (
             <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-amber-900">Remaining Balance (Receivable Credit):</span>
+                <span className="font-bold text-amber-900">{t("creditDue")}:</span>
                 <span className="font-extrabold font-mono text-rose-600 text-sm">
                   {formatCurrency(netPayable - amountPaid)}
                 </span>
@@ -336,7 +340,7 @@ export function POSCheckoutModal({
           {/* Change to Return */}
           {!isPartial && amountPaid > netPayable && (
             <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center">
-              <span className="text-xs font-bold text-emerald-900">Change to Return to Customer:</span>
+              <span className="text-xs font-bold text-emerald-900">{t("changeDue")}:</span>
               <span className="text-xl font-black font-mono text-emerald-700">{formatCurrency(change)}</span>
             </div>
           )}
@@ -344,7 +348,7 @@ export function POSCheckoutModal({
 
         <DialogFooter className="border-t pt-3">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -353,11 +357,11 @@ export function POSCheckoutModal({
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Processing Sale...
+                <Loader2 className="w-4 h-4 animate-spin" /> {t("processing")}
               </>
             ) : (
               <>
-                Confirm & Print Bill ({formatCurrency(netPayable)})
+                {t("processPayment")} ({formatCurrency(netPayable)})
               </>
             )}
           </Button>
