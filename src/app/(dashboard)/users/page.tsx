@@ -4,10 +4,16 @@ import { useEffect, useState } from "react";
 import { formatDate } from "@/lib/utils";
 import UserFormModal from "@/components/users/UserFormModal";
 import DeleteConfirmModal from "@/components/users/DeleteConfirmModal";
-import { Edit, Trash2, Plus, Search } from "lucide-react";
+import { Edit, Trash2, Plus, Search, Users } from "lucide-react";
 import { TableLoader } from "@/components/ui/loader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 export default function UsersPage() {
+  const t = useTranslations("users");
+  const tc = useTranslations("common");
+
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -99,99 +105,98 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
-        <button
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Users className="w-6 h-6 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
+        </div>
+        <Button
           onClick={handleCreate}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 transition-colors btn-primary"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs"
         >
-          <Plus size={18} />
-          Add User
-        </button>
+          <Plus className="w-4 h-4 me-1.5" /> {t("addUser")}
+        </Button>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-        <div className="relative max-w-md mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute start-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search users..."
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full ps-9 pe-4 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           />
         </div>
+      </div>
 
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse data-table">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
-                <th className="p-3 font-medium">Name</th>
-                <th className="p-3 font-medium">Email</th>
-                <th className="p-3 font-medium">Branch</th>
-                <th className="p-3 font-medium">Roles</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium">Created</th>
-                <th className="p-3 font-medium text-right">Actions</th>
+          <table className="w-full text-xs text-left">
+            <thead className="bg-slate-50 text-slate-600 border-b font-bold uppercase">
+              <tr>
+                <th className="p-3.5">{t("colName")}</th>
+                <th className="p-3.5">{t("colEmail")}</th>
+                <th className="p-3.5">{t("colBranch")}</th>
+                <th className="p-3.5">{t("colRoles")}</th>
+                <th className="p-3.5 text-center">{t("colStatus")}</th>
+                <th className="p-3.5">{t("colJoined")}</th>
+                <th className="p-3.5 text-right">{t("colActions")}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
                 <TableLoader colSpan={7} text="Loading users..." />
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
-                    No users found.
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    {t("noUsers")}
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-3 font-medium text-slate-900">{user.name}</td>
-                    <td className="p-3 text-slate-600">{user.email}</td>
-                    <td className="p-3 text-slate-600">{user.branch?.name || "-"}</td>
-                    <td className="p-3">
+                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3.5 font-bold text-slate-900">{user.name}</td>
+                    <td className="p-3.5 font-mono text-slate-600">{user.email}</td>
+                    <td className="p-3.5 text-slate-600">{user.branch?.name || "-"}</td>
+                    <td className="p-3.5">
                       <div className="flex flex-wrap gap-1">
                         {user.userRoles?.map((ur: any) => (
-                          <span
-                            key={ur.role.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800"
-                          >
+                          <Badge key={ur.role.id} variant="outline" className="text-[10px] bg-slate-50">
                             {ur.role.name}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     </td>
-                    <td className="p-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          user.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-slate-100 text-slate-800"
-                        }`}
-                      >
-                        {user.isActive ? "Active" : "Inactive"}
-                      </span>
+                    <td className="p-3.5 text-center">
+                      <Badge variant={user.isActive ? "success" : "outline"} className="text-[10px]">
+                        {user.isActive ? tc("active") : tc("inactive")}
+                      </Badge>
                     </td>
-                    <td className="p-3 text-slate-600 text-sm">
-                      {formatDate ? formatDate(new Date(user.createdAt)) : new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="p-3 text-right space-x-2">
-                      <button
-                        onClick={() => handleEdit(user)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                        title="Edit"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                    <td className="p-3.5 font-mono text-slate-500">{formatDate(user.createdAt)}</td>
+                    <td className="p-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(user)}
+                          className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(user)}
+                          className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -201,30 +206,26 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {isFormModalOpen && (
-        <UserFormModal
-          isOpen={isFormModalOpen}
-          onClose={() => setIsFormModalOpen(false)}
-          onSuccess={() => {
-            setIsFormModalOpen(false);
-            fetchUsers();
-          }}
-          user={editingUser}
-          roles={roles}
-          branches={branches}
-        />
-      )}
+      <UserFormModal
+        isOpen={isFormModalOpen}
+        onClose={() => setIsFormModalOpen(false)}
+        onSuccess={() => {
+          setIsFormModalOpen(false);
+          fetchUsers();
+        }}
+        user={editingUser}
+        roles={roles}
+        branches={branches}
+      />
 
-      {isDeleteModalOpen && (
-        <DeleteConfirmModal
-          isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={confirmDelete}
-          title="Delete User"
-          message={`Are you sure you want to delete ${deletingUser?.name}? This action cannot be undone.`}
-          loading={isDeleting}
-        />
-      )}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title={t("deleteTitle")}
+        message={t("deleteMessage", { name: deletingUser?.name || "" })}
+        loading={isDeleting}
+      />
     </div>
   );
 }

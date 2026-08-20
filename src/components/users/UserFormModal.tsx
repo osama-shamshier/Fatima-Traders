@@ -7,6 +7,7 @@ import * as z from "zod";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ButtonSpinner } from "@/components/ui/loader";
+import { useTranslations } from "next-intl";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -30,6 +31,9 @@ interface UserFormModalProps {
 }
 
 export default function UserFormModal({ isOpen, onClose, onSuccess, user, roles, branches }: UserFormModalProps) {
+  const t = useTranslations("users");
+  const tc = useTranslations("common");
+
   const isEditMode = !!user;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,12 +126,12 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, user, roles,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm modal-overlay" onClick={onClose}>
       <div 
-        className="bg-white rounded-lg shadow-xl w-full max-w-xl flex flex-col max-h-[90vh] modal-content"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[90vh] modal-content"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-200 modal-header">
-          <h2 className="text-xl font-semibold text-slate-900">
-            {isEditMode ? "Edit User" : "Add New User"}
+          <h2 className="text-lg font-bold text-slate-900">
+            {isEditMode ? t("modalEditTitle") : t("modalAddTitle")}
           </h2>
           <button
             onClick={onClose}
@@ -139,70 +143,70 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, user, roles,
 
         <div className="p-4 overflow-y-auto modal-body flex-1">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
+            <div className="mb-4 p-3 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200">
               {error}
             </div>
           )}
 
           <form id="user-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Name *</label>
+                <label className="text-xs font-semibold text-slate-700">{t("labelName")}</label>
                 <input
                   type="text"
                   {...register("name")}
                   className={cn(
-                    "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
-                    errors.name ? "border-red-500" : "border-slate-300"
+                    "w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white",
+                    errors.name ? "border-rose-500" : "border-slate-300"
                   )}
                 />
-                {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+                {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Email *</label>
+                <label className="text-xs font-semibold text-slate-700">{t("labelEmail")}</label>
                 <input
                   type="email"
                   {...register("email")}
                   className={cn(
-                    "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
-                    errors.email ? "border-red-500" : "border-slate-300"
+                    "w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white",
+                    errors.email ? "border-rose-500" : "border-slate-300"
                   )}
                 />
-                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                {errors.email && <p className="text-xs text-rose-500">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">
-                  Password {isEditMode ? "(leave empty to keep current)" : "*"}
+                <label className="text-xs font-semibold text-slate-700">
+                  {t("labelPassword")} {isEditMode && <span className="text-[11px] text-slate-400 font-normal">{t("passwordHint")}</span>}
                 </label>
                 <input
                   type="password"
                   {...register("password")}
                   className={cn(
-                    "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
-                    errors.password ? "border-red-500" : "border-slate-300"
+                    "w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white",
+                    errors.password ? "border-rose-500" : "border-slate-300"
                   )}
                 />
-                {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+                {errors.password && <p className="text-xs text-rose-500">{errors.password.message}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Phone</label>
+                <label className="text-xs font-semibold text-slate-700">{t("labelPhone")}</label>
                 <input
                   type="text"
                   {...register("phone")}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
 
               <div className="space-y-1 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700">Branch</label>
+                <label className="text-xs font-semibold text-slate-700">{t("labelBranch")}</label>
                 <select
                   {...register("branchId")}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
-                  <option value="">Select a branch (optional)</option>
+                  <option value="">{t("selectBranch")}</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -212,57 +216,57 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, user, roles,
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700">Roles *</label>
+                <label className="text-xs font-semibold text-slate-700">{t("labelRoles")}</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {roles.map((role) => (
-                    <label key={role.id} className="flex items-center space-x-2 p-2 border border-slate-200 rounded-md cursor-pointer hover:bg-slate-50">
+                    <label key={role.id} className="flex items-center gap-2 p-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 text-xs">
                       <input
                         type="checkbox"
                         checked={selectedRoleIds.includes(role.id)}
                         onChange={() => handleRoleToggle(role.id)}
-                        className="rounded text-blue-600 focus:ring-blue-500"
+                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
                       />
-                      <span className="text-sm text-slate-700">{role.name}</span>
+                      <span className="text-slate-700 font-semibold">{role.name}</span>
                     </label>
                   ))}
                   {roles.length === 0 && (
-                    <p className="text-sm text-slate-500 col-span-full">No roles available. Please create roles first.</p>
+                    <p className="text-xs text-slate-500 col-span-full">No roles available.</p>
                   )}
                 </div>
-                {errors.roleIds && <p className="text-xs text-red-500">{errors.roleIds.message}</p>}
+                {errors.roleIds && <p className="text-xs text-rose-500">{errors.roleIds.message}</p>}
               </div>
 
               <div className="space-y-1 md:col-span-2 mt-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     {...register("isActive")}
                     className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="text-sm font-medium text-slate-700">Active Account</span>
+                  <span className="text-xs font-semibold text-slate-700">{t("labelActive")}</span>
                 </label>
               </div>
             </div>
           </form>
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3 modal-footer rounded-b-lg">
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 modal-footer rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50"
           >
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             type="submit"
             form="user-form"
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
+            className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center gap-1.5 shadow-xs"
           >
             {isSubmitting && <ButtonSpinner />}
-            {isEditMode ? "Save Changes" : "Create User"}
+            {isSubmitting ? tc("saving") : t("saveUser")}
           </button>
         </div>
       </div>
