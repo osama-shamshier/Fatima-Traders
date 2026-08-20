@@ -15,34 +15,37 @@ export async function GET() {
           select: { amount: true },
         },
         salesReturns: {
-          where: { isDeleted: false },
+          where: { 
+            isDeleted: false,
+            refundMethod: "ADJUSTMENT",
+          },
           select: { totalRefund: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const formattedBuyers = buyers.map((buyer) => {
+    const formattedBuyers = buyers.map((buyer: any) => {
       // 1. Total Invoiced Sales (Debit)
       const totalSales = (buyer.sales || []).reduce(
-        (sum, sale) => sum + Number(sale.grandTotal || sale.subtotal || 0),
+        (sum: number, sale: any) => sum + Number(sale.grandTotal || sale.subtotal || 0),
         0
       );
 
       // 2. Total Payments Received (Credit)
       const totalPayments = (buyer.buyerPayments || []).reduce(
-        (sum, payment) => sum + Number(payment.amount || 0),
+        (sum: number, payment: any) => sum + Number(payment.amount || 0),
         0
       );
 
-      // 3. Total Sales Returns (Credit)
-      const totalReturns = (buyer.salesReturns || []).reduce(
-        (sum, ret) => sum + Number(ret.totalRefund || 0),
+      // 3. Total Sales Returns that were adjusted against debt (ADJUSTMENT only)
+      const totalAdjustedReturns = (buyer.salesReturns || []).reduce(
+        (sum: number, ret: any) => sum + Number(ret.totalRefund || 0),
         0
       );
 
-      // 4. Exact Double-Entry Accounting Ledger Outstanding Balance (Ground Truth)
-      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalReturns);
+      // 4. Exact Outstanding Balance (Ground Truth)
+      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalAdjustedReturns);
 
       return {
         id: buyer.id,

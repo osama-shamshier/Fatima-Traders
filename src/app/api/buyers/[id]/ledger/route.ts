@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
     
-    // Fetch Sales (Debit/Receivable)
+    // 1. Fetch Sales (Debit/Receivable)
     const sales = await prisma.sale.findMany({
       where: { buyerId: id, isDeleted: false },
       select: {
@@ -17,10 +17,11 @@ export async function GET(
         saleDate: true,
         grandTotal: true,
         notes: true,
-      }
+      },
+      orderBy: { saleDate: "asc" },
     });
 
-    // Fetch Buyer Payments (Credit/Received)
+    // 2. Fetch Buyer Payments (Credit/Received)
     const payments = await prisma.buyerPayment.findMany({
       where: { buyerId: id, isDeleted: false },
       select: {
@@ -30,25 +31,32 @@ export async function GET(
         paymentMethod: true,
         bankReference: true,
         notes: true,
-      }
+      },
+      orderBy: { paymentDate: "asc" },
     });
 
-    // Fetch Sales Returns (Credit/Received)
+    // 3. Fetch Sales Returns - ONLY returns that adjust customer credit (ADJUSTMENT)
     const returns = await prisma.salesReturn.findMany({
-      where: { buyerId: id, isDeleted: false },
+      where: { 
+        buyerId: id, 
+        isDeleted: false,
+        refundMethod: "ADJUSTMENT",
+      },
       select: {
         id: true,
         returnDate: true,
         totalRefund: true,
         refundMethod: true,
+        referenceNumber: true,
         notes: true,
-      }
+      },
+      orderBy: { returnDate: "asc" },
     });
 
     const ledger: any[] = [];
 
-    // Format Sales
-    sales.forEach(sale => {
+    // Format Sales (Debit)
+    sales.forEach((sale: any) => {
       ledger.push({
         id: sale.id,
         date: sale.saleDate,
@@ -60,8 +68,8 @@ export async function GET(
       });
     });
 
-    // Format Payments
-    payments.forEach(payment => {
+    // Format Payments (Credit)
+    payments.forEach((payment: any) => {
       ledger.push({
         id: payment.id,
         date: payment.paymentDate,
@@ -73,14 +81,14 @@ export async function GET(
       });
     });
 
-    // Format Returns
-    returns.forEach(ret => {
+    // Format Returns (Credit) - only ADJUSTMENT returns that reduce customer debt
+    returns.forEach((ret: any) => {
       ledger.push({
         id: ret.id,
         date: ret.returnDate,
         type: 'RETURN',
-        reference: ret.refundMethod,
-        description: `Sales Return ${ret.notes ? '- ' + ret.notes : ''}`,
+        reference: ret.referenceNumber || ret.refundMethod,
+        description: `Sales Return (Adjusted in Credit) ${ret.notes ? '- ' + ret.notes : ''}`,
         debit: 0,
         credit: Number(ret.totalRefund), // Receivable decreases
       });
@@ -95,7 +103,8 @@ export async function GET(
       runningBalance += entry.debit - entry.credit;
       return {
         ...entry,
-        balance: runningBalance
+        calculatedBalance: runningBalance,
+        balance: runningBalance,
       };
     });
 
