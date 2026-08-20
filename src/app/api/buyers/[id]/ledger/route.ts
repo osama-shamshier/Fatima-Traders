@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
     
-    // Fetch Sales (Debit/Receivable)
+    // 1. Fetch Sales (Debit/Receivable) & initial counter payments
     const sales = await prisma.sale.findMany({
       where: { buyerId: id, isDeleted: false },
       select: {
@@ -16,11 +16,14 @@ export async function GET(
         invoiceNumber: true,
         saleDate: true,
         grandTotal: true,
+        amountPaid: true,
+        paymentMethod: true,
         notes: true,
-      }
+      },
+      orderBy: { saleDate: "asc" },
     });
 
-    // Fetch Buyer Payments (Credit/Received)
+    // 2. Fetch Buyer Subsequent Payments (Credit/Received)
     const payments = await prisma.buyerPayment.findMany({
       where: { buyerId: id, isDeleted: false },
       select: {
@@ -30,12 +33,17 @@ export async function GET(
         paymentMethod: true,
         bankReference: true,
         notes: true,
-      }
+      },
+      orderBy: { paymentDate: "asc" },
     });
 
-    // Fetch Sales Returns
+    // 3. Fetch Sales Returns - ONLY include returns that adjust customer credit (debt affected)
     const returns = await prisma.salesReturn.findMany({
-      where: { buyerId: id, isDeleted: false },
+      where: { 
+        buyerId: id, 
+        isDeleted: false,
+        refundMethod: { in: ["ADJUSTMENT", "BUYER_CREDIT"] }
+      },
       select: {
         id: true,
         returnDate: true,
@@ -43,61 +51,67 @@ export async function GET(
         refundMethod: true,
         referenceNumber: true,
         notes: true,
-      }
+      },
+      orderBy: { returnDate: "asc" },
     });
 
     const ledger: any[] = [];
 
-    // Format Sales
+    // Format Sales & initial checkout payments
     sales.forEach(sale => {
+      // 1. Invoiced Sale (Debit)
       ledger.push({
-        id: sale.id,
+        id: `sale-${sale.id}`,
         date: sale.saleDate,
         type: 'SALE',
         reference: sale.invoiceNumber,
         description: `Sale ${sale.notes ? '- ' + sale.notes : ''}`,
-        debit: Number(sale.grandTotal), // Receivable increases
+        debit: Number(sale.grandTotal),
         credit: 0,
       });
+
+      // 2. If customer paid initial amount at checkout (amountPaid > 0)
+      const paidAtCheckout = Number(sale.amountPaid || 0);
+      if (paidAtCheckout > 0) {
+        ledger.push({
+          id: `sale-pay-${sale.id}`,
+          date: sale.saleDate,
+          type: 'PAYMENT',
+          reference: sale.invoiceNumber,
+          description: `Paid at Checkout (${sale.paymentMethod || 'CASH'}) - ${sale.invoiceNumber}`,
+          debit: 0,
+          credit: paidAtCheckout,
+        });
+      }
     });
 
-    // Format Payments
+    // Format Subsequent Ledger Payments (Credit)
     payments.forEach(payment => {
       ledger.push({
-        id: payment.id,
+        id: `pay-${payment.id}`,
         date: payment.paymentDate,
         type: 'PAYMENT',
         reference: payment.bankReference || payment.paymentMethod,
         description: `Payment Received ${payment.notes ? '- ' + payment.notes : ''}`,
         debit: 0,
-        credit: Number(payment.amount), // Receivable decreases
+        credit: Number(payment.amount),
       });
     });
 
-    // Format Returns
+    // Format Adjusted Returns (Credit)
     returns.forEach(ret => {
-      const isAdjusted = ret.refundMethod === "ADJUSTMENT" || (ret as any).refundMethod === "BUYER_CREDIT";
-      const isCash = ret.refundMethod === "CASH";
-      const isBank = ret.refundMethod === "BANK_TRANSFER";
-
       ledger.push({
-        id: ret.id,
+        id: `ret-${ret.id}`,
         date: ret.returnDate,
         type: 'RETURN',
-        reference: ret.referenceNumber || ret.refundMethod,
-        description: isAdjusted
-          ? `Sales Return (Adjusted in Pending Credit) ${ret.notes ? '- ' + ret.notes : ''}`
-          : isCash
-          ? `Sales Return (Cash Refund Payout - Debt Unaffected) ${ret.notes ? '- ' + ret.notes : ''}`
-          : `Sales Return (Bank Transfer Refund - Debt Unaffected) ${ret.notes ? '- ' + ret.notes : ''}`,
+        reference: ret.referenceNumber || 'ADJUSTMENT',
+        description: `Sales Return (Adjusted in Pending Credit) ${ret.notes ? '- ' + ret.notes : ''}`,
         debit: 0,
-        // Only credit (reduce debt) if the return was adjusted against credit!
-        // If refunded as physical cash, the customer's debt is unaffected.
-        credit: isAdjusted ? Number(ret.totalRefund) : 0,
+        credit: Number(ret.totalRefund),
       });
     });
 
-    // Sort chronologically
+    // Sort all entries chronologically
     ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Calculate running balance
@@ -106,7 +120,8 @@ export async function GET(
       runningBalance += entry.debit - entry.credit;
       return {
         ...entry,
-        balance: runningBalance
+        calculatedBalance: runningBalance,
+        balance: runningBalance,
       };
     });
 
