@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { TableLoader } from "@/components/ui/loader";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
+import { useTranslations } from "next-intl";
 
 export default function DashboardPage() {
+  const t = useTranslations("dashboard");
   const [stats, setStats] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -46,51 +48,51 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      title: "Total Active Products",
-      value: `${stats?.totalProducts || 0} Items`,
+      title: t("totalProducts"),
+      value: `${stats?.totalProducts || 0}`,
       icon: Package,
       color: "bg-blue-600",
-      subtext: `${stats?.lowStockProducts || 0} items low on stock`,
+      subtext: `${stats?.lowStockProducts || 0} ${t("totalProductsSub")}`,
     },
     {
-      title: "Total Sales Today",
+      title: t("todaySalesCount"),
       value: formatCurrency(stats?.salesTodayRevenue || 0),
       icon: ShoppingCart,
       color: "bg-emerald-600",
-      subtext: `${stats?.salesTodayCount || 0} orders completed today`,
+      subtext: `${stats?.salesTodayCount || 0} ${t("todaySalesCountSub")}`,
     },
     {
-      title: "Customer Outstanding Credit",
+      title: t("customerOutstanding"),
       value: formatCurrency(stats?.totalBuyerReceivables || 0),
       icon: CreditCard,
       color: "bg-purple-600",
-      subtext: "Pending credit to be collected",
+      subtext: t("customerOutstandingSub"),
     },
     {
-      title: "Active Operational Branches",
-      value: `${stats?.activeBranches || 0} Branches`,
+      title: t("activeBranches"),
+      value: `${stats?.activeBranches || 0}`,
       icon: Building2,
       color: "bg-orange-600",
-      subtext: "All branches active",
+      subtext: t("activeBranchesSub"),
     },
   ];
 
   const quickActions = [
-    { name: "POS Terminal", href: "/pos", icon: ShoppingCart, color: "text-emerald-600 bg-emerald-100" },
-    { name: "New Purchase Bill", href: "/purchases", icon: Truck, color: "text-blue-600 bg-blue-100" },
-    { name: "Record Expense", href: "/expenses", icon: Receipt, color: "text-orange-600 bg-orange-100" },
-    { name: "Buyer Collections", href: "/buyer-payments", icon: CreditCard, color: "text-purple-600 bg-purple-100" },
+    { name: t("actionPos"), sub: t("actionPosSub"), href: "/pos", icon: ShoppingCart, color: "text-emerald-600 bg-emerald-100" },
+    { name: t("actionPurchase"), sub: t("actionPurchaseSub"), href: "/purchases", icon: Truck, color: "text-blue-600 bg-blue-100" },
+    { name: t("actionProduct"), sub: t("actionProductSub"), href: "/products", icon: Package, color: "text-orange-600 bg-orange-100" },
+    { name: t("actionReports"), sub: t("actionReportsSub"), href: "/reports", icon: TrendingUp, color: "text-purple-600 bg-purple-100" },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Fatima Traders Dashboard</h1>
-          <p className="text-slate-500 text-sm">Real-time overview of sales, cash & bank collections, customer debt, and operational status.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchStats}>
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Dashboard
+          <RefreshCw className="w-4 h-4 mr-2" /> {t("refresh")}
         </Button>
       </div>
 
@@ -118,19 +120,19 @@ export default function DashboardPage() {
       {/* TODAY'S SALES PAYMENT BREAKDOWN (CASH, BANK, PENDING CREDIT) */}
       <div>
         <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-blue-600" /> Today's Sales Collection Breakdown
+          <Wallet className="w-4 h-4 text-blue-600" /> {t("breakdownTitle")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Today's Cash */}
           <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-800 uppercase">💵 Today's Cash Collected</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-bold">CASH</span>
+              <span className="text-xs font-bold text-emerald-800 uppercase">💵 {t("todayCash")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-bold">{t("todayCashBadge")}</span>
             </div>
             <div className="text-2xl font-extrabold text-emerald-700 mt-2 font-mono">
               {formatCurrency(stats?.todayCashSales || 0)}
             </div>
-            <p className="text-[11px] text-emerald-600 mt-1 font-medium">Physical cash collected at counter</p>
+            <p className="text-[11px] text-emerald-600 mt-1 font-medium">{t("todayCashSub")}</p>
           </div>
 
           {/* Today's Bank Transfer (CLICKABLE FOR DETAILS!) */}
@@ -140,30 +142,30 @@ export default function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-blue-900 uppercase flex items-center gap-1">
-                🏦 Today's Bank Transfer Payments
+                🏦 {t("todayBank")}
               </span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-bold group-hover:bg-blue-700">
-                Click for Details ➔
+                {t("clickForDetails")}
               </span>
             </div>
             <div className="text-2xl font-extrabold text-blue-700 mt-2 font-mono">
               {formatCurrency(stats?.todayBankSales || 0)}
             </div>
             <p className="text-[11px] text-blue-600 mt-1 font-medium">
-              {stats?.bankDetailsList?.length || 0} bank transfer transaction(s) received today
+              {t("todayBankSub", { count: stats?.bankDetailsList?.length || 0 })}
             </p>
           </div>
 
           {/* Today's Pending Credit */}
           <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 uppercase">⏳ Today's Credit / Pending</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">CREDIT</span>
+              <span className="text-xs font-bold text-amber-900 uppercase">⏳ {t("todayCredit")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">{t("todayCreditBadge")}</span>
             </div>
             <div className="text-2xl font-extrabold text-amber-700 mt-2 font-mono">
               {formatCurrency(stats?.todayPendingCredit || 0)}
             </div>
-            <p className="text-[11px] text-amber-600 mt-1 font-medium">Unpaid balance on today's orders</p>
+            <p className="text-[11px] text-amber-600 mt-1 font-medium">{t("todayCreditSub")}</p>
           </div>
         </div>
       </div>
@@ -172,21 +174,21 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-rose-800 uppercase block">Total Supplier Payables (Pending)</span>
+            <span className="text-xs font-semibold text-rose-800 uppercase block">{t("totalSupplierPayables")}</span>
             <span className="text-xl font-bold text-rose-700">{formatCurrency(stats?.totalSupplierPayables || 0)}</span>
           </div>
           <Link href="/suppliers" className="text-xs font-bold text-rose-700 hover:underline flex items-center">
-            View Suppliers <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            {t("viewSuppliers")} <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
         </div>
 
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-emerald-800 uppercase block">Total Buyer Receivables (Outstanding)</span>
+            <span className="text-xs font-semibold text-emerald-800 uppercase block">{t("totalBuyerReceivables")}</span>
             <span className="text-xl font-bold text-emerald-700">{formatCurrency(stats?.totalBuyerReceivables || 0)}</span>
           </div>
           <Link href="/buyers?filter=outstanding" className="text-xs font-bold text-emerald-700 hover:underline flex items-center">
-            View Debtors List ({stats?.outstandingDebtors?.length || 0}) <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            {t("viewDebtors", { count: stats?.outstandingDebtors?.length || 0 })} <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
         </div>
       </div>
@@ -196,28 +198,28 @@ export default function DashboardPage() {
         <div className="p-4 border-b flex justify-between items-center bg-rose-50/50">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600" />
-            <h3 className="font-bold text-slate-900 text-sm">Customers with Pending Outstanding Payments</h3>
+            <h3 className="font-bold text-slate-900 text-sm">{t("debtorsTitle")}</h3>
           </div>
           <Link href="/buyers?filter=outstanding" className="text-xs font-bold text-rose-700 hover:underline flex items-center">
-            Manage All Debtors ({stats?.outstandingDebtors?.length || 0}) <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            {t("manageAllDebtors", { count: stats?.outstandingDebtors?.length || 0 })} <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3">Customer Name</th>
-                <th className="p-3">Company / Firm</th>
-                <th className="p-3">Contact Number</th>
-                <th className="p-3 text-right">Outstanding Amount (PKR)</th>
-                <th className="p-3 text-right">Action</th>
+                <th className="p-3">{t("colCustomer")}</th>
+                <th className="p-3">{t("colCompany")}</th>
+                <th className="p-3">{t("colContact")}</th>
+                <th className="p-3 text-right">{t("colOutstanding")}</th>
+                <th className="p-3 text-right">{t("colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {isLoading ? (
-                <TableLoader colSpan={5} text="Loading debtors list..." />
+                <TableLoader colSpan={5} text={t("colCustomer")} />
               ) : (stats?.outstandingDebtors || []).length === 0 ? (
-                <tr><td colSpan={5} className="p-6 text-center text-emerald-700 font-semibold">🎉 All customer payments are settled! No pending debt.</td></tr>
+                <tr><td colSpan={5} className="p-6 text-center text-emerald-700 font-semibold">{t("allSettled")}</td></tr>
               ) : (
                 (stats?.outstandingDebtors || []).map((debtor: any) => (
                   <tr key={debtor.id} className="hover:bg-rose-50/30">
@@ -234,7 +236,7 @@ export default function DashboardPage() {
                         onClick={() => handleOpenLedger(debtor)}
                         className="text-xs bg-slate-50 hover:bg-slate-100"
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1 text-blue-600" /> Settle / Ledger
+                        <FileText className="w-3.5 h-3.5 mr-1 text-blue-600" /> {t("viewLedger")}
                       </Button>
                     </td>
                   </tr>
@@ -247,7 +249,7 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-3 text-base font-bold text-slate-900">Quick Operations & Actions</h2>
+        <h2 className="mb-3 text-base font-bold text-slate-900">{t("quickActionsTitle")}</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           {quickActions.map((action, index) => {
             const Icon = action.icon;
@@ -261,7 +263,10 @@ export default function DashboardPage() {
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${action.color}`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span className="font-semibold text-slate-800 text-sm">{action.name}</span>
+                  <div>
+                    <span className="font-semibold text-slate-800 text-sm block">{action.name}</span>
+                    <span className="text-[11px] text-slate-400 font-normal">{action.sub}</span>
+                  </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
               </Link>
@@ -276,12 +281,12 @@ export default function DashboardPage() {
           <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Landmark className="w-5 h-5 text-blue-600" /> Today's Bank & Digital Wallet Transactions
+                <Landmark className="w-5 h-5 text-blue-600" /> {t("bankModalTitle")}
               </DialogTitle>
-              <p className="text-xs text-slate-500">Itemized breakdown of payments received via bank transfer today.</p>
+              <p className="text-xs text-slate-500">{t("bankModalSub")}</p>
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-500 font-semibold block uppercase">Total Bank Payments</span>
+              <span className="text-xs text-slate-500 font-semibold block uppercase">{t("todayBank")}</span>
               <span className="text-lg font-extrabold text-blue-700 font-mono">
                 {formatCurrency(stats?.todayBankSales || 0)}
               </span>
@@ -292,18 +297,18 @@ export default function DashboardPage() {
             <table className="w-full text-xs text-left border rounded-xl overflow-hidden">
               <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
                 <tr>
-                  <th className="p-3">Invoice / Ref #</th>
-                  <th className="p-3">Customer Name</th>
-                  <th className="p-3">Payment Method / Bank Info</th>
-                  <th className="p-3 text-right">Amount (PKR)</th>
-                  <th className="p-3 text-right">Time</th>
+                  <th className="p-3">{t("colReference")}</th>
+                  <th className="p-3">{t("colCustomer")}</th>
+                  <th className="p-3">{t("colPaymentType")}</th>
+                  <th className="p-3 text-right">{t("colAmount")}</th>
+                  <th className="p-3 text-right">{t("colTime")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {(stats?.bankDetailsList || []).length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-slate-400">
-                      No bank transfer transactions recorded today yet.
+                      {t("noBankToday")}
                     </td>
                   </tr>
                 ) : (
@@ -325,7 +330,7 @@ export default function DashboardPage() {
 
           <DialogFooter className="border-t pt-3">
             <Button variant="outline" onClick={() => setIsBankModalOpen(false)} size="sm">
-              Close
+              {t("close")}
             </Button>
           </DialogFooter>
         </DialogContent>
