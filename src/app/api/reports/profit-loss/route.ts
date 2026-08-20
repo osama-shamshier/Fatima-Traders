@@ -153,12 +153,15 @@ export async function GET(request: NextRequest) {
             quantitySold: 0,
             quantityReturned: 0,
             netQuantitySold: 0,
+            totalQuantitySold: 0,
             grossRevenue: 0,
             refundAmount: 0,
             netRevenue: 0,
+            totalRevenue: 0,
             grossCogs: 0,
             returnedCogs: 0,
             netCogs: 0,
+            totalFifoCost: 0,
             grossProfit: 0,
             marginPercent: 0,
             isLoss: false,
@@ -197,12 +200,15 @@ export async function GET(request: NextRequest) {
             quantitySold: 0,
             quantityReturned: 0,
             netQuantitySold: 0,
+            totalQuantitySold: 0,
             grossRevenue: 0,
             refundAmount: 0,
             netRevenue: 0,
+            totalRevenue: 0,
             grossCogs: 0,
             returnedCogs: 0,
             netCogs: 0,
+            totalFifoCost: 0,
             grossProfit: 0,
             marginPercent: 0,
             isLoss: false,
@@ -222,8 +228,11 @@ export async function GET(request: NextRequest) {
 
     const itemizedBreakdown = Array.from(productMap.values()).map((p) => {
       p.netQuantitySold = Math.max(0, p.quantitySold - p.quantityReturned);
+      p.totalQuantitySold = p.netQuantitySold || p.quantitySold;
       p.netRevenue = Math.max(0, p.grossRevenue - p.refundAmount);
+      p.totalRevenue = p.netRevenue || p.grossRevenue;
       p.netCogs = Math.max(0, p.grossCogs - p.returnedCogs);
+      p.totalFifoCost = p.netCogs || p.grossCogs;
       p.grossProfit = p.netRevenue - p.netCogs;
       p.marginPercent = p.netRevenue > 0 ? Number(((p.grossProfit / p.netRevenue) * 100).toFixed(2)) : 0;
       p.isLoss = p.grossProfit < 0;
@@ -249,16 +258,24 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       revenue: netRevenue,
+      netRevenue,
       grossRevenue,
+      totalSalesRevenue: grossRevenue,
       totalReturns: totalReturnsRefund,
+      totalSalesReturns: totalReturnsRefund,
       totalReturnsCount: salesReturns.length,
       cogs: netCogs,
+      totalCOGS: netCogs,
       grossCogs,
       returnedCogs,
       grossProfit,
       expenses: totalExpenses,
+      operatingExpenses: totalExpenses,
+      totalExpenses,
       netProfit,
+      grossProfitMargin: Number(grossMarginPercent.toFixed(2)),
       grossMarginPercent: Number(grossMarginPercent.toFixed(2)),
+      netProfitMargin: Number(netMarginPercent.toFixed(2)),
       netMarginPercent: Number(netMarginPercent.toFixed(2)),
       totalSalesCount: sales.length,
       itemizedBreakdown,

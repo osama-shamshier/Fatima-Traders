@@ -231,7 +231,7 @@ export default function ProfitLossPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-extrabold font-mono text-slate-900">
-              {formatCurrency(plData?.totalSalesRevenue || 0)}
+              {formatCurrency(plData?.totalSalesRevenue ?? plData?.grossRevenue ?? 0)}
             </div>
             <p className="text-[10px] text-slate-400 mt-1">{t("billedBeforeReturns")}</p>
           </CardContent>
@@ -245,7 +245,7 @@ export default function ProfitLossPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-extrabold font-mono text-rose-600">
-              -{formatCurrency(plData?.totalSalesReturns || 0)}
+              -{formatCurrency(plData?.totalSalesReturns ?? plData?.totalReturns ?? 0)}
             </div>
             <p className="text-[10px] text-slate-400 mt-1">{t("returnedRefunds")}</p>
           </CardContent>
@@ -259,7 +259,7 @@ export default function ProfitLossPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-extrabold font-mono text-emerald-600">
-              {formatCurrency(plData?.netRevenue || 0)}
+              {formatCurrency(plData?.netRevenue ?? plData?.revenue ?? 0)}
             </div>
             <p className="text-[10px] text-slate-400 mt-1">{t("grossMinusReturns")}</p>
           </CardContent>
@@ -273,7 +273,7 @@ export default function ProfitLossPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-extrabold font-mono text-orange-600">
-              {formatCurrency(plData?.totalCOGS || 0)}
+              {formatCurrency(plData?.totalCOGS ?? plData?.cogs ?? 0)}
             </div>
             <p className="text-[10px] text-slate-400 mt-1">{t("fifoCostSub")}</p>
           </CardContent>
@@ -287,10 +287,10 @@ export default function ProfitLossPage() {
           <div>
             <span className="text-slate-500 text-xs font-bold uppercase">{t("grossProfit")}</span>
             <div className="text-2xl font-black font-mono text-emerald-600 mt-1">
-              {formatCurrency(plData?.grossProfit || 0)}
+              {formatCurrency(plData?.grossProfit ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
-              {t("margin")}: <strong>{Number(plData?.grossProfitMargin || 0).toFixed(1)}%</strong>
+              {t("margin")}: <strong>{Number(plData?.grossProfitMargin ?? plData?.grossMarginPercent ?? 0).toFixed(1)}%</strong>
             </span>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -303,7 +303,7 @@ export default function ProfitLossPage() {
           <div>
             <span className="text-slate-500 text-xs font-bold uppercase">{t("operatingExpenses")}</span>
             <div className="text-2xl font-black font-mono text-rose-600 mt-1">
-              {formatCurrency(plData?.operatingExpenses || 0)}
+              {formatCurrency(plData?.operatingExpenses ?? plData?.expenses ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">{t("rentUtilitiesBills")}</span>
           </div>
@@ -317,15 +317,15 @@ export default function ProfitLossPage() {
           <div>
             <span className="text-slate-500 text-xs font-bold uppercase">{t("netProfit")}</span>
             <div className={`text-2xl font-black font-mono mt-1 ${
-              Number(plData?.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
+              Number(plData?.netProfit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}>
-              {formatCurrency(plData?.netProfit || 0)}
+              {formatCurrency(plData?.netProfit ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
-              {t("netMargin")}: <strong>{Number(plData?.netProfitMargin || 0).toFixed(1)}%</strong>
+              {t("netMargin")}: <strong>{Number(plData?.netProfitMargin ?? plData?.netMarginPercent ?? 0).toFixed(1)}%</strong>
             </span>
           </div>
-          <div className={`p-3 rounded-xl ${Number(plData?.netProfit || 0) >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+          <div className={`p-3 rounded-xl ${Number(plData?.netProfit ?? 0) >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
             <TrendingUp className="w-6 h-6" />
           </div>
         </div>
