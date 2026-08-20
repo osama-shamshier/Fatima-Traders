@@ -112,7 +112,7 @@ export default function AuditLogsPage() {
                       </Badge>
                     </td>
                     <td className="p-3.5">
-                      <Badge variant={log.action === "DELETE" ? "danger" : "secondary"} className="text-[10px] font-mono">
+                      <Badge variant={log.action === "DELETE" ? "danger" : "default"} className="text-[10px] font-mono">
                         {log.action}
                       </Badge>
                     </td>

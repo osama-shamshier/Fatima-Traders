@@ -118,7 +118,7 @@ export default function RolesPage() {
                       {role.permissions?.length || 0}
                     </td>
                     <td className="p-3.5 text-center">
-                      <Badge variant={role.isSystem ? "secondary" : "outline"} className="text-[10px]">
+                      <Badge variant={role.isSystem ? "primary" : "outline"} className="text-[10px]">
                         {role.isSystem ? t("systemRole") : t("customRole")}
                       </Badge>
                     </td>
