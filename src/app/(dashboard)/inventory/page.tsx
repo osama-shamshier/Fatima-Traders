@@ -11,8 +11,12 @@ import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { StockAdjustmentModal } from "@/components/inventory/StockAdjustmentModal";
 import { Search, AlertTriangle, RefreshCw, Warehouse, ArrowLeftRight, ClipboardEdit } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function InventoryPage() {
+  const t = useTranslations("inventory");
+  const tc = useTranslations("common");
+
   const [activeTab, setActiveTab] = useState("current");
   const [inventory, setInventory] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -106,152 +110,125 @@ export default function InventoryPage() {
     }
   };
 
-  const handleAdjustStock = (item: any) => {
+  const handleAdjustClick = (item: any) => {
     setSelectedProduct(item);
     setIsAdjustModalOpen(true);
-  };
-
-  const onAdjustmentComplete = () => {
-    fetchInventory();
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Real-Time Inventory & Stock Management</h1>
-          <p className="text-slate-500 text-sm">Monitor available product stock across branches, audit movement logs, and perform adjustments.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchInventory}>
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Stock Data
-        </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:w-[450px]">
-          <TabsTrigger value="current" className="text-xs font-semibold">
-            <Warehouse className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> Current Stock
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-slate-100 p-1 rounded-xl">
+          <TabsTrigger value="current" className="rounded-lg text-xs font-semibold gap-1.5">
+            <Warehouse className="w-3.5 h-3.5" /> {t("tabCurrent")}
           </TabsTrigger>
-          <TabsTrigger value="movements" className="text-xs font-semibold">
-            <ArrowLeftRight className="w-3.5 h-3.5 mr-1.5 text-emerald-600" /> Stock Movements
+          <TabsTrigger value="movements" className="rounded-lg text-xs font-semibold gap-1.5">
+            <ArrowLeftRight className="w-3.5 h-3.5" /> {t("tabMovements")}
           </TabsTrigger>
-          <TabsTrigger value="adjustments" className="text-xs font-semibold">
-            <ClipboardEdit className="w-3.5 h-3.5 mr-1.5 text-amber-600" /> Adjustments
+          <TabsTrigger value="adjustments" className="rounded-lg text-xs font-semibold gap-1.5">
+            <ClipboardEdit className="w-3.5 h-3.5" /> {t("tabAdjustments")}
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex flex-col md:flex-row gap-4 mt-6 items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          {activeTab === "current" && (
-            <div className="flex-1 w-full max-w-sm">
-              <Label className="text-xs font-semibold text-slate-700">Search Products</Label>
-              <div className="relative mt-1">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        {/* Tab 1: Current Stock */}
+        <TabsContent value="current" className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex flex-1 items-center gap-3 w-full">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute start-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search product by name or SKU..."
-                  className="pl-9 text-xs bg-slate-50 font-medium"
+                  placeholder={t("searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ps-9 text-xs bg-slate-50"
                 />
               </div>
+
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-3 py-2 font-medium"
+              >
+                <option value="">{t("allBranches")}</option>
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          <div className="w-full max-w-xs">
-            <Label className="text-xs font-semibold text-slate-700">Filter Branch</Label>
-            <select
-              className="input text-xs bg-slate-50 mt-1 font-medium"
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-            >
-              <option value="">All Operational Branches</option>
-              {branches.map((b: any) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {activeTab === "current" && (
-            <div className="flex items-center space-x-2 pb-1.5">
+            <div className="flex items-center space-x-2">
               <Checkbox
                 id="lowStock"
                 checked={lowStockOnly}
-                onCheckedChange={(c) => setLowStockOnly(!!c)}
+                onCheckedChange={(checked) => setLowStockOnly(!!checked)}
               />
-              <Label htmlFor="lowStock" className="flex items-center gap-1 cursor-pointer text-xs font-bold text-amber-800">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Low / Out of Stock Only
+              <Label htmlFor="lowStock" className="text-xs font-semibold text-rose-700 cursor-pointer">
+                {t("lowStockOnly")}
               </Label>
             </div>
-          )}
-        </div>
+          </div>
 
-        <TabsContent value="current" className="mt-4">
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="p-3.5 border-b bg-slate-50 flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-900">Total Products in Stock ({inventory.length})</span>
-            </div>
-
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
                   <tr>
-                    <th className="p-3.5">SKU</th>
-                    <th className="p-3.5">Product Name</th>
-                    <th className="p-3.5">Category</th>
-                    <th className="p-3.5">Branch</th>
-                    <th className="p-3.5 text-right">Available Stock</th>
-                    <th className="p-3.5 text-right">Min Alert Level</th>
-                    <th className="p-3.5 text-center">Stock Status</th>
-                    <th className="p-3.5 text-right">Action</th>
+                    <th className="p-3.5">{t("colProduct")}</th>
+                    <th className="p-3.5">{t("colSku")}</th>
+                    <th className="p-3.5">{t("colCategory")}</th>
+                    <th className="p-3.5">{t("colBranch")}</th>
+                    <th className="p-3.5 text-center">{t("colStock")}</th>
+                    <th className="p-3.5 text-center">{t("colMinLevel")}</th>
+                    <th className="p-3.5 text-center">{t("colStatus")}</th>
+                    <th className="p-3.5 text-right">{t("colActions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <TableLoader colSpan={8} text="Loading real-time stock levels..." />
+                    <TableLoader colSpan={8} text="Loading stock overview..." />
                   ) : inventory.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-400">
-                        No inventory matching filters found.
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
+                        {t("noInventory")}
                       </td>
                     </tr>
                   ) : (
                     inventory.map((item: any) => {
-                      const minStock = Number(item.minStockLevel || item.product?.minStockLevel || 0);
-                      const qty = Number(item.quantity || 0);
-                      const unitAbbr = item.product?.unit?.abbreviation || "";
-                      const isOutOfStock = qty <= 0;
-                      const isLowStock = !isOutOfStock && qty <= minStock;
+                      const qty = Number(item.quantity);
+                      const minStock = Number(item.product?.minStockLevel || 0);
+                      const isLow = qty <= minStock;
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-3.5 font-mono font-bold text-slate-600">{item.product?.sku}</td>
                           <td className="p-3.5 font-bold text-slate-900">{item.product?.name}</td>
-                          <td className="p-3.5">
-                            <Badge variant="outline" className="text-[11px]">
-                              {item.product?.category?.name || "General"}
-                            </Badge>
+                          <td className="p-3.5 font-mono text-slate-500">{item.product?.sku}</td>
+                          <td className="p-3.5 text-slate-600">{item.product?.category?.name || "-"}</td>
+                          <td className="p-3.5 text-slate-600">{item.branch?.name}</td>
+                          <td className="p-3.5 text-center font-mono font-bold text-sm">
+                            <span className={isLow ? "text-rose-600 font-black" : "text-slate-900"}>
+                              {qty} {item.product?.unit?.abbreviation || ""}
+                            </span>
                           </td>
-                          <td className="p-3.5 text-slate-700 font-semibold">{item.branch?.name || "Main Branch"}</td>
-                          <td className="p-3.5 text-right font-mono font-extrabold text-sm text-slate-900">
-                            {qty} {unitAbbr}
-                          </td>
-                          <td className="p-3.5 text-right font-mono text-slate-500">
-                            {minStock} {unitAbbr}
+                          <td className="p-3.5 text-center font-mono text-slate-500">
+                            {minStock} {item.product?.unit?.abbreviation || ""}
                           </td>
                           <td className="p-3.5 text-center">
-                            {isOutOfStock ? (
+                            {isLow ? (
                               <Badge variant="danger" className="text-[10px] font-bold">
-                                🚫 OUT OF STOCK
-                              </Badge>
-                            ) : isLowStock ? (
-                              <Badge variant="warning" className="text-[10px] font-bold">
-                                ⚠️ LOW STOCK
+                                {t("statusLow")}
                               </Badge>
                             ) : (
                               <Badge variant="success" className="text-[10px] font-bold">
-                                ✓ IN STOCK
+                                {t("statusOk")}
                               </Badge>
                             )}
                           </td>
@@ -259,10 +236,10 @@ export default function InventoryPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleAdjustStock(item)}
-                              className="text-xs py-1 px-3 bg-slate-50 hover:bg-slate-100"
+                              onClick={() => handleAdjustClick(item)}
+                              className="text-xs h-7"
                             >
-                              Adjust Stock
+                              {t("adjustStock")}
                             </Button>
                           </td>
                         </tr>
@@ -275,55 +252,47 @@ export default function InventoryPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="movements" className="mt-4">
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* Tab 2: Stock Movements */}
+        <TabsContent value="movements">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
                   <tr>
-                    <th className="p-3.5">Date & Time</th>
-                    <th className="p-3.5">Product</th>
-                    <th className="p-3.5">Branch</th>
-                    <th className="p-3.5">Movement Type</th>
-                    <th className="p-3.5 text-right">Quantity Change</th>
-                    <th className="p-3.5">Notes</th>
+                    <th className="p-3.5">{t("colDateTime")}</th>
+                    <th className="p-3.5">{t("colProduct")}</th>
+                    <th className="p-3.5">{t("colBranch")}</th>
+                    <th className="p-3.5">{t("colType")}</th>
+                    <th className="p-3.5">{t("colReference")}</th>
+                    <th className="p-3.5 text-right">{t("colQtyChange")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <TableLoader colSpan={6} text="Loading movement logs..." />
+                    <TableLoader colSpan={6} text="Loading stock movements..." />
                   ) : movements.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400">
-                        No stock movement history found.
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
+                        No movement records found.
                       </td>
                     </tr>
                   ) : (
-                    movements.map((item: any) => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3.5 font-mono text-slate-500">{formatDate(item.createdAt)}</td>
-                        <td className="p-3.5 font-bold text-slate-900">{item.product?.name}</td>
-                        <td className="p-3.5 text-slate-700 font-semibold">{item.branch?.name}</td>
+                    movements.map((m: any) => (
+                      <tr key={m.id} className="hover:bg-slate-50">
+                        <td className="p-3.5 font-mono text-slate-500">{formatDate(m.createdAt)}</td>
+                        <td className="p-3.5 font-bold text-slate-900">{m.product?.name}</td>
+                        <td className="p-3.5 text-slate-600">{m.branch?.name}</td>
                         <td className="p-3.5">
-                          <Badge variant="outline" className="text-[11px]">
-                            {item.movementType}
+                          <Badge variant="outline" className="text-[10px] font-bold uppercase">
+                            {m.type}
                           </Badge>
                         </td>
-                        <td className="p-3.5 text-right font-mono font-bold text-sm">
-                          <span
-                            className={
-                              Number(item.quantity) > 0
-                                ? "text-emerald-600"
-                                : Number(item.quantity) < 0
-                                ? "text-rose-600"
-                                : "text-slate-900"
-                            }
-                          >
-                            {Number(item.quantity) > 0 ? "+" : ""}
-                            {Number(item.quantity)}
+                        <td className="p-3.5 font-mono text-slate-500">{m.referenceId ? `#${m.referenceId.slice(0, 8)}` : "-"}</td>
+                        <td className="p-3.5 text-right font-mono font-bold">
+                          <span className={Number(m.quantity) > 0 ? "text-emerald-600" : "text-rose-600"}>
+                            {Number(m.quantity) > 0 ? `+${m.quantity}` : m.quantity}
                           </span>
                         </td>
-                        <td className="p-3.5 text-slate-600 truncate max-w-xs">{item.notes || "-"}</td>
                       </tr>
                     ))
                   )}
@@ -333,46 +302,47 @@ export default function InventoryPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="adjustments" className="mt-4">
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* Tab 3: Adjustments */}
+        <TabsContent value="adjustments">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
                   <tr>
-                    <th className="p-3.5">Date & Time</th>
-                    <th className="p-3.5">Product</th>
-                    <th className="p-3.5">Branch</th>
-                    <th className="p-3.5">Adjustment Type</th>
-                    <th className="p-3.5 text-right">Quantity Diff</th>
-                    <th className="p-3.5">Reason</th>
-                    <th className="p-3.5">Performed By</th>
+                    <th className="p-3.5">{t("colDateTime")}</th>
+                    <th className="p-3.5">{t("colProduct")}</th>
+                    <th className="p-3.5">{t("colBranch")}</th>
+                    <th className="p-3.5">{t("adjustmentType")}</th>
+                    <th className="p-3.5 text-center">{t("colPreviousQty")}</th>
+                    <th className="p-3.5 text-center">{t("colNewQty")}</th>
+                    <th className="p-3.5">{t("colReason")}</th>
+                    <th className="p-3.5">{t("colUser")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {loading ? (
-                    <TableLoader colSpan={7} text="Loading adjustments..." />
+                    <TableLoader colSpan={8} text="Loading stock adjustments..." />
                   ) : adjustments.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-400">
-                        No manual stock adjustments recorded.
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
+                        No adjustment records found.
                       </td>
                     </tr>
                   ) : (
-                    adjustments.map((item: any) => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3.5 font-mono text-slate-500">{formatDate(item.createdAt)}</td>
-                        <td className="p-3.5 font-bold text-slate-900">{item.product?.name}</td>
-                        <td className="p-3.5 text-slate-700 font-semibold">{item.branch?.name}</td>
+                    adjustments.map((a: any) => (
+                      <tr key={a.id} className="hover:bg-slate-50">
+                        <td className="p-3.5 font-mono text-slate-500">{formatDate(a.createdAt)}</td>
+                        <td className="p-3.5 font-bold text-slate-900">{a.product?.name}</td>
+                        <td className="p-3.5 text-slate-600">{a.branch?.name}</td>
                         <td className="p-3.5">
-                          <Badge variant="outline" className="text-[11px]">
-                            {item.adjustmentType}
+                          <Badge variant="warning" className="text-[10px] font-bold">
+                            {a.adjustmentType}
                           </Badge>
                         </td>
-                        <td className="p-3.5 text-right font-mono font-bold text-sm text-slate-900">
-                          {Number(item.previousQty)} → {Number(item.newQty)}
-                        </td>
-                        <td className="p-3.5 text-slate-600 truncate max-w-xs">{item.reason || "-"}</td>
-                        <td className="p-3.5 text-slate-700 font-semibold">{item.createdBy?.name || "System"}</td>
+                        <td className="p-3.5 text-center font-mono">{a.previousQty}</td>
+                        <td className="p-3.5 text-center font-mono font-bold text-blue-600">{a.newQty}</td>
+                        <td className="p-3.5 text-slate-600">{a.reason || "-"}</td>
+                        <td className="p-3.5 text-slate-500">{a.createdBy?.name || "Admin"}</td>
                       </tr>
                     ))
                   )}
@@ -383,7 +353,7 @@ export default function InventoryPage() {
         </TabsContent>
       </Tabs>
 
-      {isAdjustModalOpen && selectedProduct && (
+      {selectedProduct && (
         <StockAdjustmentModal
           isOpen={isAdjustModalOpen}
           onClose={() => {
@@ -391,7 +361,7 @@ export default function InventoryPage() {
             setSelectedProduct(null);
           }}
           inventory={selectedProduct}
-          onComplete={onAdjustmentComplete}
+          onComplete={fetchInventory}
         />
       )}
     </div>

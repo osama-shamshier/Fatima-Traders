@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { RotateCcw, Plus, Search, Eye, ArrowUpRight, PackageOpen, CheckCircle2 } from "lucide-react";
+import { RotateCcw, Plus, Search, Eye, PackageOpen, CheckCircle2 } from "lucide-react";
 import ReturnCreateModal from "@/components/sales-returns/ReturnCreateModal";
 import ReturnDetailModal from "@/components/sales-returns/ReturnDetailModal";
+import { useTranslations } from "next-intl";
 
 export default function SalesReturnsPage() {
+  const t = useTranslations("salesReturns");
+  const tc = useTranslations("common");
+
   const [returns, setReturns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -58,17 +62,15 @@ export default function SalesReturnsPage() {
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <RotateCcw className="w-7 h-7 text-rose-600" /> Sales Returns & Restock
+            <RotateCcw className="w-7 h-7 text-rose-600" /> {t("title")}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Process customer returns, adjust pending credit, or issue refunds with automatic inventory restocking.
-          </p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
         </div>
         <Button
           onClick={() => setIsCreateOpen(true)}
           className="bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm gap-2"
         >
-          <Plus className="w-4 h-4" /> Process Return & Restock
+          <Plus className="w-4 h-4" /> {t("processReturn")}
         </Button>
       </div>
 
@@ -77,7 +79,7 @@ export default function SalesReturnsPage() {
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Returns Processed
+              {t("totalReturns")}
             </span>
             <span className="text-2xl font-black text-slate-900 mt-1 block">{returns.length}</span>
           </div>
@@ -89,7 +91,7 @@ export default function SalesReturnsPage() {
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Restocked Product Units
+              {t("restockedUnits")}
             </span>
             <span className="text-2xl font-black text-slate-900 mt-1 block">{totalItemsReturned.toLocaleString()}</span>
           </div>
@@ -101,7 +103,7 @@ export default function SalesReturnsPage() {
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Refund & Adjustments
+              {t("totalRefundValue")}
             </span>
             <span className="text-2xl font-black text-rose-600 font-mono mt-1 block">
               {formatCurrency(totalRefundsValue)}
@@ -115,9 +117,9 @@ export default function SalesReturnsPage() {
 
       {/* Search & Filter Bar */}
       <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-        <Search className="w-4 h-4 text-slate-400 ml-1" />
+        <Search className="w-4 h-4 text-slate-400 ms-1" />
         <Input
-          placeholder="Search by Return Ref #, Customer Name, Invoice #, or Product..."
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border-0 focus-visible:ring-0 text-xs shadow-none p-0 h-auto"
@@ -130,14 +132,14 @@ export default function SalesReturnsPage() {
           <table className="w-full text-xs">
             <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
               <tr>
-                <th className="p-4 text-left font-bold">Return Reference</th>
-                <th className="p-4 text-left font-bold">Date & Time</th>
-                <th className="p-4 text-left font-bold">Customer</th>
-                <th className="p-4 text-left font-bold">Invoice Ref</th>
-                <th className="p-4 text-left font-bold">Returned Items</th>
-                <th className="p-4 text-center font-bold">Refund Method</th>
-                <th className="p-4 text-right font-bold">Total Refund</th>
-                <th className="p-4 text-right font-bold">Action</th>
+                <th className="p-4 text-left font-bold">{t("colReturnRef")}</th>
+                <th className="p-4 text-left font-bold">{t("colDateTime")}</th>
+                <th className="p-4 text-left font-bold">{t("colCustomer")}</th>
+                <th className="p-4 text-left font-bold">{t("colInvoiceRef")}</th>
+                <th className="p-4 text-left font-bold">{t("colReturnedItems")}</th>
+                <th className="p-4 text-center font-bold">{t("colRefundMethod")}</th>
+                <th className="p-4 text-right font-bold">{t("colTotalRefund")}</th>
+                <th className="p-4 text-right font-bold">{t("colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -151,10 +153,7 @@ export default function SalesReturnsPage() {
                 <tr>
                   <td colSpan={8} className="p-12 text-center text-slate-500">
                     <RotateCcw className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                    <p className="font-semibold text-slate-700">No Sales Returns Found</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {search ? "No records match your search filter" : "Click 'Process Return & Restock' above to record a new return."}
-                    </p>
+                    <p className="font-semibold text-slate-700">{t("noReturns")}</p>
                   </td>
                 </tr>
               ) : (
@@ -167,7 +166,7 @@ export default function SalesReturnsPage() {
                       <td className="p-4 font-mono font-bold text-blue-600">
                         {r.referenceNumber || r.id.slice(0, 8)}
                       </td>
-                      <td className="p-4 text-slate-600 whitespace-nowrap">
+                      <td className="p-4 text-slate-600 whitespace-nowrap font-mono">
                         {formatDate(r.returnDate || r.createdAt)}
                       </td>
                       <td className="p-4">
@@ -182,7 +181,7 @@ export default function SalesReturnsPage() {
                         {r.sale?.invoiceNumber ? (
                           <span className="text-slate-800 font-semibold">#{r.sale.invoiceNumber}</span>
                         ) : (
-                          <span className="text-slate-400 italic">Direct Return</span>
+                          <span className="text-slate-400 italic">{t("directReturn")}</span>
                         )}
                       </td>
                       <td className="p-4">
@@ -205,10 +204,10 @@ export default function SalesReturnsPage() {
                           }
                         >
                           {r.refundMethod === "ADJUSTMENT"
-                            ? "📉 Adjusted in Credit"
+                            ? t("adjustedInCredit")
                             : r.refundMethod === "BANK_TRANSFER"
-                            ? "🏦 Bank Transfer"
-                            : "💵 Cash Refund"}
+                            ? t("bankTransfer")
+                            : t("cashRefund")}
                         </Badge>
                       </td>
                       <td className="p-4 text-right font-bold font-mono text-rose-600 text-sm">
@@ -221,7 +220,7 @@ export default function SalesReturnsPage() {
                           onClick={() => setSelectedReturn(r)}
                           className="h-8 px-2.5 text-xs text-blue-600 hover:bg-blue-50 font-semibold gap-1"
                         >
-                          <Eye className="w-3.5 h-3.5" /> View Details
+                          <Eye className="w-3.5 h-3.5 me-1" /> {t("viewDetails")}
                         </Button>
                       </td>
                     </tr>

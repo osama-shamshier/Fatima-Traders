@@ -6,8 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import TransferCreateModal from "@/components/stock-transfers/TransferCreateModal";
 import TransferReceiveModal from "@/components/stock-transfers/TransferReceiveModal";
+import { Plus, ArrowLeftRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function StockTransfersPage() {
+  const t = useTranslations("stockTransfers");
+  const tc = useTranslations("common");
+
   const [transfers, setTransfers] = useState([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
@@ -23,52 +28,64 @@ export default function StockTransfersPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Stock Transfers</h1>
-        <Button onClick={() => setIsCreateOpen(true)}>New Transfer</Button>
+    <div className="p-4 md:p-8 pt-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+            <ArrowLeftRight className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="bg-blue-600 hover:bg-blue-700 font-bold gap-1.5 shadow-sm">
+          <Plus className="w-4 h-4" /> {t("newTransfer")}
+        </Button>
       </div>
 
-      <div className="bg-white rounded-md shadow overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50 text-left">
-              <th className="p-4 font-medium text-gray-500">Reference No</th>
-              <th className="p-4 font-medium text-gray-500">Date</th>
-              <th className="p-4 font-medium text-gray-500">From Branch</th>
-              <th className="p-4 font-medium text-gray-500">To Branch</th>
-              <th className="p-4 font-medium text-gray-500">Status</th>
-              <th className="p-4 font-medium text-gray-500">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transfers.map((t: any) => (
-              <tr key={t.id} className="border-b">
-                <td className="p-4">{t.transferNumber || t.id.slice(0, 8)}</td>
-                <td className="p-4">{formatDate(t.createdAt)}</td>
-                <td className="p-4">{t.sourceBranch?.name || "N/A"}</td>
-                <td className="p-4">{t.destBranch?.name || "N/A"}</td>
-                <td className="p-4">
-                  <Badge variant={t.status === "PENDING" ? "warning" : "success"}>
-                    {t.status}
-                  </Badge>
-                </td>
-                <td className="p-4">
-                  {t.status === "PENDING" && (
-                    <Button variant="outline" size="sm" onClick={() => setSelectedTransfer(t)}>
-                      Receive
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {transfers.length === 0 && (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="relative w-full overflow-auto">
+          <table className="w-full caption-bottom text-xs text-left">
+            <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">No transfers found</td>
+                <th className="h-11 px-4">{t("colRef")}</th>
+                <th className="h-11 px-4">{t("colDate")}</th>
+                <th className="h-11 px-4">{t("colFrom")}</th>
+                <th className="h-11 px-4">{t("colTo")}</th>
+                <th className="h-11 px-4 text-center">{t("colStatus")}</th>
+                <th className="h-11 px-4 text-right">{t("colAction")}</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {transfers.map((item: any) => (
+                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="p-4 font-mono font-bold text-blue-600">{item.transferNumber || item.id.slice(0, 8)}</td>
+                  <td className="p-4 text-slate-600 font-mono">{formatDate(item.createdAt)}</td>
+                  <td className="p-4 font-bold text-slate-900">{item.sourceBranch?.name || "-"}</td>
+                  <td className="p-4 font-bold text-slate-900">{item.destBranch?.name || "-"}</td>
+                  <td className="p-4 text-center">
+                    <Badge variant={item.status === "PENDING" ? "warning" : "success"} className="text-[10px] font-bold">
+                      {item.status === "PENDING" ? t("statusPending") : t("statusCompleted")}
+                    </Badge>
+                  </td>
+                  <td className="p-4 text-right">
+                    {item.status === "PENDING" && (
+                      <Button variant="outline" size="sm" onClick={() => setSelectedTransfer(item)} className="text-xs h-7">
+                        {t("receiveTransfer")}
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {transfers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-slate-400">
+                    <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    {t("noTransfers")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <TransferCreateModal 

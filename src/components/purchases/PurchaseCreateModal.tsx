@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Trash2, Tag, TrendingUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface PurchaseCreateModalProps {
   isOpen: boolean;
@@ -17,6 +18,9 @@ interface PurchaseCreateModalProps {
 }
 
 export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCreateModalProps) {
+  const t = useTranslations("purchases");
+  const tc = useTranslations("common");
+
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -98,29 +102,50 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
     setItems([...items, { productId: "", quantity: 1, purchaseRate: 0, newSellingPrice: 0 }]);
 
   const removeItem = (index: number) => {
-    if (items.length > 1) setItems(items.filter((_, i) => i !== index));
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const totalAmount = items.reduce((acc, item) => acc + item.quantity * item.purchaseRate, 0);
-  const pendingAmount = Math.max(0, totalAmount - Number(formData.amountPaid || 0));
+  const calculateTotal = () => {
+    return items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.purchaseRate) || 0), 0);
+  };
+
+  const totalAmount = calculateTotal();
+  const balanceRemaining = Math.max(0, totalAmount - (Number(formData.amountPaid) || 0));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.supplierId) {
-      alert("Please select a supplier");
+
+    if (!formData.supplierId || !formData.branchId) {
+      alert("Please select both Supplier and Branch.");
       return;
     }
-    if (!formData.branchId) {
-      alert("Please select a destination branch for stock inventory");
+
+    if (items.some((i) => !i.productId || Number(i.quantity) <= 0 || Number(i.purchaseRate) < 0)) {
+      alert("Please ensure all items have a valid Product, Quantity (>0), and Purchase Rate.");
       return;
     }
 
     setLoading(true);
+
     try {
+      const refText = [
+        formData.bankName ? `Bank: ${formData.bankName}` : null,
+        formData.bankReference ? `Ref: ${formData.bankReference}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
       const payload = {
         ...formData,
-        items,
-        amountPaid: Number(formData.amountPaid),
+        amountPaid: Number(formData.amountPaid) || 0,
+        bankReference: refText || undefined,
+        items: items.map((i) => ({
+          productId: i.productId,
+          quantity: Number(i.quantity),
+          purchaseRate: Number(i.purchaseRate),
+          newSellingPrice: Number(i.newSellingPrice) > 0 ? Number(i.newSellingPrice) : undefined,
+        })),
       };
 
       const res = await fetch("/api/purchases", {
@@ -130,27 +155,15 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       });
 
       if (!res.ok) {
-        throw new Error("Failed to record purchase");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to create purchase");
       }
 
       onSuccess();
       onClose();
-      // reset state
-      setFormData({
-        supplierId: "",
-        branchId: branches[0]?.id || "",
-        invoiceNumber: "",
-        purchaseDate: new Date().toISOString().split("T")[0],
-        amountPaid: 0,
-        paymentMethod: "CASH",
-        bankName: "",
-        bankReference: "",
-        notes: "",
-      });
-      setItems([{ productId: "", quantity: 1, purchaseRate: 0, newSellingPrice: 0 }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Error saving purchase");
+      alert(error.message || "Error creating purchase bill");
     } finally {
       setLoading(false);
     }
@@ -158,296 +171,266 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[950px] max-h-[92vh] overflow-y-auto bg-white rounded-2xl p-6">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-b pb-3 mb-4">
-            <DialogTitle className="text-xl font-bold text-slate-900">New Purchase & Stock Receiving</DialogTitle>
-            <p className="text-xs text-slate-500">
-              Record supplier purchase bill. Enter purchase rates and updated retail sale rates to auto-update product catalog pricing.
-            </p>
-          </DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
+        <DialogHeader className="border-b pb-3 mb-2">
+          <DialogTitle className="text-xl font-bold text-slate-900">{t("modalCreateTitle")}</DialogTitle>
+        </DialogHeader>
 
-          <div className="grid gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="supplierId">Select Supplier *</Label>
-                <select
-                  id="supplierId"
-                  name="supplierId"
-                  value={formData.supplierId}
-                  onChange={handleChange}
-                  className="input text-sm bg-white"
-                  required
-                >
-                  <option value="">Choose Supplier</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.companyName || "Individual"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="branchId">Receiving Branch Stock *</Label>
-                <select
-                  id="branchId"
-                  name="branchId"
-                  value={formData.branchId}
-                  onChange={handleChange}
-                  className="input text-sm bg-white"
-                  required
-                >
-                  <option value="">Select Branch</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="invoiceNumber">Supplier Bill / Invoice #</Label>
-                <Input
-                  id="invoiceNumber"
-                  name="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={handleChange}
-                  placeholder="e.g. SUP-INV-9988"
-                  required
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {/* Header Info Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <div>
+              <Label className="text-xs font-semibold">{t("selectSupplier")} *</Label>
+              <select
+                name="supplierId"
+                value={formData.supplierId}
+                onChange={handleChange}
+                className="input text-xs bg-white mt-1 w-full"
+                required
+              >
+                <option value="">-- {t("selectSupplier")} --</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.companyName ? `(${s.companyName})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Line Items Section */}
-            <div className="mt-2 border rounded-xl p-4 bg-slate-50/50 space-y-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Purchase Line Items & Sale Price Updates</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Entering a new sale rate here automatically updates the item's retail price in the master catalog.
-                  </p>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Product Line
-                </Button>
-              </div>
+            <div>
+              <Label className="text-xs font-semibold">{t("selectBranch")} *</Label>
+              <select
+                name="branchId"
+                value={formData.branchId}
+                onChange={handleChange}
+                className="input text-xs bg-white mt-1 w-full"
+                required
+              >
+                <option value="">-- {t("selectBranch")} --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
+            <div>
+              <Label className="text-xs font-semibold">{t("invoiceNumber")}</Label>
+              <Input
+                name="invoiceNumber"
+                value={formData.invoiceNumber}
+                onChange={handleChange}
+                placeholder="e.g. INV-98231"
+                className="text-xs bg-white mt-1 font-mono"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">{t("purchaseDate")} *</Label>
+              <Input
+                type="date"
+                name="purchaseDate"
+                value={formData.purchaseDate}
+                onChange={handleChange}
+                className="text-xs bg-white mt-1"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Line Items Table */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="p-3 bg-slate-100/80 border-b flex justify-between items-center">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                {t("purchaseItems")}
+              </h4>
+              <Button type="button" size="sm" onClick={addItem} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                <Plus className="w-3.5 h-3.5 mr-1" /> {t("addItem")}
+              </Button>
+            </div>
+
+            <div className="p-3 space-y-2.5">
               {items.map((item, index) => {
-                const prod = products.find((p) => p.id === item.productId);
-                const currentSalePrice = prod ? Number(prod.sellingPrice || 0) : 0;
-                const margin = item.newSellingPrice - item.purchaseRate;
+                const lineTotal = (Number(item.quantity) || 0) * (Number(item.purchaseRate) || 0);
 
                 return (
-                  <div key={index} className="flex flex-wrap gap-2.5 items-end bg-white p-3 rounded-lg border shadow-xs">
-                    <div className="flex-1 min-w-[200px] space-y-1">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-xs font-semibold text-slate-700">Product *</Label>
-                        {prod && (
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            Current Rate: <strong className="text-slate-900">{formatCurrency(currentSalePrice)}</strong>
-                          </span>
-                        )}
-                      </div>
+                  <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-50/50 p-2.5 rounded-lg border border-slate-200">
+                    <div className="sm:col-span-4">
+                      <Label className="text-[10px] text-slate-500 font-semibold">{t("colProduct")} *</Label>
                       <select
                         value={item.productId}
                         onChange={(e) => handleItemChange(index, "productId", e.target.value)}
-                        className="input text-xs bg-white"
+                        className="input text-xs bg-white mt-0.5 w-full"
                         required
                       >
-                        <option value="">Select Product</option>
+                        <option value="">-- {tc("search")} Product --</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} ({p.sku}) - Current Sale Rate: Rs. {p.sellingPrice}
+                            {p.name} ({p.sku})
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    <div className="w-24 space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Qty ({prod?.unit?.abbreviation || "Unit"}) *</Label>
+                    <div className="sm:col-span-2">
+                      <Label className="text-[10px] text-slate-500 font-semibold">{t("colQuantity")} *</Label>
                       <Input
                         type="number"
+                        step="any"
                         min="0.001"
-                        step="any"
                         value={item.quantity}
-                        onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
-                        className="text-xs font-mono font-bold"
+                        onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                        className="text-xs bg-white mt-0.5 font-bold text-center"
                         required
                       />
                     </div>
 
-                    <div className="w-28 space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Purchase Rate *</Label>
+                    <div className="sm:col-span-2">
+                      <Label className="text-[10px] text-slate-500 font-semibold">{t("colPurchaseRate")} *</Label>
                       <Input
                         type="number"
-                        min="0.01"
                         step="any"
-                        value={item.purchaseRate || ""}
-                        onChange={(e) => handleItemChange(index, "purchaseRate", Number(e.target.value))}
-                        className="text-xs font-mono"
-                        placeholder="Cost Rate"
-                        required
-                      />
-                    </div>
-
-                    {/* NEW SELLING PRICE INPUT FIELD */}
-                    <div className="w-32 space-y-1 bg-amber-50/70 p-1.5 rounded-lg border border-amber-200">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                          <Tag className="w-3 h-3 text-amber-700" /> New Sale Rate *
-                        </Label>
-                      </div>
-                      <Input
-                        type="number"
                         min="0"
-                        step="any"
-                        value={item.newSellingPrice || ""}
-                        onChange={(e) => handleItemChange(index, "newSellingPrice", Number(e.target.value))}
-                        className="text-xs font-mono font-bold bg-white text-amber-950 border-amber-300 focus:ring-amber-500"
-                        placeholder="Retail Rate"
+                        value={item.purchaseRate}
+                        onChange={(e) => handleItemChange(index, "purchaseRate", e.target.value)}
+                        className="text-xs bg-white mt-0.5 font-mono font-bold text-right text-slate-900"
                         required
                       />
-                      {item.purchaseRate > 0 && item.newSellingPrice > 0 && (
-                        <div className="text-[10px] font-mono flex justify-between pt-0.5">
-                          <span className="text-slate-500">Margin:</span>
-                          <span className={margin >= 0 ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
-                            {margin >= 0 ? `+${formatCurrency(margin)}` : formatCurrency(margin)}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
-                    <div className="w-32 space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700">Line Subtotal</Label>
+                    <div className="sm:col-span-2">
+                      <Label className="text-[10px] text-blue-600 font-semibold flex items-center gap-0.5">
+                        <Tag className="w-2.5 h-2.5" /> {t("colSellingPrice")}
+                      </Label>
                       <Input
-                        readOnly
-                        value={formatCurrency(item.quantity * item.purchaseRate)}
-                        className="bg-slate-50 text-xs font-bold font-mono text-slate-900"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={item.newSellingPrice}
+                        onChange={(e) => handleItemChange(index, "newSellingPrice", e.target.value)}
+                        className="text-xs bg-white mt-0.5 font-mono font-bold text-right text-blue-600"
                       />
                     </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(index)}
-                      disabled={items.length === 1}
-                      className="text-red-500 hover:text-red-700 h-9 w-9 p-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-3 sm:pt-0">
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-400 block uppercase">{t("colLineTotal")}</span>
+                        <span className="font-mono font-extrabold text-xs text-slate-900">
+                          {formatCurrency(lineTotal)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        disabled={items.length === 1}
+                        className="text-rose-500 hover:text-rose-700 disabled:opacity-30 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
+          </div>
 
-            {/* Financials & Payment Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-              <div className="space-y-3">
+          {/* Payment & Remarks Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            {/* Left: Notes */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold">{t("purchaseItems")} / {tc("notes") || "Remarks"}</Label>
+              <Textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="Add supplier notes, freight details, or batch reference"
+                className="text-xs bg-white min-h-[90px]"
+              />
+            </div>
+
+            {/* Right: Payment Calculation */}
+            <div className="space-y-3 bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+              <div className="flex justify-between items-center text-xs pb-2 border-b">
+                <span className="font-bold text-slate-700 uppercase">{t("colTotalAmount")}:</span>
+                <span className="text-lg font-black font-mono text-slate-900">{formatCurrency(totalAmount)}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Label className="text-[11px] font-semibold">{t("amountPaid")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max={totalAmount}
+                    name="amountPaid"
+                    value={formData.amountPaid}
+                    onChange={handleChange}
+                    className="text-xs font-bold text-emerald-600 font-mono mt-0.5"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[11px] font-semibold">{t("paymentMethod")}</Label>
                   <select
-                    id="paymentMethod"
                     name="paymentMethod"
                     value={formData.paymentMethod}
                     onChange={handleChange}
-                    className="input text-sm bg-white mt-1"
+                    className="input text-xs bg-white mt-0.5 w-full"
                   >
-                    <option value="CASH">💵 Cash Payment</option>
-                    <option value="BANK_TRANSFER">🏦 Bank Transfer / Digital Wallet</option>
+                    <option value="CASH">{t("cash")}</option>
+                    <option value="BANK_TRANSFER">{t("bank")}</option>
                   </select>
-                </div>
-
-                {formData.paymentMethod === "BANK_TRANSFER" && (
-                  <div className="grid grid-cols-2 gap-2 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
-                    <div>
-                      <Label className="text-xs">Bank / Wallet *</Label>
-                      <select
-                        name="bankName"
-                        value={formData.bankName}
-                        onChange={handleChange}
-                        className="input text-xs bg-white mt-1"
-                        required={formData.paymentMethod === "BANK_TRANSFER"}
-                      >
-                        <option value="">Select Bank</option>
-                        {PAKISTANI_BANKS.map((b) => (
-                          <option key={b.id} value={b.name}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">TRX / Ref #</Label>
-                      <Input
-                        name="bankReference"
-                        value={formData.bankReference}
-                        onChange={handleChange}
-                        placeholder="TRX-123456"
-                        className="text-xs mt-1"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="notes">Notes / Bill Description</Label>
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    placeholder="e.g. Received new stock batch with revised retail selling rate"
-                    className="text-xs h-20"
-                  />
                 </div>
               </div>
 
-              {/* Total & Payable Summary Card */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm font-semibold text-slate-700">
-                    <span>Total Purchase Bill:</span>
-                    <span className="text-base font-bold text-slate-900 font-mono">{formatCurrency(totalAmount)}</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="amountPaid" className="text-xs">
-                      Amount Paid to Supplier (PKR)
-                    </Label>
-                    <Input
-                      type="number"
-                      id="amountPaid"
-                      name="amountPaid"
-                      min="0"
-                      max={totalAmount}
-                      step="any"
-                      value={formData.amountPaid}
+              {formData.paymentMethod === "BANK_TRANSFER" && Number(formData.amountPaid) > 0 && (
+                <div className="grid grid-cols-2 gap-2 p-2 bg-blue-50/70 rounded-lg border border-blue-100 text-xs">
+                  <div>
+                    <Label className="text-[10px]">Bank / Wallet</Label>
+                    <select
+                      name="bankName"
+                      value={formData.bankName}
                       onChange={handleChange}
-                      className="font-bold text-emerald-600 text-sm font-mono"
+                      className="input text-xs bg-white mt-0.5 w-full"
+                    >
+                      <option value="">Select Bank</option>
+                      {PAKISTANI_BANKS.map((b) => (
+                        <option key={b.id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">TRX Ref #</Label>
+                    <Input
+                      name="bankReference"
+                      value={formData.bankReference}
+                      onChange={handleChange}
+                      placeholder="TRX-12345"
+                      className="text-xs bg-white mt-0.5"
                     />
                   </div>
-
-                  <div className="flex justify-between items-center pt-2 border-t text-sm font-bold font-mono">
-                    <span className="text-slate-700">Pending Payable:</span>
-                    <span className={pendingAmount > 0 ? "text-rose-600" : "text-emerald-600"}>
-                      {formatCurrency(pendingAmount)}
-                    </span>
-                  </div>
                 </div>
+              )}
+
+              <div className="flex justify-between items-center text-xs pt-1">
+                <span className="font-semibold text-slate-500">{t("colOutstanding")}:</span>
+                <span className={`font-mono font-bold ${balanceRemaining > 0 ? "text-rose-600 text-sm" : "text-emerald-600"}`}>
+                  {formatCurrency(balanceRemaining)}
+                </span>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="mt-6 border-t pt-4">
+          <DialogFooter className="pt-3 border-t flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button type="submit" disabled={loading} className="bg-blue-600 text-white font-semibold shadow-sm">
-              {loading ? "Processing..." : "Save Purchase & Update Prices"}
+            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
+              {loading ? tc("saving") : t("savePurchase")}
             </Button>
           </DialogFooter>
         </form>

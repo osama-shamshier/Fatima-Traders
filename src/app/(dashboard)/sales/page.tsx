@@ -10,8 +10,12 @@ import { TableLoader } from "@/components/ui/loader";
 import { Plus, Filter, RefreshCw, ShoppingCart, Calculator, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { InvoiceModalWrapper } from "./components/InvoiceModalWrapper";
+import { useTranslations } from "next-intl";
 
 export default function SalesPage() {
+  const t = useTranslations("sales");
+  const tc = useTranslations("common");
+
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,12 +71,12 @@ export default function SalesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Sales Transactions & Invoice Log</h1>
-          <p className="text-slate-500 text-sm">View sales orders, customer invoice statuses, and filter by date periods.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
         <Link href="/pos">
           <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0">
-            <Plus className="mr-2 h-4 w-4" /> New Sale (POS)
+            <Plus className="me-2 h-4 w-4" /> {t("newSale")}
           </Button>
         </Link>
       </div>
@@ -82,18 +86,18 @@ export default function SalesPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-900 uppercase">Date Range Filter</span>
+            <span className="text-xs font-bold text-slate-900 uppercase">{t("filterTitle")}</span>
           </div>
 
           {/* Filter Quick Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              { id: "all", label: "All Time" },
-              { id: "today", label: "Today" },
-              { id: "this_week", label: "This Week" },
-              { id: "this_month", label: "This Month" },
-              { id: "last_month", label: "Last Month" },
-              { id: "custom", label: "Custom Range" },
+              { id: "all", label: t("allTime") },
+              { id: "today", label: t("today") },
+              { id: "this_week", label: t("thisWeek") },
+              { id: "this_month", label: t("thisMonth") },
+              { id: "last_month", label: t("lastMonth") },
+              { id: "custom", label: t("customRange") },
             ].map((p) => (
               <button
                 key={p.id}
@@ -110,125 +114,162 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Custom Date Inputs if Custom Selected */}
+        {/* Custom Date Form */}
         {period === "custom" && (
           <form onSubmit={handleCustomApply} className="flex flex-wrap items-end gap-3 pt-1">
             <div>
-              <Label className="text-xs font-semibold">Start Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">{t("startDate")}</Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="text-xs py-1 px-2.5 mt-1 bg-slate-50"
+                className="text-xs py-1 px-2 bg-slate-50 mt-0.5"
+                required
               />
             </div>
             <div>
-              <Label className="text-xs font-semibold">End Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">{t("endDate")}</Label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="text-xs py-1 px-2.5 mt-1 bg-slate-50"
+                className="text-xs py-1 px-2 bg-slate-50 mt-0.5"
+                required
               />
             </div>
-            <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-              Apply Custom Range
+            <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs font-semibold">
+              {t("applyDate")}
             </Button>
           </form>
         )}
+      </div>
 
-        {/* Filter Summary Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase block">Filtered Orders</span>
-            <span className="text-lg font-extrabold text-slate-900">{sales.length} Bills</span>
+      {/* Sales Summary Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalSales")}</span>
+            <span className="text-xl font-bold font-mono text-slate-900 block mt-1">
+              {formatCurrency(totalSalesAmount)}
+            </span>
           </div>
-
-          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
-            <span className="text-[11px] font-semibold text-blue-700 uppercase block">Total Sales & Collection</span>
-            <div className="flex justify-between items-center mt-0.5 font-mono">
-              <span className="text-sm font-bold text-slate-800">{formatCurrency(totalSalesAmount)}</span>
-              <span className="text-xs font-semibold text-emerald-700">Rec: {formatCurrency(totalPaidAmount)}</span>
-            </div>
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+            <ShoppingCart className="w-5 h-5" />
           </div>
+        </div>
 
-          {/* ROUND OFF AUDIT STAT CARD */}
-          <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100">
-            <div className="flex justify-between items-center">
-              <span className="text-[11px] font-semibold text-indigo-800 uppercase flex items-center gap-1">
-                <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Round-Off Net Balance
-              </span>
-              <span className="text-[10px] font-bold text-slate-500">{roundOffCount} Rounded Bill(s)</span>
-            </div>
-            <div className="flex justify-between items-center mt-0.5">
-              <span
-                className={`text-base font-extrabold font-mono ${
-                  totalRoundOffAmount >= 0 ? "text-emerald-700" : "text-rose-700"
-                }`}
-              >
-                {totalRoundOffAmount >= 0 ? `+${formatCurrency(totalRoundOffAmount)}` : formatCurrency(totalRoundOffAmount)}
-              </span>
-              <div className="flex items-center gap-2 text-[11px] font-mono font-semibold">
-                <span className="text-emerald-700 flex items-center" title="Extra amount collected from rounding up">
-                  <ArrowUpRight className="w-3 h-3 mr-0.5" />+{roundOffUpAmount}
-                </span>
-                <span className="text-rose-700 flex items-center" title="Discounts given from rounding down">
-                  <ArrowDownRight className="w-3 h-3 mr-0.5" />{roundOffDownAmount}
-                </span>
-              </div>
-            </div>
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalPaid")}</span>
+            <span className="text-xl font-bold font-mono text-emerald-600 block mt-1">
+              {formatCurrency(totalPaidAmount)}
+            </span>
+          </div>
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+            <ShoppingCart className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Round-Off Net Impact Card */}
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-slate-500 text-xs font-medium uppercase">{t("netRoundOff")}</span>
+            <span
+              className={`text-xl font-bold font-mono block mt-1 ${
+                totalRoundOffAmount > 0
+                  ? "text-emerald-600"
+                  : totalRoundOffAmount < 0
+                  ? "text-rose-600"
+                  : "text-slate-700"
+              }`}
+            >
+              {totalRoundOffAmount > 0 ? `+${formatCurrency(totalRoundOffAmount)}` : formatCurrency(totalRoundOffAmount)}
+            </span>
+          </div>
+          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
+            <Calculator className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Round-Off Breakdown (Up vs Down) */}
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 flex flex-col justify-between text-xs">
+          <div className="flex justify-between items-center text-slate-600">
+            <span className="flex items-center gap-1 text-[11px] font-semibold">
+              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" /> {t("roundedUp")}:
+            </span>
+            <span className="font-mono font-bold text-emerald-700">+{formatCurrency(roundOffUpAmount)}</span>
+          </div>
+          <div className="flex justify-between items-center text-slate-600 mt-1">
+            <span className="flex items-center gap-1 text-[11px] font-semibold">
+              <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" /> {t("roundedDown")}:
+            </span>
+            <span className="font-mono font-bold text-rose-700">{formatCurrency(roundOffDownAmount)}</span>
+          </div>
+          <div className="text-[10px] text-slate-400 font-medium text-end mt-1 border-t border-slate-200 pt-1">
+            {t("roundedBillsCount", { count: roundOffCount })}
           </div>
         </div>
       </div>
 
-      {/* Sales Orders Table */}
+      {/* Sales Table */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3.5">Invoice #</th>
-                <th className="p-3.5">Date & Time</th>
-                <th className="p-3.5">Branch</th>
-                <th className="p-3.5">Customer Name</th>
-                <th className="p-3.5 text-right">Round Off</th>
-                <th className="p-3.5 text-right">Grand Total</th>
-                <th className="p-3.5 text-right">Amount Paid</th>
-                <th className="p-3.5 text-center">Payment Status</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-3.5">{t("colInvoice")}</th>
+                <th className="p-3.5">{t("colDate")}</th>
+                <th className="p-3.5">{t("colBuyer")}</th>
+                <th className="p-3.5">{t("colBranch")}</th>
+                <th className="p-3.5">{t("colCashier")}</th>
+                <th className="p-3.5 text-right">{t("colGrandTotal")}</th>
+                <th className="p-3.5 text-right">{t("colRoundOff")}</th>
+                <th className="p-3.5 text-right">{t("colPaid")}</th>
+                <th className="p-3.5 text-right">{t("colOutstanding")}</th>
+                <th className="p-3.5 text-center">{t("colStatus")}</th>
+                <th className="p-3.5 text-right">{t("colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <TableLoader colSpan={9} text="Loading sales records..." />
+                <TableLoader colSpan={11} text="Loading sales transactions..." />
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
-                    <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    No sales orders found for the selected period.
+                  <td colSpan={11} className="p-8 text-center text-slate-400">
+                    {t("noSales")}
                   </td>
                 </tr>
               ) : (
                 sales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-3.5 font-mono font-bold text-blue-600">{sale.invoiceNumber}</td>
-                    <td className="p-3.5 font-mono text-slate-600">{formatDate(sale.createdAt || sale.saleDate)}</td>
-                    <td className="p-3.5 text-slate-800 font-semibold">{sale.branch?.name || "Main Branch"}</td>
-                    <td className="p-3.5 font-bold text-slate-900">{sale.buyer?.name || "Walk-in Customer"}</td>
-                    <td className="p-3.5 text-right font-mono font-semibold">
-                      {Number(sale.roundOff || 0) === 0 ? (
-                        <span className="text-slate-400">-</span>
-                      ) : Number(sale.roundOff) > 0 ? (
-                        <span className="text-emerald-700 font-bold">+{formatCurrency(Number(sale.roundOff))}</span>
+                    <td className="p-3.5 text-slate-500 font-mono whitespace-nowrap">{formatDate(sale.saleDate)}</td>
+                    <td className="p-3.5 font-bold text-slate-900">
+                      {sale.buyer ? sale.buyer.name : "👤 Walk-in Cash Customer"}
+                    </td>
+                    <td className="p-3.5 text-slate-600">{sale.branch?.name || "-"}</td>
+                    <td className="p-3.5 text-slate-600 font-mono">{sale.createdBy?.name || "Admin"}</td>
+                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">{formatCurrency(sale.grandTotal)}</td>
+                    <td className="p-3.5 text-right font-mono text-xs">
+                      {sale.roundOff ? (
+                        <span
+                          className={`font-semibold ${
+                            Number(sale.roundOff) > 0 ? "text-emerald-600" : "text-rose-600"
+                          }`}
+                        >
+                          {Number(sale.roundOff) > 0 ? `+${Number(sale.roundOff)}` : Number(sale.roundOff)}
+                        </span>
                       ) : (
-                        <span className="text-rose-700 font-bold">{formatCurrency(Number(sale.roundOff))}</span>
+                        <span className="text-slate-300">-</span>
                       )}
                     </td>
-                    <td className="p-3.5 text-right font-mono font-bold text-slate-900 text-sm">
-                      {formatCurrency(Number(sale.grandTotal))}
-                    </td>
-                    <td className="p-3.5 text-right font-mono font-bold text-emerald-600">
-                      {formatCurrency(Number(sale.amountPaid))}
+                    <td className="p-3.5 text-right font-mono text-emerald-600 font-bold">{formatCurrency(sale.amountPaid)}</td>
+                    <td className="p-3.5 text-right font-mono font-bold">
+                      {Number(sale.outstandingAmount) > 0 ? (
+                        <span className="text-rose-600">{formatCurrency(sale.outstandingAmount)}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal">Rs. 0</span>
+                      )}
                     </td>
                     <td className="p-3.5 text-center">
                       <Badge
@@ -239,7 +280,7 @@ export default function SalesPage() {
                             ? "warning"
                             : "danger"
                         }
-                        className="text-[10px] font-bold"
+                        className="text-[10px] font-bold uppercase"
                       >
                         {sale.paymentStatus}
                       </Badge>
