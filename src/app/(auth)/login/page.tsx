@@ -65,11 +65,15 @@ export default function LoginPage() {
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-blue-600"></div>
           
           <div className="flex flex-col items-center justify-center space-y-2 mb-8 text-white">
-            <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-500/30">
-              <Store className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/95 p-1 shadow-xl flex items-center justify-center border border-white/30">
+              <img 
+                src="/logo.jpg" 
+                alt="Fatima Traders" 
+                className="w-full h-full object-cover rounded-xl"
+              />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mt-4 text-center">Fatima Traders</h1>
-            <p className="text-blue-200 text-sm font-medium">Multi-Branch Store Management</p>
+            <h1 className="text-2xl font-bold tracking-tight mt-3 text-center">Fatima Traders</h1>
+            <p className="text-blue-200 text-xs font-medium">Multi-Branch Store Management System</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

@@ -323,12 +323,18 @@ export function Sidebar({
         )}
       >
         {/* Logo & Close/Collapse area */}
-        <div className="flex h-16 shrink-0 items-center justify-between px-5 py-4 border-b border-slate-800">
+        <div className="flex h-16 shrink-0 items-center justify-between px-4 py-3 border-b border-slate-800">
           <Link
             href={!isOwner && isBillCounterManager ? "/pos" : "/dashboard"}
-            className="flex items-center gap-2 text-white transition-opacity hover:opacity-80"
+            className="flex items-center gap-2.5 text-white transition-opacity hover:opacity-90 group"
           >
-            <Store className="h-6 w-6 text-blue-500" />
+            <div className="h-9 w-9 rounded-xl overflow-hidden bg-white/95 p-0.5 shadow-xs flex items-center justify-center shrink-0 border border-slate-700/60 group-hover:scale-105 transition-transform">
+              <img 
+                src="/logo.jpg" 
+                alt="Fatima Traders" 
+                className="h-full w-full object-cover rounded-lg"
+              />
+            </div>
             <span className="text-base font-bold tracking-tight text-white">{t("storeName")}</span>
           </Link>
           
