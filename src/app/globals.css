@@ -464,3 +464,109 @@
     to { opacity: 1; transform: translateX(0); }
   }
 }
+
+/* ==========================================================================
+   Comprehensive Mobile & Desktop Print / PDF Optimization Rules
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 10mm 10mm;
+  }
+
+  /* Reset body and hide all background UI */
+  html, body {
+    background: white !important;
+    color: black !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    font-size: 10pt !important;
+  }
+
+  /* Hide navigation, sidebar, headers, and UI elements */
+  aside,
+  header,
+  nav,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force dialog modal to fill the printed page completely */
+  [role="dialog"],
+  [data-radix-portal] [role="dialog"],
+  .modal-content {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    background: transparent !important;
+  }
+
+  /* Printable area container */
+  #buyer-ledger-print-area,
+  #supplier-ledger-print-area,
+  #invoice-print-area,
+  #receipt-print-area,
+  #report-print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Tables inside printable areas - 100% width, no cut-offs */
+  #buyer-ledger-print-area table,
+  #supplier-ledger-print-area table,
+  #invoice-print-area table,
+  #report-print-area table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+  }
+
+  #buyer-ledger-print-area th,
+  #buyer-ledger-print-area td,
+  #supplier-ledger-print-area th,
+  #supplier-ledger-print-area td,
+  #invoice-print-area th,
+  #invoice-print-area td {
+    padding: 5px 6px !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  #buyer-ledger-print-area thead,
+  #supplier-ledger-print-area thead {
+    display: table-header-group !important;
+    background-color: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
