@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, ShoppingCart, TrendingUp, Building2, Plus, Users, Receipt, ArrowRight, Truck, CreditCard, AlertTriangle, RefreshCw, FileText, Landmark, Wallet, DollarSign } from "lucide-react";
+import { Package, ShoppingCart, TrendingUp, Building2, Users, ArrowRight, Truck, CreditCard, RefreshCw, Landmark, Wallet } from "lucide-react";
 import Link from "next/link";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { TableLoader } from "@/components/ui/loader";
-import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { useTranslations } from "next-intl";
 
 export default function DashboardPage() {
@@ -18,10 +15,6 @@ export default function DashboardPage() {
 
   // Bank Transfer Details Modal State
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
-
-  // Buyer Ledger Modal State
-  const [selectedBuyer, setSelectedBuyer] = useState<any>(null);
-  const [isLedgerOpen, setIsLedgerOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -39,11 +32,6 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleOpenLedger = (buyer: any) => {
-    setSelectedBuyer(buyer);
-    setIsLedgerOpen(true);
   };
 
   const statCards = [
@@ -102,16 +90,16 @@ export default function DashboardPage() {
           const Icon = card.icon;
           return (
             <div key={index} className="rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md">
-              <div className="flex items-center gap-4">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-sm ${card.color}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">{card.title}</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">{card.value}</p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{card.title}</span>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color} text-white shadow-sm`}>
+                  <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <div className="mt-3 text-xs text-slate-500 border-t pt-2">{card.subtext}</div>
+              <div className="mt-3">
+                <span className="text-2xl font-extrabold text-slate-900 font-mono">{isLoading ? "..." : card.value}</span>
+                <p className="text-xs text-slate-400 mt-1">{card.subtext}</p>
+              </div>
             </div>
           );
         })}
@@ -190,60 +178,6 @@ export default function DashboardPage() {
           <Link href="/buyers?filter=outstanding" className="text-xs font-bold text-emerald-700 hover:underline flex items-center">
             {t("viewDebtors", { count: stats?.outstandingDebtors?.length || 0 })} <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
-        </div>
-      </div>
-
-      {/* Outstanding Debtors List Breakdown Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center bg-rose-50/50">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
-            <h3 className="font-bold text-slate-900 text-sm">{t("debtorsTitle")}</h3>
-          </div>
-          <Link href="/buyers?filter=outstanding" className="text-xs font-bold text-rose-700 hover:underline flex items-center">
-            {t("manageAllDebtors", { count: stats?.outstandingDebtors?.length || 0 })} <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
-              <tr>
-                <th className="p-3">{t("colCustomer")}</th>
-                <th className="p-3">{t("colCompany")}</th>
-                <th className="p-3">{t("colContact")}</th>
-                <th className="p-3 text-right">{t("colOutstanding")}</th>
-                <th className="p-3 text-right">{t("colAction")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {isLoading ? (
-                <TableLoader colSpan={5} text={t("colCustomer")} />
-              ) : (stats?.outstandingDebtors || []).length === 0 ? (
-                <tr><td colSpan={5} className="p-6 text-center text-emerald-700 font-semibold">{t("allSettled")}</td></tr>
-              ) : (
-                (stats?.outstandingDebtors || []).map((debtor: any) => (
-                  <tr key={debtor.id} className="hover:bg-rose-50/30">
-                    <td className="p-3 font-bold text-slate-900">{debtor.name}</td>
-                    <td className="p-3 text-slate-600">{debtor.companyName || "-"}</td>
-                    <td className="p-3 text-slate-600 font-mono">{debtor.contactNumber || "-"}</td>
-                    <td className="p-3 text-right font-mono font-bold text-rose-600 text-sm">
-                      {formatCurrency(debtor.totalOutstanding)}
-                    </td>
-                    <td className="p-3 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenLedger(debtor)}
-                        className="text-xs bg-slate-50 hover:bg-slate-100"
-                      >
-                        <FileText className="w-3.5 h-3.5 mr-1 text-blue-600" /> {t("viewLedger")}
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -335,16 +269,6 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {isLedgerOpen && selectedBuyer && (
-        <BuyerLedgerModal
-          isOpen={isLedgerOpen}
-          onClose={() => setIsLedgerOpen(false)}
-          buyerId={selectedBuyer.id}
-          buyerName={selectedBuyer.name}
-          onSuccess={fetchStats}
-        />
-      )}
     </div>
   );
 }

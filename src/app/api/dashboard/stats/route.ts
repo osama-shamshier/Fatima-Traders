@@ -96,7 +96,7 @@ export async function GET() {
       }),
       prisma.salesReturn.groupBy({
         by: ["buyerId"],
-        where: { isDeleted: false, buyerId: { not: null } },
+        where: { isDeleted: false, buyerId: { not: null }, refundMethod: "ADJUSTMENT" },
         _sum: { totalRefund: true },
       }),
       prisma.purchase.groupBy({
@@ -115,7 +115,7 @@ export async function GET() {
     const salesTodayRevenue = salesToday.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
     const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || totalRevenueAgg._sum.amountPaid || 0);
 
-    // Today's Sales Payment Breakdown (Airtight Single-Entry Calculation)
+    // Today's Sales Payment Breakdown
     let todayCashSales = 0;
     let todayBankSales = 0;
     let todayPendingCredit = 0;
@@ -126,8 +126,6 @@ export async function GET() {
       const outstanding = Number(sale.outstandingAmount || 0);
       todayPendingCredit += outstanding;
 
-      // Only count direct checkout amounts for walk-in sales without registered buyer
-      // (Registered buyer checkout payments are already recorded in buyerPayment)
       if (!sale.buyerId) {
         const paid = Number(sale.amountPaid || 0);
         if (sale.paymentMethod === "BANK_TRANSFER") {
@@ -149,7 +147,7 @@ export async function GET() {
       }
     });
 
-    // 2. All Registered Customer Payments Received Today (Checkout Payments + Debt Settlements)
+    // 2. All Registered Customer Payments Received Today
     buyerPaymentsToday.forEach((bp) => {
       const paid = Number(bp.amount || 0);
       if (bp.paymentMethod === "BANK_TRANSFER") {
