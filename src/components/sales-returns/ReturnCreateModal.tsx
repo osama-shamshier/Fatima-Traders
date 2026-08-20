@@ -5,11 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, RotateCcw, AlertTriangle, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { Plus, Trash2, RotateCcw, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface ReturnItemRow {
   productId: string;
@@ -25,6 +25,9 @@ interface Props {
 }
 
 export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props) {
+  const t = useTranslations("salesReturns");
+  const tc = useTranslations("common");
+
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
   const [buyers, setBuyers] = useState<any[]>([]);
@@ -194,7 +197,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
         <DialogHeader className="border-b pb-3">
           <div className="flex items-center gap-2">
             <RotateCcw className="w-5 h-5 text-rose-600" />
-            <DialogTitle className="text-xl font-bold text-slate-900">Process Sales Return & Restock</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-slate-900">{t("modalTitle")}</DialogTitle>
           </div>
         </DialogHeader>
 
@@ -202,7 +205,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           {/* Top Row: Branch & Customer */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Store Branch *</Label>
+              <Label className="text-xs font-semibold text-slate-700">{t("storeBranch")} *</Label>
               <select
                 required
                 value={selectedBranchId}
@@ -218,13 +221,13 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Customer / Buyer *</Label>
+              <Label className="text-xs font-semibold text-slate-700">{t("customerBuyer")} *</Label>
               <select
                 value={selectedBuyerId}
                 onChange={(e) => setSelectedBuyerId(e.target.value)}
                 className="input text-xs bg-white mt-1 w-full font-medium"
               >
-                <option value="">👤 Walk-in Customer (Cash Sale)</option>
+                <option value="">{t("walkInCustomer")}</option>
                 {buyers.map((b) => (
                   <option key={b.id} value={b.id}>
                     🏢 {b.name} {b.companyName ? `(${b.companyName})` : ""}
@@ -243,7 +246,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
               <div className="flex items-center gap-2">
                 <AlertTriangle className={`w-4 h-4 ${pendingCredit > 0 ? "text-amber-600" : "text-slate-400"}`} />
                 <span>
-                  Customer Total Outstanding Credit:{" "}
+                  {t("customerPendingCredit")}:{" "}
                   <strong className={`font-bold font-mono text-sm ${pendingCredit > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                     {formatCurrency(pendingCredit)}
                   </strong>
@@ -251,7 +254,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
               </div>
               {pendingCredit > 0 && (
                 <span className="text-[11px] font-semibold bg-amber-200/80 px-2 py-0.5 rounded text-amber-800">
-                  Can adjust return amount against pending balance
+                  {t("adjustCreditHint")}
                 </span>
               )}
             </div>
@@ -260,13 +263,13 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           {/* Optional Invoice Selection if buyer has past sales */}
           {buyerSales.length > 0 && (
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Link to Original Invoice (Optional)</Label>
+              <Label className="text-xs font-semibold text-slate-700">{t("linkInvoice")}</Label>
               <select
                 value={selectedSaleId}
                 onChange={(e) => setSelectedSaleId(e.target.value)}
                 className="input text-xs bg-white mt-1 w-full"
               >
-                <option value="">-- Direct Return (No Specific Invoice) --</option>
+                <option value="">{t("directReturnOpt")}</option>
                 {buyerSales.map((s) => (
                   <option key={s.id} value={s.id}>
                     Invoice #{s.invoiceNumber} — Total: {formatCurrency(s.grandTotal)} (Paid: {formatCurrency(s.amountPaid)}, Out: {formatCurrency(s.outstandingAmount)})
@@ -280,10 +283,10 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           <div className="space-y-2 pt-2 border-t">
             <div className="flex justify-between items-center">
               <Label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                📦 Products Being Returned
+                📦 {t("returnedProducts")}
               </Label>
               <Button type="button" variant="outline" size="sm" onClick={addItemRow} className="text-xs h-7 gap-1">
-                <Plus className="w-3.5 h-3.5" /> Add Another Item
+                <Plus className="w-3.5 h-3.5" /> {t("addAnotherItem")}
               </Button>
             </div>
 
@@ -298,14 +301,14 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                     className="p-3 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end"
                   >
                     <div className="md:col-span-5">
-                      <Label className="text-[11px] font-semibold text-slate-600">Select Product *</Label>
+                      <Label className="text-[11px] font-semibold text-slate-600">{t("selectProduct")} *</Label>
                       <select
                         required
                         value={row.productId}
                         onChange={(e) => handleProductChange(index, e.target.value)}
                         className="input text-xs bg-white mt-1 w-full font-medium"
                       >
-                        <option value="">-- Choose Product --</option>
+                        <option value="">{t("chooseProduct")}</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} ({p.sku}) — Price: {formatCurrency(p.sellingPrice)}/{p.unit?.abbreviation || "unit"}
@@ -316,7 +319,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
 
                     <div className="md:col-span-2">
                       <Label className="text-[11px] font-semibold text-slate-600">
-                        Qty ({selectedProd?.unit?.abbreviation || "units"}) *
+                        {tc("quantity") || "Qty"} ({selectedProd?.unit?.abbreviation || "units"}) *
                       </Label>
                       <Input
                         type="number"
@@ -330,7 +333,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                     </div>
 
                     <div className="md:col-span-2">
-                      <Label className="text-[11px] font-semibold text-slate-600">Refund Rate (PKR) *</Label>
+                      <Label className="text-[11px] font-semibold text-slate-600">{t("refundRate")} *</Label>
                       <Input
                         type="number"
                         step="any"
@@ -343,7 +346,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                     </div>
 
                     <div className="md:col-span-2 text-right">
-                      <Label className="text-[10px] font-bold uppercase text-slate-500">Line Total</Label>
+                      <Label className="text-[10px] font-bold uppercase text-slate-500">{t("lineTotal")}</Label>
                       <div className="text-sm font-extrabold font-mono text-slate-900 mt-1.5">
                         {formatCurrency(lineTotal)}
                       </div>
@@ -370,7 +373,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           {/* Refund Settlement Options */}
           <div className="space-y-3 pt-3 border-t">
             <Label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              💰 Refund & Settlement Method *
+              💰 {t("settlementMethod")} *
             </Label>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -385,11 +388,11 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">📉 Adjust in Pending</span>
+                    <span className="text-xs font-bold text-slate-900">{t("adjustInPending")}</span>
                     {refundMethod === "ADJUSTMENT" && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Reduce customer outstanding credit by {formatCurrency(totalReturnAmount)}
+                    {t("reduceDebtDesc", { amount: formatCurrency(totalReturnAmount) })}
                   </p>
                 </div>
               )}
@@ -404,11 +407,11 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">💵 Cash Refund</span>
+                  <span className="text-xs font-bold text-slate-900">{t("cashRefund")}</span>
                   {refundMethod === "CASH" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Pay cash refund immediately to customer
+                  {t("cashRefundDesc")}
                 </p>
               </div>
 
@@ -422,11 +425,11 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">🏦 Bank Transfer</span>
+                  <span className="text-xs font-bold text-slate-900">{t("bankTransfer")}</span>
                   {refundMethod === "BANK_TRANSFER" && <CheckCircle2 className="w-4 h-4 text-purple-600" />}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Send refund to customer bank account / digital wallet
+                  {t("bankTransferDesc")}
                 </p>
               </div>
             </div>
@@ -435,14 +438,14 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
             {refundMethod === "BANK_TRANSFER" && (
               <div className="grid grid-cols-2 gap-3 p-3.5 bg-purple-50/60 rounded-xl border border-purple-100">
                 <div>
-                  <Label className="text-xs font-medium text-purple-900">Select Bank / Wallet *</Label>
+                  <Label className="text-xs font-medium text-purple-900">{t("selectBank")} *</Label>
                   <select
                     required
                     value={bankName}
                     onChange={(e) => setBankName(e.target.value)}
                     className="input text-xs bg-white mt-1 w-full"
                   >
-                    <option value="">-- Choose Bank / Wallet --</option>
+                    <option value="">-- {t("selectBank")} --</option>
                     {PAKISTANI_BANKS.map((b) => (
                       <option key={b.id} value={b.name}>
                         {b.name}
@@ -451,7 +454,7 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
                   </select>
                 </div>
                 <div>
-                  <Label className="text-xs font-medium text-purple-900">TRX / Reference #</Label>
+                  <Label className="text-xs font-medium text-purple-900">{t("trxRef")}</Label>
                   <Input
                     placeholder="e.g. TRX-12345678"
                     value={bankReference}
@@ -466,22 +469,22 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           {/* Return Reason & Notes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Reason for Return</Label>
+              <Label className="text-xs font-semibold text-slate-700">{t("reasonForReturn")}</Label>
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="input text-xs bg-white mt-1 w-full"
               >
-                <option value="Customer Return">Customer Return</option>
-                <option value="Defective / Damaged Item">Defective / Damaged Item</option>
-                <option value="Wrong Item Delivered">Wrong Item Delivered</option>
-                <option value="Quality Issue">Quality Issue</option>
-                <option value="Customer Changed Mind">Customer Changed Mind</option>
-                <option value="Billing Correction">Billing Correction</option>
+                <option value="Customer Return">{t("reasonCustReturn")}</option>
+                <option value="Defective / Damaged Item">{t("reasonDefective")}</option>
+                <option value="Wrong Item Delivered">{t("reasonWrong")}</option>
+                <option value="Quality Issue">{t("reasonQuality")}</option>
+                <option value="Customer Changed Mind">{t("reasonChangedMind")}</option>
+                <option value="Billing Correction">{t("reasonBilling")}</option>
               </select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Additional Notes</Label>
+              <Label className="text-xs font-semibold text-slate-700">{t("additionalNotes")}</Label>
               <Input
                 placeholder="Optional comments or batch notes..."
                 value={notes}
@@ -494,27 +497,27 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
           {/* Live Summary Footer */}
           <div className="p-4 bg-slate-900 text-white rounded-xl flex flex-wrap items-center justify-between gap-4 mt-3">
             <div>
-              <span className="text-xs text-slate-400 block font-medium">Total Return Refund Amount:</span>
+              <span className="text-xs text-slate-400 block font-medium">{t("totalRefundAmount")}:</span>
               <span className="text-2xl font-black font-mono text-emerald-400">
                 {formatCurrency(totalReturnAmount)}
               </span>
             </div>
 
             <div className="text-right">
-              <span className="text-xs text-slate-400 block font-medium">Settlement Action:</span>
+              <span className="text-xs text-slate-400 block font-medium">{t("settlementAction")}:</span>
               <Badge className="bg-white/10 text-white border-white/20 font-bold">
                 {refundMethod === "ADJUSTMENT"
-                  ? `📉 Adjust Rs. ${totalReturnAmount.toLocaleString()} against Pending Credit`
+                  ? t("adjustActionText", { amount: formatCurrency(totalReturnAmount) })
                   : refundMethod === "BANK_TRANSFER"
-                  ? `🏦 Bank Transfer (${bankName || "Digital"})`
-                  : "💵 Cash Payout"}
+                  ? t("bankActionText", { bank: bankName || "Digital" })
+                  : t("cashActionText")}
               </Badge>
             </div>
           </div>
 
           <DialogFooter className="border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button
               type="submit"
@@ -523,11 +526,11 @@ export default function ReturnCreateModal({ isOpen, onClose, onSuccess }: Props)
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Processing Return...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {t("processingReturn")}
                 </>
               ) : (
                 <>
-                  <RotateCcw className="w-4 h-4" /> Process Return & Restock ({formatCurrency(totalReturnAmount)})
+                  <RotateCcw className="w-4 h-4" /> {t("processReturnBtn", { amount: formatCurrency(totalReturnAmount) })}
                 </>
               )}
             </Button>
