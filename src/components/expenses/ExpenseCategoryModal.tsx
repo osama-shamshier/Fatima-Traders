@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslations } from "next-intl";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -24,6 +25,9 @@ interface Props {
 }
 
 export function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: Props) {
+  const t = useTranslations("expenses");
+  const tc = useTranslations("common");
+
   const [loading, setLoading] = useState(false);
   
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
@@ -56,26 +60,26 @@ export function ExpenseCategoryModal({ isOpen, onClose, onSuccess }: Props) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add Expense Category</DialogTitle>
+      <DialogContent className="bg-white rounded-2xl p-6">
+        <DialogHeader className="border-b pb-3">
+          <DialogTitle className="text-lg font-bold text-slate-900">{t("modalCatTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Category Name</Label>
-            <Input id="name" {...register("name")} placeholder="e.g., Rent, Utilities" />
-            {errors.name && <span className="text-sm text-red-500">{errors.name.message}</span>}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <div className="space-y-1">
+            <Label htmlFor="name" className="text-xs font-semibold">{t("catName")}</Label>
+            <Input id="name" {...register("name")} placeholder="e.g. Rent, Utilities, Transport, Salaries" className="text-xs bg-white" />
+            {errors.name && <span className="text-xs text-rose-500">{errors.name.message}</span>}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" {...register("description")} placeholder="Optional description..." />
+          <div className="space-y-1">
+            <Label htmlFor="description" className="text-xs font-semibold">{t("catDesc")}</Label>
+            <Textarea id="description" {...register("description")} placeholder="Optional description..." className="text-xs bg-white" />
           </div>
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {tc("cancel")}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save Category"}
+            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+              {loading ? tc("saving") : t("saveCat")}
             </Button>
           </div>
         </form>

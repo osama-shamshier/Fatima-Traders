@@ -10,8 +10,12 @@ import { TableLoader } from "@/components/ui/loader";
 import { ExpenseFormModal } from "@/components/expenses/ExpenseFormModal";
 import { ExpenseCategoryModal } from "@/components/expenses/ExpenseCategoryModal";
 import { PlusCircle, Tags, Trash2, Filter, Receipt } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function ExpensesPage() {
+  const t = useTranslations("expenses");
+  const tc = useTranslations("common");
+
   const [expenses, setExpenses] = useState<any[]>([]);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -70,15 +74,15 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Operational Expenses & Cash Disbursements</h1>
-          <p className="text-slate-500 text-sm">Track branch operational expenses, utility payments, and category totals.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)} className="text-xs font-semibold">
-            <Tags className="mr-1.5 h-3.5 w-3.5" /> Manage Categories
+            <Tags className="me-1.5 h-3.5 w-3.5" /> {t("manageCategories")}
           </Button>
           <Button onClick={() => setIsExpenseModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm">
-            <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Record Expense
+            <PlusCircle className="me-1.5 h-3.5 w-3.5" /> {t("recordExpense")}
           </Button>
         </div>
       </div>
@@ -88,7 +92,7 @@ export default function ExpensesPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-900 uppercase">Date Period Filter</span>
+            <span className="text-xs font-bold text-slate-900 uppercase">{t("filterTitle")}</span>
           </div>
 
           {/* Filter Quick Pills */}
@@ -116,95 +120,116 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        {/* Custom Date Inputs */}
+        {/* Custom Date Form */}
         {period === "custom" && (
           <form onSubmit={handleCustomApply} className="flex flex-wrap items-end gap-3 pt-1">
             <div>
-              <Label className="text-xs font-semibold">Start Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">Start Date</Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="text-xs py-1 px-2.5 mt-1 bg-slate-50"
+                className="text-xs py-1 px-2 bg-slate-50 mt-0.5"
+                required
               />
             </div>
             <div>
-              <Label className="text-xs font-semibold">End Date</Label>
+              <Label className="text-[11px] font-semibold text-slate-600">End Date</Label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="text-xs py-1 px-2.5 mt-1 bg-slate-50"
+                className="text-xs py-1 px-2 bg-slate-50 mt-0.5"
+                required
               />
             </div>
-            <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-              Apply Custom Range
+            <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs font-semibold">
+              Apply Date
             </Button>
           </form>
         )}
+      </div>
 
-        {/* Filter Summary Stats */}
-        <div className="flex flex-wrap justify-between items-center text-xs font-semibold text-slate-600 pt-1">
-          <span>Showing {expenses.length} expense record(s)</span>
-          <span className="text-slate-900 font-mono">
-            Total Expense: <strong className="text-rose-600 font-bold">{formatCurrency(totalExpenseAmount)}</strong>
-          </span>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalExpenses")}</span>
+            <span className="text-2xl font-bold font-mono text-rose-600 block mt-1">
+              {formatCurrency(totalExpenseAmount)}
+            </span>
+          </div>
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+            <Receipt className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalTransactions")}</span>
+            <span className="text-2xl font-bold font-mono text-slate-900 block mt-1">
+              {expenses.length}
+            </span>
+          </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <Receipt className="w-6 h-6" />
+          </div>
         </div>
       </div>
 
-      {/* Expenses Table */}
+      {/* Expense Table */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3.5">Date & Time</th>
-                <th className="p-3.5">Expense Category</th>
-                <th className="p-3.5">Branch</th>
-                <th className="p-3.5">Payment Method</th>
-                <th className="p-3.5">Reference / TRX</th>
-                <th className="p-3.5 text-right">Amount (PKR)</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-3.5">{t("colDate")}</th>
+                <th className="p-3.5">{t("colCategory")}</th>
+                <th className="p-3.5">{t("colBranch")}</th>
+                <th className="p-3.5">{t("colMethod")}</th>
+                <th className="p-3.5">{t("colBankRef")}</th>
+                <th className="p-3.5">{t("colNotes")}</th>
+                <th className="p-3.5 text-right">{t("colAmount")}</th>
+                <th className="p-3.5 text-right">{t("colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
-                <TableLoader colSpan={7} text="Loading expenses..." />
+                <TableLoader colSpan={8} text="Loading expenses..." />
               ) : expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    <Receipt className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    No expense records found for the selected period.
+                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                    {t("noExpenses")}
                   </td>
                 </tr>
               ) : (
                 expenses.map((expense) => (
                   <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3.5 font-mono text-slate-600">{formatDate(expense.createdAt || expense.expenseDate)}</td>
+                    <td className="p-3.5 font-mono text-slate-500 whitespace-nowrap">{formatDate(expense.createdAt || expense.expenseDate)}</td>
                     <td className="p-3.5">
-                      <Badge variant="outline" className="text-[11px] font-bold text-slate-900">
+                      <Badge variant="outline" className="text-[10px] font-bold text-slate-800">
                         {expense.category?.name || "General"}
                       </Badge>
                     </td>
-                    <td className="p-3.5 text-slate-800 font-semibold">{expense.branch?.name || "Main Branch"}</td>
+                    <td className="p-3.5 text-slate-600">{expense.branch?.name || "-"}</td>
                     <td className="p-3.5">
-                      <Badge variant={expense.paymentMethod === "CASH" ? "success" : "warning"} className="text-[10px] font-bold">
+                      <Badge variant="outline" className="text-[10px] font-mono">
                         {expense.paymentMethod}
                       </Badge>
                     </td>
-                    <td className="p-3.5 text-slate-600 font-mono truncate max-w-xs">{expense.reference || expense.notes || "-"}</td>
-                    <td className="p-3.5 text-right font-mono font-extrabold text-sm text-rose-600">
-                      {formatCurrency(Number(expense.amount))}
+                    <td className="p-3.5 text-slate-600 font-mono">{expense.referenceNumber || "-"}</td>
+                    <td className="p-3.5 text-slate-600 max-w-xs truncate">{expense.notes || "-"}</td>
+                    <td className="p-3.5 text-right font-mono font-bold text-rose-600 text-sm">
+                      {formatCurrency(expense.amount)}
                     </td>
                     <td className="p-3.5 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
                         onClick={() => handleDelete(expense.id)}
-                        title="Cancel Expense"
+                        className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-7 w-7 p-0"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </td>
                   </tr>
@@ -224,7 +249,7 @@ export default function ExpensesPage() {
       <ExpenseCategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
-        onSuccess={() => {}}
+        onSuccess={fetchExpenses}
       />
     </div>
   );

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
+import { useTranslations } from "next-intl";
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +16,9 @@ interface Props {
 }
 
 export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
+  const t = useTranslations("expenses");
+  const tc = useTranslations("common");
+
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -103,19 +107,19 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl p-6">
         <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-lg font-bold text-slate-900">Record Store Expense</DialogTitle>
+          <DialogTitle className="text-lg font-bold text-slate-900">{t("modalRecordTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs font-semibold">Select Branch *</Label>
+              <Label className="text-xs font-semibold">{t("selectBranch")} *</Label>
               <select
                 required
                 value={formData.branchId}
                 onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                className="input text-xs bg-white mt-1"
+                className="input text-xs bg-white mt-1 w-full"
               >
-                <option value="">Select Branch</option>
+                <option value="">{t("selectBranch")}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
@@ -125,14 +129,14 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Expense Category *</Label>
+              <Label className="text-xs font-semibold">{t("selectCategory")} *</Label>
               <select
                 required
                 value={formData.categoryId}
                 onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                className="input text-xs bg-white mt-1"
+                className="input text-xs bg-white mt-1 w-full"
               >
-                <option value="">Select Category</option>
+                <option value="">{t("chooseCategory")}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -144,7 +148,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs font-semibold">Amount (PKR) *</Label>
+              <Label className="text-xs font-semibold">{t("amountPkr")} *</Label>
               <Input
                 type="number"
                 step="any"
@@ -153,11 +157,11 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
                 placeholder="0.00"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="text-base font-bold text-rose-600 mt-1"
+                className="text-base font-bold text-rose-600 mt-1 font-mono"
               />
             </div>
             <div>
-              <Label className="text-xs font-semibold">Expense Date *</Label>
+              <Label className="text-xs font-semibold">{t("expenseDate")}</Label>
               <Input
                 type="date"
                 required
@@ -169,28 +173,28 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
           </div>
 
           <div>
-            <Label className="text-xs font-semibold">Payment Method *</Label>
+            <Label className="text-xs font-semibold">{t("paymentMethod")} *</Label>
             <select
               value={formData.paymentMethod}
               onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-              className="input text-xs bg-white mt-1"
+              className="input text-xs bg-white mt-1 w-full"
             >
-              <option value="CASH">💵 Cash</option>
-              <option value="BANK_TRANSFER">🏦 Bank Transfer / Digital Wallet</option>
+              <option value="CASH">{t("cash")}</option>
+              <option value="BANK_TRANSFER">{t("bank")}</option>
             </select>
           </div>
 
           {formData.paymentMethod === "BANK_TRANSFER" && (
             <div className="space-y-3 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
               <div>
-                <Label className="text-xs">Pakistani Bank / Digital Wallet *</Label>
+                <Label className="text-xs">{t("selectBank")}</Label>
                 <select
                   value={formData.bankName}
                   onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                  className="input text-xs bg-white mt-1"
+                  className="input text-xs bg-white mt-1 w-full"
                   required={formData.paymentMethod === "BANK_TRANSFER"}
                 >
-                  <option value="">Select Bank / Wallet</option>
+                  <option value="">-- {t("selectBank")} --</option>
                   {PAKISTANI_BANKS.map((b) => (
                     <option key={b.id} value={b.name}>
                       {b.name}
@@ -200,19 +204,19 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
               </div>
 
               <div>
-                <Label className="text-xs">TRX / Reference #</Label>
+                <Label className="text-xs">{t("trxRef")}</Label>
                 <Input
                   placeholder="TRX-123456"
                   value={formData.bankReference}
                   onChange={(e) => setFormData({ ...formData, bankReference: e.target.value })}
-                  className="text-xs mt-1 bg-white"
+                  className="text-xs mt-1 bg-white font-mono"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <Label className="text-xs font-semibold">Notes / Purpose</Label>
+            <Label className="text-xs font-semibold">{t("notesPurpose")}</Label>
             <Textarea
               placeholder="e.g. Monthly shop rent payment or electricity bill receipt"
               value={formData.notes}
@@ -223,10 +227,10 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button type="submit" disabled={loading} className="bg-rose-600 hover:bg-rose-700 text-white font-semibold">
-              {loading ? "Saving..." : "Record Expense"}
+              {loading ? tc("saving") : t("saveExpense")}
             </Button>
           </div>
         </form>
