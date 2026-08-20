@@ -312,20 +312,20 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
           </div>
 
           {/* Ledger Table */}
-          <div className="border rounded-xl bg-white shadow-xs overflow-hidden">
+          <div className="border rounded-xl bg-white shadow-xs overflow-x-auto w-full">
             {loading ? (
               <Loader text="Loading supplier ledger..." className="py-12" />
             ) : (
-              <table className="w-full text-xs text-left border-collapse table-fixed">
+              <table className="w-full text-xs text-left border-collapse min-w-[680px]">
                 <thead className="bg-slate-50 sticky top-0 font-semibold border-b text-slate-700 uppercase tracking-wider">
                   <tr>
                     <th className="p-3 w-28">{t("colDate")}</th>
                     <th className="p-3 w-24">{t("colType")}</th>
                     <th className="p-3 w-32">{t("colRef")}</th>
-                    <th className="p-3">{t("colDescription")}</th>
-                    <th className="p-3 text-right w-36">{t("colDebit")}</th>
-                    <th className="p-3 text-right w-36">{t("colCredit")}</th>
-                    <th className="p-3 text-right w-40">{t("colBalance")}</th>
+                    <th className="p-3 min-w-[120px]">{t("colDescription")}</th>
+                    <th className="p-3 text-right w-28">{t("colDebit")}</th>
+                    <th className="p-3 text-right w-28">{t("colCredit")}</th>
+                    <th className="p-3 text-right w-32">{t("colBalance")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
