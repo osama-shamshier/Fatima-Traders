@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
-import { Plus, Edit, Trash2, FileText, Search, CreditCard, AlertCircle } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Search, Download, MapPin, X } from "lucide-react";
 import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
+import { generatePartiesPDF } from "@/lib/pdfExport";
 
 export default function BuyersPage() {
   const searchParams = useSearchParams();
@@ -17,6 +18,7 @@ export default function BuyersPage() {
 
   const [buyers, setBuyers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [areaSearch, setAreaSearch] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "OUTSTANDING">(
     initialFilter === "outstanding" ? "OUTSTANDING" : "ALL"
   );
@@ -73,19 +75,75 @@ export default function BuyersPage() {
   };
 
   const filteredBuyers = buyers.filter((buyer) => {
+    const q = search.toLowerCase().trim();
     const matchesSearch =
-      buyer.name.toLowerCase().includes(search.toLowerCase()) ||
-      (buyer.companyName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (buyer.contactNumber || "").includes(search);
+      !q ||
+      buyer.name?.toLowerCase().includes(q) ||
+      (buyer.companyName || "").toLowerCase().includes(q) ||
+      (buyer.contactNumber || "").includes(q);
+
+    const a = areaSearch.toLowerCase().trim();
+    const matchesArea = !a || (buyer.address || "").toLowerCase().includes(a);
 
     if (filterType === "OUTSTANDING") {
-      return matchesSearch && Number(buyer.totalOutstanding) > 0;
+      return matchesSearch && matchesArea && Number(buyer.totalOutstanding) > 0;
     }
-    return matchesSearch;
+    return matchesSearch && matchesArea;
   });
 
-  const totalOutstandingSum = buyers.reduce((sum, b) => sum + Number(b.totalOutstanding || 0), 0);
-  const debtorsCount = buyers.filter((b) => Number(b.totalOutstanding) > 0).length;
+  const totalOutstandingSum = filteredBuyers.reduce((sum, b) => sum + Number(b.totalOutstanding || 0), 0);
+  const debtorsCount = filteredBuyers.filter((b) => Number(b.totalOutstanding) > 0).length;
+
+  const handleDownloadPDF = () => {
+    const items = filteredBuyers.map((b) => ({
+      name: b.name,
+      companyName: b.companyName,
+      contactNumber: b.contactNumber,
+      address: b.address,
+      outstandingAmount: Number(b.totalOutstanding || 0),
+      isActive: b.isActive,
+    }));
+
+    generatePartiesPDF({
+      partyType: "Customers",
+      areaQuery: areaSearch,
+      filterType,
+      items,
+      totalOutstanding: totalOutstandingSum,
+    });
+  };
+
+  const handleDownloadCSV = () => {
+    if (filteredBuyers.length === 0) {
+      alert("No customers to export.");
+      return;
+    }
+
+    const headers = ["#", "Customer Name", "Company / Firm", "Contact Number", "Address / Area", "Outstanding Due (PKR)", "Status"];
+    const rows = filteredBuyers.map((b, index) => [
+      index + 1,
+      `"${(b.name || "").replace(/"/g, '""')}"`,
+      `"${(b.companyName || "").replace(/"/g, '""')}"`,
+      `"${(b.contactNumber || "").replace(/"/g, '""')}"`,
+      `"${(b.address || "").replace(/"/g, '""')}"`,
+      Number(b.totalOutstanding || 0),
+      b.isActive !== false ? "Active" : "Inactive",
+    ]);
+
+    rows.push(["", '"TOTAL"', "", "", "", totalOutstandingSum, `"${filteredBuyers.length} Customers"`]);
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const sanitizedArea = areaSearch.trim() ? `_${areaSearch.trim().replace(/[^a-zA-Z0-9_-]/g, "_")}` : "";
+    link.download = `Customers_List${sanitizedArea}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -94,16 +152,41 @@ export default function BuyersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Buyers & Customer Accounts</h1>
           <p className="text-slate-500 text-sm">Manage customers, view chronological financial ledgers, and settle outstanding receivables.</p>
         </div>
-        <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
-          <Plus className="mr-2 h-4 w-4" /> Add New Customer
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={handleDownloadCSV}
+            variant="outline"
+            disabled={filteredBuyers.length === 0}
+            className="bg-white hover:bg-slate-50 border-slate-300 text-slate-800 font-semibold shadow-xs gap-1.5"
+            title="Download CSV / Excel spreadsheet of the filtered customers list"
+          >
+            <Download className="h-4 w-4 text-blue-600" />
+            Export Excel (CSV)
+          </Button>
+          <Button
+            onClick={handleDownloadPDF}
+            variant="outline"
+            disabled={filteredBuyers.length === 0}
+            className="bg-white hover:bg-slate-50 border-slate-300 text-slate-800 font-semibold shadow-xs gap-1.5"
+            title="Download PDF report of the filtered customers list"
+          >
+            <Download className="h-4 w-4 text-rose-600" />
+            Download PDF
+            {areaSearch.trim() ? ` (${filteredBuyers.length})` : ""}
+          </Button>
+          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
+            <Plus className="mr-2 h-4 w-4" /> Add New Customer
+          </Button>
+        </div>
       </div>
 
       {/* KPI Receivables Summary Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-emerald-800 uppercase block">Total Outstanding Receivables</span>
+            <span className="text-xs font-semibold text-emerald-800 uppercase block">
+              {areaSearch.trim() ? `Outstanding in "${areaSearch.trim()}"` : "Total Outstanding Receivables"}
+            </span>
             <span className="text-2xl font-bold text-emerald-700">{formatCurrency(totalOutstandingSum)}</span>
           </div>
           <Badge variant="success" className="text-xs font-bold py-1 px-3">
@@ -111,39 +194,69 @@ export default function BuyersPage() {
           </Badge>
         </div>
 
-        {/* Search & Filter Controls */}
-        <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+        {/* Search & Area Filter Controls */}
+        <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col gap-2.5">
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setFilterType("ALL")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
                 filterType === "ALL"
                   ? "bg-slate-900 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              All Customers ({buyers.length})
+              All ({buyers.length})
             </button>
             <button
               onClick={() => setFilterType("OUTSTANDING")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
                 filterType === "OUTSTANDING"
                   ? "bg-rose-600 text-white shadow-xs"
                   : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
               }`}
             >
-              ⚠️ Outstanding Debtors Only ({debtorsCount})
+              ⚠️ Outstanding Debtors Only
             </button>
           </div>
 
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            <Input
-              placeholder="Search by name, company, or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 text-xs py-1 h-8"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {/* Area Search Bar */}
+            <div className="relative">
+              <MapPin className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-500" />
+              <Input
+                placeholder="Search by Area / Address (e.g. Gulberg, Saddar)..."
+                value={areaSearch}
+                onChange={(e) => setAreaSearch(e.target.value)}
+                className="pl-8 pr-7 text-xs py-1 h-8 bg-blue-50/40 border-blue-200 focus:bg-white"
+              />
+              {areaSearch && (
+                <button
+                  onClick={() => setAreaSearch("")}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* General Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search by name, company, or phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 pr-7 text-xs py-1 h-8"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +281,11 @@ export default function BuyersPage() {
             ) : filteredBuyers.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-slate-400">
-                  {filterType === "OUTSTANDING"
+                  {areaSearch
+                    ? `No customers found in area "${areaSearch}"`
+                    : search
+                    ? `No customers found matching "${search}"`
+                    : filterType === "OUTSTANDING"
                     ? "🎉 No customers currently have outstanding debt!"
                     : "No buyers found."}
                 </td>
