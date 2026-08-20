@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface UnitFormModalProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface UnitFormModalProps {
 }
 
 export function UnitFormModal({ isOpen, onClose, unit, onSuccess }: UnitFormModalProps) {
+  const t = useTranslations("units");
+  const tc = useTranslations("common");
+
   const [name, setName] = useState(unit?.name || "");
   const [abbreviation, setAbbreviation] = useState(unit?.abbreviation || "");
   const [loading, setLoading] = useState(false);
@@ -52,7 +56,7 @@ export function UnitFormModal({ isOpen, onClose, unit, onSuccess }: UnitFormModa
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-900">
         <div className="flex items-center justify-between border-b pb-3 mb-4">
-          <h2 className="text-lg font-bold text-slate-900">{unit ? "Edit Unit of Measure" : "Add New Unit"}</h2>
+          <h2 className="text-lg font-bold text-slate-900">{unit ? t("modalEditTitle") : t("modalAddTitle")}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
             <X className="h-5 w-5" />
           </button>
@@ -66,35 +70,35 @@ export function UnitFormModal({ isOpen, onClose, unit, onSuccess }: UnitFormModa
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Unit Full Name *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">{t("labelName")} *</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="input text-xs bg-white text-slate-900 font-medium border-slate-300"
+              className="input text-xs bg-white text-slate-900 font-medium border-slate-300 w-full"
               placeholder="e.g. Kilogram"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Abbreviation *</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">{t("labelAbbr")} *</label>
             <input
               type="text"
               required
               value={abbreviation}
               onChange={(e) => setAbbreviation(e.target.value)}
-              className="input text-xs bg-white text-slate-900 font-mono font-bold border-slate-300"
+              className="input text-xs bg-white text-slate-900 font-mono font-bold border-slate-300 w-full"
               placeholder="e.g. kg"
             />
           </div>
 
           <div className="flex justify-end gap-2 mt-6 border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
-              {loading ? "Saving..." : "Save Unit"}
+              {loading ? tc("saving") : t("saveUnit")}
             </Button>
           </div>
         </form>
