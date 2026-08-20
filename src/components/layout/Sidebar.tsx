@@ -300,9 +300,8 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0",
-          "start-0",
-          isOpen ? "translate-x-0" : "ltr:-translate-x-full rtl:translate-x-full"
+          "fixed top-0 start-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
         {/* Logo area */}
