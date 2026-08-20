@@ -160,33 +160,33 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl w-full sm:max-w-5xl max-h-[92vh] flex flex-col bg-white rounded-2xl p-6 shadow-2xl overflow-hidden">
-        {/* Header (Hidden in Print) */}
-        <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between print:hidden">
-          <div>
-            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Truck className="w-5 h-5 text-blue-600" /> {t("title")} — {supplierName}
+      <DialogContent className="max-w-6xl w-full sm:max-w-6xl max-h-[94vh] flex flex-col bg-white rounded-2xl p-4 sm:p-6 shadow-2xl overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="border-b pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
+          <div className="flex-1">
+            <DialogTitle className="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Truck className="w-5 h-5 text-blue-600 shrink-0" /> {t("title")} — {supplierName}
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-0.5">
               {t("subtitle", { name: supplierName })}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-end">
-              <span className="text-[11px] text-slate-500 font-semibold uppercase block">{t("closingBalance")}</span>
-              <span className={`text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+          <div className="flex flex-wrap items-center justify-between md:justify-end gap-3">
+            <div className="text-start md:text-end">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 font-semibold uppercase block">{t("closingBalance")}</span>
+              <span className={`text-base sm:text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                 {formatCurrency(closingBalance)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadCSV}
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
-                className="text-xs font-semibold gap-1.5 border-slate-300 hover:bg-slate-50"
+                className="text-xs font-semibold gap-1 border-slate-300 hover:bg-slate-50 h-8 px-2.5"
               >
                 <Download className="w-3.5 h-3.5 text-blue-600" /> Excel (CSV)
               </Button>
@@ -195,7 +195,7 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                 size="sm"
                 onClick={handleDownloadPDF}
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
-                className="text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                className="text-xs font-semibold gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-xs h-8 px-2.5"
               >
                 <FileText className="w-3.5 h-3.5" /> PDF Statement
               </Button>

@@ -332,24 +332,13 @@ export function Sidebar({
             <span className="text-base font-bold tracking-tight text-white">{t("storeName")}</span>
           </Link>
           
-          <div className="flex items-center gap-1">
-            {/* Desktop Collapse Trigger */}
-            <button 
-              onClick={() => setIsCollapsed((prev) => !prev)} 
-              className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title={t("toggleSidebar")}
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
-
-            {/* Mobile Close Trigger */}
-            <button 
-              onClick={() => setIsMobileOpen(false)} 
-              className="flex md:hidden items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          {/* Mobile Close Trigger */}
+          <button 
+            onClick={() => setIsMobileOpen(false)} 
+            className="flex md:hidden items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation */}
