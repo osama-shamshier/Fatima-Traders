@@ -191,6 +191,51 @@
     "sessionClosed": "بند",
     "noCounters": "کوئی کیش کاؤنٹر درج نہیں ہے۔"
   },
+  "products": {
+    "title": "پروڈکٹس کیٹلاگ اور ماسٹر ریٹس",
+    "subtitle": "پروڈکٹس، ایس کے یو، کیٹیگریز اور فروخت کی قیمتوں کا انتظام کریں۔",
+    "addProduct": "نئی پروڈکٹ شامل کریں",
+    "searchPlaceholder": "پروڈکٹ کا نام یا SKU تلاش کریں...",
+    "allCategories": "تمام کیٹیگریز",
+    "allStatuses": "تمام حالتیں",
+    "activeOnly": "صرف فعال",
+    "inactiveOnly": "صرف غیر فعال",
+    "colSku": "ایس کے یو",
+    "colProductName": "پروڈکٹ کا نام",
+    "colCategory": "کیٹیگری",
+    "colUnit": "یونٹ",
+    "colSellingPrice": "فروخت قیمت",
+    "colMinStock": "کم از کم اسٹاک",
+    "colStatus": "حالت",
+    "colActions": "کارروائی",
+    "active": "فعال",
+    "inactive": "غیر فعال",
+    "noProducts": "کوئی پروڈکٹ نہیں ملی۔"
+  },
+  "categories": {
+    "title": "پروڈکٹ کیٹیگریز",
+    "subtitle": "کیٹلاگ اور پی او ایس کے لیے پروڈکٹس کو کیٹیگریز میں تقسیم کریں۔",
+    "addCategory": "نئی کیٹیگری شامل کریں",
+    "listTitle": "کیٹیگریز کی فہرست",
+    "colCategoryName": "کیٹیگری کا نام",
+    "colDescription": "تفصیل",
+    "colProducts": "مربوط پروڈکٹس",
+    "colCreated": "تاریخ اندراج",
+    "colActions": "کارروائی",
+    "noCategories": "کوئی کیٹیگری درج نہیں ہے۔"
+  },
+  "units": {
+    "title": "پیمائش کے یونٹس",
+    "subtitle": "اسٹاک اور سیلز کے لیے پیمائشی یونٹس (کلو، گرام، لیٹر، دانہ، پیکٹ) کا انتظام کریں۔",
+    "addUnit": "نیا یونٹ شامل کریں",
+    "listTitle": "یونٹس کی فہرست",
+    "colUnitName": "یونٹ کا نام",
+    "colAbbr": "مخفف (شارٹ کوڈ)",
+    "colProducts": "مربوط پروڈکٹس",
+    "colCreated": "تاریخ اندراج",
+    "colActions": "کارروائی",
+    "noUnits": "کوئی پیمائشی یونٹ درج نہیں ہے۔"
+  },
   "common": {
     "add": "شامل کریں",
     "edit": "ترمیم",
@@ -215,6 +260,7 @@
     "price": "قیمت",
     "total": "کل",
     "loading": "لوڈ ہو رہا ہے...",
-    "noData": "کوئی ڈیٹا نہیں ملا"
+    "noData": "کوئی ڈیٹا نہیں ملا",
+    "refresh": "ریفریش"
   }
 }

@@ -7,8 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
+import { useTranslations } from "next-intl";
 
 export default function UnitsPage() {
+  const t = useTranslations("units");
+  const tc = useTranslations("common");
+
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,8 +56,10 @@ export default function UnitsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Units of Measure</h1>
-          <p className="text-slate-500 text-sm">Define measurement units (kg, gram, liter, piece, packet) for inventory tracking.</p>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Ruler className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
         </div>
         <Button
           onClick={() => {
@@ -62,15 +68,15 @@ export default function UnitsPage() {
           }}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0"
         >
-          <Plus className="mr-2 h-4 w-4" /> Add Unit
+          <Plus className="me-2 h-4 w-4" /> {t("addUnit")}
         </Button>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-900 text-sm">Units List ({units.length})</h3>
+          <h3 className="font-bold text-slate-900 text-sm">{t("listTitle")} ({units.length})</h3>
           <Button variant="outline" size="sm" onClick={fetchUnits}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+            <RefreshCw className="h-3.5 w-3.5 me-1" /> {tc("refresh")}
           </Button>
         </div>
 
@@ -78,11 +84,11 @@ export default function UnitsPage() {
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3.5">Unit Name</th>
-                <th className="p-3.5">Abbreviation</th>
-                <th className="p-3.5 text-center">Assigned Products</th>
-                <th className="p-3.5">Created Date</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-3.5">{t("colUnitName")}</th>
+                <th className="p-3.5">{t("colAbbr")}</th>
+                <th className="p-3.5 text-center">{t("colProducts")}</th>
+                <th className="p-3.5">{t("colCreated")}</th>
+                <th className="p-3.5 text-right">{t("colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -92,7 +98,7 @@ export default function UnitsPage() {
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400">
                     <Ruler className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    No measurement units found.
+                    {t("noUnits")}
                   </td>
                 </tr>
               ) : (
@@ -106,7 +112,7 @@ export default function UnitsPage() {
                     </td>
                     <td className="p-3.5 text-center">
                       <Badge variant="outline" className="text-xs font-bold text-blue-700">
-                        {unit._count?.products || 0} Products
+                        {unit._count?.products || 0}
                       </Badge>
                     </td>
                     <td className="p-3.5 text-slate-500 font-mono">{formatDate(unit.createdAt)}</td>

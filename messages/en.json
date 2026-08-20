@@ -191,6 +191,51 @@
     "sessionClosed": "CLOSED",
     "noCounters": "No cash counters registered."
   },
+  "products": {
+    "title": "Product Catalog & Master Prices",
+    "subtitle": "Manage products, SKUs, category assignments, and selling prices.",
+    "addProduct": "Add Product",
+    "searchPlaceholder": "Search by product name or SKU...",
+    "allCategories": "All Categories",
+    "allStatuses": "All Statuses",
+    "activeOnly": "Active Only",
+    "inactiveOnly": "Inactive Only",
+    "colSku": "SKU",
+    "colProductName": "Product Name",
+    "colCategory": "Category",
+    "colUnit": "Unit",
+    "colSellingPrice": "Selling Price",
+    "colMinStock": "Min Stock",
+    "colStatus": "Status",
+    "colActions": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "noProducts": "No products found matching filters."
+  },
+  "categories": {
+    "title": "Product Categories",
+    "subtitle": "Organize products into logical categories for catalog management and POS filters.",
+    "addCategory": "Add Category",
+    "listTitle": "Category List",
+    "colCategoryName": "Category Name",
+    "colDescription": "Description",
+    "colProducts": "Assigned Products",
+    "colCreated": "Created Date",
+    "colActions": "Actions",
+    "noCategories": "No product categories found."
+  },
+  "units": {
+    "title": "Units of Measure",
+    "subtitle": "Define measurement units (kg, gram, liter, piece, packet) for inventory tracking.",
+    "addUnit": "Add Unit",
+    "listTitle": "Units List",
+    "colUnitName": "Unit Name",
+    "colAbbr": "Abbreviation",
+    "colProducts": "Assigned Products",
+    "colCreated": "Created Date",
+    "colActions": "Actions",
+    "noUnits": "No measurement units found."
+  },
   "common": {
     "add": "Add",
     "edit": "Edit",
@@ -215,6 +260,7 @@
     "price": "Price",
     "total": "Total",
     "loading": "Loading...",
-    "noData": "No data found"
+    "noData": "No data found",
+    "refresh": "Refresh"
   }
 }

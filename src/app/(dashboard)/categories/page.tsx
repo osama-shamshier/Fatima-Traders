@@ -7,8 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { CategoryFormModal } from "@/components/categories/CategoryFormModal";
+import { useTranslations } from "next-intl";
 
 export default function CategoriesPage() {
+  const t = useTranslations("categories");
+  const tc = useTranslations("common");
+
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,8 +56,10 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Product Categories</h1>
-          <p className="text-slate-500 text-sm">Organize products into logical categories for catalog management and POS filters.</p>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Tag className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
         </div>
         <Button
           onClick={() => {
@@ -62,15 +68,15 @@ export default function CategoriesPage() {
           }}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0"
         >
-          <Plus className="mr-2 h-4 w-4" /> Add Category
+          <Plus className="me-2 h-4 w-4" /> {t("addCategory")}
         </Button>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-900 text-sm">Category List ({categories.length})</h3>
+          <h3 className="font-bold text-slate-900 text-sm">{t("listTitle")} ({categories.length})</h3>
           <Button variant="outline" size="sm" onClick={fetchCategories}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+            <RefreshCw className="h-3.5 w-3.5 me-1" /> {tc("refresh")}
           </Button>
         </div>
 
@@ -78,11 +84,11 @@ export default function CategoriesPage() {
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3.5">Category Name</th>
-                <th className="p-3.5">Description</th>
-                <th className="p-3.5 text-center">Assigned Products</th>
-                <th className="p-3.5">Created Date</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-3.5">{t("colCategoryName")}</th>
+                <th className="p-3.5">{t("colDescription")}</th>
+                <th className="p-3.5 text-center">{t("colProducts")}</th>
+                <th className="p-3.5">{t("colCreated")}</th>
+                <th className="p-3.5 text-right">{t("colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -92,7 +98,7 @@ export default function CategoriesPage() {
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400">
                     <Tag className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    No product categories found.
+                    {t("noCategories")}
                   </td>
                 </tr>
               ) : (
@@ -102,7 +108,7 @@ export default function CategoriesPage() {
                     <td className="p-3.5 text-slate-600 truncate max-w-xs">{category.description || "-"}</td>
                     <td className="p-3.5 text-center">
                       <Badge variant="outline" className="text-xs font-bold text-blue-700">
-                        {category._count?.products || 0} Products
+                        {category._count?.products || 0}
                       </Badge>
                     </td>
                     <td className="p-3.5 text-slate-500 font-mono">{formatDate(category.createdAt)}</td>
