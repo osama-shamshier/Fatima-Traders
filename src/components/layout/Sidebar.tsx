@@ -35,14 +35,17 @@ import {
   AlertTriangle,
   Calendar,
   ChevronRight,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   userName?: string;
   userRole?: string;
-  isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
+  isMobileOpen: boolean;
+  setIsMobileOpen: (open: boolean) => void;
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean) => void;
 }
 
 const navSections = [
@@ -144,12 +147,10 @@ function CollapsibleSection({
       const el = contentRef.current;
       if (el) {
         setHeight(el.scrollHeight);
-        // After transition, set to auto so dynamically added content works
         const timer = setTimeout(() => setHeight(undefined), 200);
         return () => clearTimeout(timer);
       }
     } else {
-      // First set explicit height, then on next frame set to 0 for animation
       const el = contentRef.current;
       if (el) {
         setHeight(el.scrollHeight);
@@ -168,7 +169,7 @@ function CollapsibleSection({
       <button
         onClick={onToggle}
         className={cn(
-          "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold transition-all duration-200",
+          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 cursor-pointer",
           hasActiveChild
             ? "bg-slate-800/80 text-white"
             : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
@@ -205,7 +206,7 @@ function CollapsibleSection({
                 <Link
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                     isActive
                       ? "bg-blue-500/10 text-blue-400 font-semibold"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
@@ -228,7 +229,14 @@ function CollapsibleSection({
   );
 }
 
-export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ 
+  userName = "User", 
+  userRole = "Owner", 
+  isMobileOpen, 
+  setIsMobileOpen,
+  isCollapsed,
+  setIsCollapsed,
+}: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("header");
 
@@ -271,7 +279,7 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
       if (hasActive) expanded.add(idx);
     });
     return expanded;
-  }, []); // Only compute once on mount
+  }, []);
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(initialExpanded);
 
@@ -287,25 +295,35 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
     });
   }, []);
 
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname, setIsMobileOpen]);
+
   return (
     <>
       {/* Mobile overlay backdrop */}
-      {isOpen && (
+      {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs md:hidden"
-          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs md:hidden"
+          onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed top-0 start-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out md:translate-x-0",
-          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          "fixed top-0 start-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out shadow-2xl",
+          // Mobile state:
+          isMobileOpen 
+            ? "translate-x-0" 
+            : "ltr:-translate-x-full rtl:translate-x-full md:translate-x-0",
+          // Desktop collapsed state:
+          isCollapsed && "md:ltr:-translate-x-full md:rtl:translate-x-full"
         )}
       >
-        {/* Logo area */}
-        <div className="flex h-16 shrink-0 items-center justify-between px-6 py-4 border-b border-slate-800">
+        {/* Logo & Close/Collapse area */}
+        <div className="flex h-16 shrink-0 items-center justify-between px-5 py-4 border-b border-slate-800">
           <Link
             href={!isOwner && isBillCounterManager ? "/pos" : "/dashboard"}
             className="flex items-center gap-2 text-white transition-opacity hover:opacity-80"
@@ -313,9 +331,25 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
             <Store className="h-6 w-6 text-blue-500" />
             <span className="text-base font-bold tracking-tight text-white">{t("storeName")}</span>
           </Link>
-          <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white md:hidden">
-            <X className="h-5 w-5" />
-          </button>
+          
+          <div className="flex items-center gap-1">
+            {/* Desktop Collapse Trigger */}
+            <button 
+              onClick={() => setIsCollapsed(!isCollapsed)} 
+              className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title={t("toggleSidebar")}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+
+            {/* Mobile Close Trigger */}
+            <button 
+              onClick={() => setIsMobileOpen(false)} 
+              className="flex md:hidden items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -335,15 +369,15 @@ export function Sidebar({ userName = "User", userRole = "Owner", isOpen, setIsOp
         <div className="mt-auto shrink-0 border-t border-slate-800 p-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-white">{userName}</span>
-              <span className="text-xs text-slate-400">{userRole}</span>
+              <span className="text-xs font-bold text-white truncate max-w-[140px]">{userName}</span>
+              <span className="text-[10px] text-slate-400 font-medium">{userRole}</span>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               title={t("signOut")}
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>

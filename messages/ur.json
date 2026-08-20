@@ -11,7 +11,8 @@
     "signOut": "لاگ آؤٹ",
     "mainBranch": "مرکزی برانچ",
     "notifications": "اطلاعات",
-    "openMenu": "مینو کھولیں"
+    "openMenu": "مینو کھولیں",
+    "toggleSidebar": "سائیڈ بار چھپائیں / دکھائیں"
   },
   "sidebar": {
     "storeName": "فاطمہ ٹریڈرز",

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { cn } from "@/lib/utils";
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
@@ -16,7 +17,8 @@ export function DashboardLayoutClient({
   userName = "User",
   userRole = "Admin"
 }: DashboardLayoutClientProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -42,20 +44,37 @@ export function DashboardLayoutClient({
     }
   }, [pathname, isBillCounterManager, isOwner, router]);
 
+  // Handle toggle logic
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      setIsSidebarCollapsed((prev) => !prev);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar 
-        isOpen={isSidebarOpen} 
-        setIsOpen={setIsSidebarOpen} 
+        isMobileOpen={isMobileSidebarOpen} 
+        setIsMobileOpen={setIsMobileSidebarOpen}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
         userName={userName}
         userRole={userRole}
       />
-      <div className="flex flex-1 flex-col md:ps-64">
+      <div 
+        className={cn(
+          "flex flex-1 flex-col transition-all duration-300 ease-in-out min-w-0",
+          isSidebarCollapsed ? "md:ps-0" : "md:ps-64"
+        )}
+      >
         <Header 
-          onMenuClick={() => setIsSidebarOpen(true)} 
+          onToggleSidebar={handleToggleSidebar}
+          isSidebarCollapsed={isSidebarCollapsed}
           userName={userName}
         />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {children}
         </main>
       </div>
