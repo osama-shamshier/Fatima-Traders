@@ -177,17 +177,16 @@
     "inactive": "Inactive"
   },
   "counters": {
-    "title": "Cash Counters & Sessions",
-    "subtitle": "Manage physical cash registers, open/close daily shifts, and reconcile cash.",
+    "title": "Cash Counters",
+    "subtitle": "Manage physical cash registers and active cashier assignments.",
     "addCounter": "Add Counter",
     "colCounterName": "Counter Name",
     "colBranch": "Branch",
     "colStatus": "Status",
-    "colSession": "Session Status",
     "colCashier": "Active Cashier",
     "colActions": "Actions",
-    "openSession": "Open Session",
-    "closeSession": "Close Session",
+    "openSession": "Open Counter",
+    "closeSession": "Close Counter",
     "sessionOpen": "OPEN",
     "sessionClosed": "CLOSED",
     "noCounters": "No cash counters registered."

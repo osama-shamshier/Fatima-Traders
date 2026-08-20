@@ -177,17 +177,16 @@
     "inactive": "غیر فعال"
   },
   "counters": {
-    "title": "کیش کاؤنٹرز اور سیشنز",
-    "subtitle": "کاؤنٹر شفٹیں کھولیں/بند کریں اور روزانہ کیش کا حساب ملائیں۔",
+    "title": "کیش کاؤنٹرز",
+    "subtitle": "کاؤنٹرز اور کیشیئر کا انتظام کریں۔",
     "addCounter": "نیا کاؤنٹر شامل کریں",
     "colCounterName": "کاؤنٹر کا نام",
     "colBranch": "برانچ",
     "colStatus": "حالت",
-    "colSession": "سیشن کی حالت",
     "colCashier": "موجودہ کیشیئر",
     "colActions": "کارروائی",
-    "openSession": "سیشن کھولیں",
-    "closeSession": "سیشن بند کریں",
+    "openSession": "کاؤنٹر کھولیں",
+    "closeSession": "کاؤنٹر بند کریں",
     "sessionOpen": "اوپن",
     "sessionClosed": "بند",
     "noCounters": "کوئی کیش کاؤنٹر درج نہیں ہے۔"

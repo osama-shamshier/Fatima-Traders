@@ -73,16 +73,15 @@ export default function CountersPage() {
               <th className="px-4 py-3.5">{t("colCounterName")}</th>
               <th className="px-4 py-3.5">{t("colBranch")}</th>
               <th className="px-4 py-3.5">{t("colStatus")}</th>
-              <th className="px-4 py-3.5">{t("colSession")}</th>
               <th className="px-4 py-3.5">{t("colCashier")}</th>
               <th className="px-4 py-3.5 text-right">{t("colActions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {isLoading ? (
-              <TableLoader colSpan={6} text="Loading counters..." />
+              <TableLoader colSpan={5} text="Loading counters..." />
             ) : counters.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-400">{t("noCounters")}</td></tr>
+              <tr><td colSpan={5} className="p-8 text-center text-slate-400">{t("noCounters")}</td></tr>
             ) : (
               counters.map((counter) => {
                 const openSession = counter.sessions && counter.sessions.length > 0 ? counter.sessions[0] : null;
@@ -95,13 +94,6 @@ export default function CountersPage() {
                       <Badge variant={counter.isActive ? "success" : "outline"}>
                         {counter.isActive ? tc("active") : tc("inactive")}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {openSession ? (
-                        <Badge variant="success">{t("sessionOpen")}</Badge>
-                      ) : (
-                        <Badge variant="outline">{t("sessionClosed")}</Badge>
-                      )}
                     </td>
                     <td className="px-4 py-3.5 text-slate-700 font-bold">{openSession?.user?.name || "-"}</td>
                     <td className="px-4 py-3.5 text-right">
