@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
+import { formatCurrency } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface BuyerPaymentFormModalProps {
   isOpen: boolean;
@@ -16,6 +18,9 @@ interface BuyerPaymentFormModalProps {
 }
 
 export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPaymentFormModalProps) {
+  const t = useTranslations("buyerPayments");
+  const tc = useTranslations("common");
+
   const [isLoading, setIsLoading] = useState(false);
   const [buyers, setBuyers] = useState<any[]>([]);
 
@@ -96,15 +101,15 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl p-6">
-        <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-lg font-bold text-slate-900">Record Customer Payment / Collection</DialogTitle>
+        <DialogHeader className="border-b pb-3 mb-2">
+          <DialogTitle className="text-lg font-bold text-slate-900">{t("modalTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div className="space-y-1">
-            <Label htmlFor="buyerId">Select Buyer / Customer *</Label>
+            <Label htmlFor="buyerId" className="text-xs font-semibold">{t("selectCustomer")} *</Label>
             <select
               id="buyerId"
-              className="input text-sm bg-white"
+              className="input text-xs bg-white w-full"
               {...register("buyerId", { required: "Buyer is required" })}
               onChange={(e) => {
                 setValue("buyerId", e.target.value);
@@ -116,30 +121,30 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
                 }
               }}
             >
-              <option value="">-- Select a Buyer --</option>
+              <option value="">-- {t("selectCustomer")} --</option>
               {buyers.map((buyer) => (
                 <option key={buyer.id} value={buyer.id}>
-                  {buyer.name} {buyer.companyName ? `(${buyer.companyName})` : ""} - Credit: Rs. {Number(buyer.totalOutstanding || 0).toLocaleString()}
+                  {buyer.name} {buyer.companyName ? `(${buyer.companyName})` : ""} - {formatCurrency(Number(buyer.totalOutstanding || 0))}
                 </option>
               ))}
             </select>
-            {errors.buyerId && <p className="text-red-500 text-xs">{errors.buyerId.message as string}</p>}
+            {errors.buyerId && <p className="text-rose-500 text-xs">{errors.buyerId.message as string}</p>}
           </div>
 
           {selectedBuyer && (
             <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${maxAllowedAmount > 0 ? "bg-amber-50 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-900 border-emerald-200"}`}>
-              <span>Total Outstanding Credit:</span>
-              <span className="text-sm font-bold">Rs. {maxAllowedAmount.toLocaleString()}</span>
+              <span>{t("totalOutstandingCredit")}:</span>
+              <span className="text-sm font-bold font-mono">{formatCurrency(maxAllowedAmount)}</span>
             </div>
           )}
 
           <div className="space-y-1">
-            <Label htmlFor="amount">Amount Received (PKR) *</Label>
+            <Label htmlFor="amount" className="text-xs font-semibold">{t("amountReceived")} *</Label>
             <Input
               id="amount"
               type="number"
               step="any"
-              className="text-lg font-bold text-emerald-600"
+              className="text-lg font-bold text-emerald-600 bg-white"
               {...register("amount", {
                 required: "Amount is required",
                 validate: {
@@ -149,29 +154,29 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
                     if (maxAllowedAmount === 0) return "Customer has Rs. 0 credit balance";
                     return (
                       Number(v) <= maxAllowedAmount ||
-                      `Amount cannot exceed credit balance (Rs. ${maxAllowedAmount.toLocaleString()})`
+                      `Amount cannot exceed credit balance (${formatCurrency(maxAllowedAmount)})`
                     );
                   },
                 },
               })}
             />
-            {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount.message as string}</p>}
+            {errors.amount && <p className="text-rose-500 text-xs mt-1">{errors.amount.message as string}</p>}
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="paymentMethod">Payment Method *</Label>
-            <select id="paymentMethod" className="input text-sm bg-white" {...register("paymentMethod")}>
-              <option value="CASH">💵 Cash</option>
-              <option value="BANK_TRANSFER">🏦 Bank Transfer / Digital Wallet</option>
+            <Label htmlFor="paymentMethod" className="text-xs font-semibold">{tc("payment") || "Payment Method"} *</Label>
+            <select id="paymentMethod" className="input text-xs bg-white w-full" {...register("paymentMethod")}>
+              <option value="CASH">{t("cash")}</option>
+              <option value="BANK_TRANSFER">{t("bank")}</option>
             </select>
           </div>
 
           {paymentMethod === "BANK_TRANSFER" && (
             <div className="space-y-3 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
               <div className="space-y-1">
-                <Label className="text-xs">Pakistani Bank / Digital Wallet *</Label>
-                <select className="input text-xs bg-white" {...register("bankName")}>
-                  <option value="">Select Bank / Wallet</option>
+                <Label className="text-xs font-semibold">{tc("selectBank") || "Pakistani Bank / Digital Wallet"} *</Label>
+                <select className="input text-xs bg-white w-full" {...register("bankName")}>
+                  <option value="">-- Select Bank / Wallet --</option>
                   {PAKISTANI_BANKS.map((b) => (
                     <option key={b.id} value={b.name}>
                       {b.name}
@@ -181,27 +186,27 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Bank Reference / TRX #</Label>
-                <Input placeholder="TRX-123456" className="text-xs" {...register("bankReference")} />
+                <Label className="text-xs font-semibold">{t("colBankRef")}</Label>
+                <Input placeholder="TRX-123456" className="text-xs bg-white" {...register("bankReference")} />
               </div>
             </div>
           )}
 
           <div className="space-y-1">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" className="text-xs" {...register("notes")} />
+            <Label htmlFor="notes" className="text-xs font-semibold">{t("colNotes")}</Label>
+            <Textarea id="notes" className="text-xs bg-white" {...register("notes")} />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={isLoading || (selectedBuyer && maxAllowedAmount === 0) || (enteredAmount && Number(enteredAmount) > maxAllowedAmount)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"
             >
-              {isLoading ? "Saving..." : "Record Payment"}
+              {isLoading ? tc("saving") : t("savePayment")}
             </Button>
           </div>
         </form>

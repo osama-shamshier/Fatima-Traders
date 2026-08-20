@@ -10,6 +10,7 @@ import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, RefreshCw, DollarSign, User, Download, Calendar, X, FileText } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
+import { useTranslations } from "next-intl";
 
 interface BuyerLedgerModalProps {
   isOpen: boolean;
@@ -20,9 +21,12 @@ interface BuyerLedgerModalProps {
 }
 
 export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSuccess }: BuyerLedgerModalProps) {
+  const t = useTranslations("ledger");
+  const tc = useTranslations("common");
+
   const [ledger, setLedger] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [startDate, setStartDate] = useState<string>("" );
+  const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
   // Settlement Form State
@@ -118,22 +122,14 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
     const headers = ["Date", "Type", "Ref / Invoice #", "Description", "Debit (Invoiced)", "Credit (Received)", "Running Balance"];
     const rows: string[][] = [];
 
-    if (startDate && openingBalance !== 0) {
-      rows.push([
-        `"${formatDate(startDate)}"`,
-        `"OPENING"`,
-        `"-"`,
-        `"Opening Balance"`,
-        "0",
-        "0",
-        String(openingBalance),
-      ]);
+    if (startDate) {
+      rows.push([startDate, "OPENING", "-", "Opening Balance Brought Forward", "0", "0", String(openingBalance)]);
     }
 
     filteredLedger.forEach((entry) => {
       rows.push([
-        `"${formatDate(entry.date)}"`,
-        `"${entry.type || ""}"`,
+        entry.date ? entry.date.split("T")[0] : "",
+        entry.type || "",
         `"${entry.reference || ""}"`,
         `"${(entry.description || "").replace(/"/g, '""')}"`,
         String(entry.debit || 0),
@@ -142,38 +138,34 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
       ]);
     });
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
-    const dateTag = startDate ? `${startDate}_to_${endDate || "latest"}` : "all_time";
-    link.download = `Customer_Ledger_${(buyerName || "Customer").replace(/[^a-zA-Z0-9]/g, "_")}_${dateTag}.csv`;
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `Ledger_${buyerName?.replace(/\s+/g, "_") || "Customer"}_${new Date().toISOString().split("T")[0]}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
-  const setPresetRange = (type: "THIS_MONTH" | "LAST_30" | "ALL") => {
-    if (type === "ALL") {
-      setStartDate("");
-      setEndDate("");
-      return;
-    }
-
+  const setPresetRange = (preset: "THIS_MONTH" | "LAST_30" | "ALL") => {
     const now = new Date();
-    const endStr = now.toISOString().split("T")[0];
-
-    if (type === "THIS_MONTH") {
+    if (preset === "THIS_MONTH") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       setStartDate(firstDay.toISOString().split("T")[0]);
-      setEndDate(endStr);
-    } else if (type === "LAST_30") {
+      setEndDate(now.toISOString().split("T")[0]);
+    } else if (preset === "LAST_30") {
       const past30 = new Date();
       past30.setDate(past30.getDate() - 30);
       setStartDate(past30.toISOString().split("T")[0]);
-      setEndDate(endStr);
+      setEndDate(now.toISOString().split("T")[0]);
+    } else {
+      setStartDate("");
+      setEndDate("");
     }
   };
 
@@ -239,16 +231,16 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
         <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between print:hidden">
           <div>
             <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <User className="w-5 h-5 text-blue-600" /> Customer Financial Ledger & Settlement — {buyerName || "Buyer"}
+              <User className="w-5 h-5 text-blue-600" /> {t("title")} — {buyerName || "Customer"}
             </DialogTitle>
-            <p className="text-xs text-slate-500">
-              Filter by date range, track opening debt, and download official PDF statements or Excel spreadsheets.
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t("subtitle", { name: buyerName || "Customer" })}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Closing Balance Due</span>
+            <div className="text-end">
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">{t("closingBalance")}</span>
               <span className={`text-xl font-extrabold font-mono ${closingBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                 {formatCurrency(closingBalance)}
               </span>
@@ -262,7 +254,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 border-slate-300 hover:bg-slate-50"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" /> Export CSV / Excel
+                <Download className="w-3.5 h-3.5 text-blue-600" /> {t("exportCsv")}
               </Button>
 
               <Button
@@ -271,14 +263,14 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 disabled={filteredLedger.length === 0 && openingBalance === 0}
                 className="text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
               >
-                <FileText className="w-3.5 h-3.5" /> Download PDF Statement
+                <FileText className="w-3.5 h-3.5" /> {t("printPdf")}
               </Button>
 
               <Button
                 onClick={() => setIsSettleOpen(true)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 px-3 shadow-sm"
               >
-                <CreditCard className="w-3.5 h-3.5 mr-1" /> Settle Bill
+                <CreditCard className="w-3.5 h-3.5 me-1" /> {t("settleAccount")}
               </Button>
             </div>
           </div>
@@ -288,11 +280,11 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
         <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-200 mt-2 flex flex-wrap items-center justify-between gap-3 text-xs print:hidden">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-slate-700 flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date Range:
+              <Calendar className="w-3.5 h-3.5 text-blue-600" /> {t("filterDates")}:
             </span>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">From:</span>
+              <span className="text-slate-500">{t("fromDate")}:</span>
               <Input
                 type="date"
                 value={startDate}
@@ -302,7 +294,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">To:</span>
+              <span className="text-slate-500">{t("toDate")}:</span>
               <Input
                 type="date"
                 value={endDate}
@@ -319,7 +311,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 }}
                 className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1 rounded"
               >
-                <X className="w-3 h-3" /> Clear Filter
+                <X className="w-3 h-3" /> {tc("cancel")}
               </button>
             )}
           </div>
@@ -330,13 +322,13 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
               onClick={() => setPresetRange("THIS_MONTH")}
               className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
             >
-              This Month
+              {t("presetMonth")}
             </button>
             <button
               onClick={() => setPresetRange("LAST_30")}
               className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"
             >
-              Last 30 Days
+              {t("preset30Days")}
             </button>
             <button
               onClick={() => setPresetRange("ALL")}
@@ -346,7 +338,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
               }`}
             >
-              All Time
+              {t("presetAll")}
             </button>
           </div>
         </div>
@@ -356,16 +348,16 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
           <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl my-2 space-y-3 shrink-0 print:hidden">
             <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
               <h4 className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-emerald-600" /> Record Bill Settlement Payment
+                <DollarSign className="w-4 h-4 text-emerald-600" /> {t("settleModalTitle")}
               </h4>
               <button onClick={() => setIsSettleOpen(false)} className="text-xs text-slate-500 hover:text-slate-800 font-bold">
-                ✕ Close
+                ✕
               </button>
             </div>
 
             <form onSubmit={handleSettleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <Label className="text-xs font-semibold">Payment Amount (PKR) *</Label>
+                <Label className="text-xs font-semibold">{t("settleAmountLabel")} *</Label>
                 <Input
                   type="number"
                   step="any"
@@ -377,27 +369,27 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Payment Method *</Label>
+                <Label className="text-xs font-semibold">{t("paymentMethod")} *</Label>
                 <select
                   value={settleForm.paymentMethod}
                   onChange={(e) => setSettleForm({ ...settleForm, paymentMethod: e.target.value })}
                   className="input text-xs bg-white mt-1"
                 >
-                  <option value="CASH">💵 Cash</option>
-                  <option value="BANK_TRANSFER">🏦 Bank / Digital Wallet</option>
+                  <option value="CASH">{t("cash")}</option>
+                  <option value="BANK_TRANSFER">{t("bankTransfer")}</option>
                 </select>
               </div>
 
               {settleForm.paymentMethod === "BANK_TRANSFER" ? (
                 <div>
-                  <Label className="text-xs font-semibold">Pakistani Bank / Wallet *</Label>
+                  <Label className="text-xs font-semibold">{t("selectBank")} *</Label>
                   <select
                     value={settleForm.bankName}
                     onChange={(e) => setSettleForm({ ...settleForm, bankName: e.target.value })}
                     className="input text-xs bg-white mt-1"
                     required={settleForm.paymentMethod === "BANK_TRANSFER"}
                   >
-                    <option value="">Select Bank</option>
+                    <option value="">{t("selectBank")}</option>
                     {PAKISTANI_BANKS.map((b) => (
                       <option key={b.id} value={b.name}>
                         {b.name}
@@ -407,7 +399,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 </div>
               ) : (
                 <div>
-                  <Label className="text-xs font-semibold">Receipt / Notes</Label>
+                  <Label className="text-xs font-semibold">{t("colNotes")}</Label>
                   <Input
                     placeholder="e.g. Partial cash settlement"
                     value={settleForm.notes}
@@ -419,7 +411,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
 
               {settleForm.paymentMethod === "BANK_TRANSFER" && (
                 <div className="sm:col-span-2">
-                  <Label className="text-xs font-semibold">TRX / Bank Reference #</Label>
+                  <Label className="text-xs font-semibold">{t("bankRef")}</Label>
                   <Input
                     placeholder="TRX-98765432"
                     value={settleForm.bankReference}
@@ -431,7 +423,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
 
               <div className="sm:col-span-3 flex justify-end gap-2 pt-2 border-t border-emerald-200">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsSettleOpen(false)}>
-                  Cancel
+                  {tc("cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -439,7 +431,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                   disabled={isSubmitting}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
                 >
-                  {isSubmitting ? "Saving..." : "Confirm & Apply Settlement"}
+                  {isSubmitting ? t("saving") : t("saveSettlement")}
                 </Button>
               </div>
             </form>
@@ -456,7 +448,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 <p className="text-xs text-slate-600">Chemical & Packing Materials Store</p>
                 <p className="text-xs text-slate-600">Purani Ghalla Mandi, Ahmad Pur East | Tel: 0334-7776934</p>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <h2 className="text-lg font-bold text-slate-900 uppercase">Customer Account Statement</h2>
                 <p className="text-xs text-slate-500 font-mono">Date Generated: {formatDate(new Date())}</p>
                 <p className="text-xs font-bold text-slate-800 mt-1">Customer: {buyerName || "Customer"}</p>
@@ -469,19 +461,19 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
             {/* Print Summary Metrics */}
             <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t text-xs">
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Opening Balance:</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("openingBalance")}:</span>
                 <strong className="text-slate-900 font-mono">{formatCurrency(openingBalance)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Period Invoices (Debit):</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("periodDebit")}:</span>
                 <strong className="text-rose-700 font-mono">{formatCurrency(periodDebit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Period Receipts (Credit):</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("periodCredit")}:</span>
                 <strong className="text-emerald-700 font-mono">{formatCurrency(periodCredit)}</strong>
               </div>
               <div className="p-2 bg-slate-50 border rounded">
-                <span className="text-slate-500 block text-[10px] uppercase">Closing Balance Due:</span>
+                <span className="text-slate-500 block text-[10px] uppercase">{t("closingBalance")}:</span>
                 <strong className="text-rose-700 font-mono font-black">{formatCurrency(closingBalance)}</strong>
               </div>
             </div>
@@ -495,13 +487,13 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
               <table className="w-full text-xs text-left border-collapse table-fixed">
                 <thead className="bg-slate-50 sticky top-0 font-semibold border-b text-slate-700 uppercase tracking-wider">
                   <tr>
-                    <th className="p-3 w-28">Date</th>
-                    <th className="p-3 w-28">Type</th>
-                    <th className="p-3 w-32">Invoice / Ref #</th>
-                    <th className="p-3">Details / Description</th>
-                    <th className="p-3 text-right w-36">Debit (Bill Charged)</th>
-                    <th className="p-3 text-right w-36">Credit (Paid)</th>
-                    <th className="p-3 text-right w-40">Running Balance</th>
+                    <th className="p-3 w-28">{t("colDate")}</th>
+                    <th className="p-3 w-28">{t("colType")}</th>
+                    <th className="p-3 w-32">{t("colRef")}</th>
+                    <th className="p-3">{t("colNotes")}</th>
+                    <th className="p-3 text-right w-36">{t("colDebit")}</th>
+                    <th className="p-3 text-right w-36">{t("colCredit")}</th>
+                    <th className="p-3 text-right w-40">{t("colBalance")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -515,7 +507,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                         </span>
                       </td>
                       <td className="p-3 font-mono text-slate-400">-</td>
-                      <td className="p-3 text-slate-800">Opening Balance Brought Forward</td>
+                      <td className="p-3 text-slate-800">{t("openingBalance")}</td>
                       <td className="p-3 text-right font-mono">-</td>
                       <td className="p-3 text-right font-mono">-</td>
                       <td className="p-3 text-right font-mono font-extrabold text-slate-900">
@@ -562,7 +554,7 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                   {filteredLedger.length === 0 && openingBalance === 0 && (
                     <tr>
                       <td colSpan={7} className="p-12 text-center text-slate-400">
-                        No ledger transactions recorded for the selected date range.
+                        {t("noEntries")}
                       </td>
                     </tr>
                   )}
@@ -587,10 +579,10 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
 
         <DialogFooter className="mt-4 border-t pt-3 flex justify-between items-center shrink-0 print:hidden">
           <Button variant="outline" onClick={fetchLedger} size="sm">
-            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh Ledger
+            <RefreshCw className="w-3.5 h-3.5 me-1" /> {tc("refresh")}
           </Button>
           <Button variant="outline" onClick={onClose} size="sm">
-            Close
+            {tc("cancel")}
           </Button>
         </DialogFooter>
 

@@ -9,8 +9,12 @@ import { Label } from "@/components/ui/label";
 import { TableLoader } from "@/components/ui/loader";
 import { Calendar, Filter, RefreshCw, FileText, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
+import { useTranslations } from "next-intl";
 
 export default function BuyerDueDatesPage() {
+  const t = useTranslations("buyerDueDates");
+  const tc = useTranslations("common");
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,11 +70,11 @@ export default function BuyerDueDatesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Customer Credit Payment Due Dates</h1>
-          <p className="text-slate-500 text-sm">Monitor credit bills due today, overdue collections, and schedule customer settlements.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchDueDates}>
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Due Schedule
+          <RefreshCw className="w-4 h-4 me-2" /> {t("refresh")}
         </Button>
       </div>
 
@@ -79,18 +83,18 @@ export default function BuyerDueDatesPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-900 uppercase">Collection Schedule Period</span>
+            <span className="text-xs font-bold text-slate-900 uppercase">{t("collectionSchedule")}</span>
           </div>
 
           {/* Quick Filter Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              { id: "due_today", label: "📅 Due Today", badgeColor: "bg-amber-600 text-white" },
-              { id: "overdue", label: "⚠️ Overdue Bills", badgeColor: "bg-rose-600 text-white" },
-              { id: "this_week", label: "📆 This Week" },
-              { id: "this_month", label: "🗓️ This Month" },
-              { id: "all", label: "All Credit Sales" },
-              { id: "custom", label: "Custom Range" },
+              { id: "due_today", label: t("dueToday"), badgeColor: "bg-amber-600 text-white" },
+              { id: "overdue", label: t("overdue"), badgeColor: "bg-rose-600 text-white" },
+              { id: "this_week", label: t("thisWeek") },
+              { id: "this_month", label: t("thisMonth") },
+              { id: "all", label: t("allSales") },
+              { id: "custom", label: t("customRange") },
             ].map((p) => (
               <button
                 key={p.id}
@@ -111,7 +115,7 @@ export default function BuyerDueDatesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex-1 min-w-[200px]">
             <Input
-              placeholder="Search by customer name, company, or invoice #..."
+              placeholder={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchDueDates()}
@@ -138,13 +142,13 @@ export default function BuyerDueDatesPage() {
                 />
               </div>
               <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs font-semibold">
-                Apply Date
+                {t("applyDate")}
               </Button>
             </form>
           )}
 
           <div className="text-xs font-semibold text-slate-700 font-mono">
-            Pending Credit Total: <strong className="text-rose-600 font-bold text-sm">{formatCurrency(totalOutstandingAmount)}</strong>
+            {t("pendingCreditTotal")}: <strong className="text-rose-600 font-bold text-sm">{formatCurrency(totalOutstandingAmount)}</strong>
           </div>
         </div>
       </div>
@@ -155,15 +159,15 @@ export default function BuyerDueDatesPage() {
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
               <tr>
-                <th className="p-3.5">Invoice #</th>
-                <th className="p-3.5">Customer Name</th>
-                <th className="p-3.5">Company / Phone</th>
-                <th className="p-3.5">Sale Date</th>
-                <th className="p-3.5 text-right">Grand Total</th>
-                <th className="p-3.5 text-right">Outstanding Credit</th>
-                <th className="p-3.5 text-center">Payment Due Date</th>
-                <th className="p-3.5 text-center">Status</th>
-                <th className="p-3.5 text-right">Action</th>
+                <th className="p-3.5">{t("colInvoice")}</th>
+                <th className="p-3.5">{t("colCustomer")}</th>
+                <th className="p-3.5">{t("colCompanyPhone")}</th>
+                <th className="p-3.5">{t("colSaleDate")}</th>
+                <th className="p-3.5 text-right">{t("colGrandTotal")}</th>
+                <th className="p-3.5 text-right">{t("colOutstanding")}</th>
+                <th className="p-3.5 text-center">{t("colDueDate")}</th>
+                <th className="p-3.5 text-center">{t("colStatus")}</th>
+                <th className="p-3.5 text-right">{t("colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -173,7 +177,7 @@ export default function BuyerDueDatesPage() {
                 <tr>
                   <td colSpan={9} className="p-8 text-center text-slate-400">
                     <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-60" />
-                    No credit sales found for the selected period matching filters.
+                    {t("noDueSales")}
                   </td>
                 </tr>
               ) : (
@@ -190,20 +194,20 @@ export default function BuyerDueDatesPage() {
                       {formatCurrency(item.outstandingAmount)}
                     </td>
                     <td className="p-3.5 text-center font-mono font-bold text-slate-900">
-                      {item.dueDate ? formatDate(item.dueDate) : "No Due Date"}
+                      {item.dueDate ? formatDate(item.dueDate) : t("noDueDate")}
                     </td>
                     <td className="p-3.5 text-center">
                       {item.status === "DUE TODAY" ? (
                         <Badge variant="warning" className="text-[10px] font-bold">
-                          📅 DUE TODAY
+                          {t("statusDueToday")}
                         </Badge>
                       ) : item.status === "OVERDUE" ? (
                         <Badge variant="danger" className="text-[10px] font-bold">
-                          ⚠️ OVERDUE
+                          {t("statusOverdue")}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-[10px] font-bold text-blue-700 border-blue-300">
-                          ⌛ UPCOMING
+                          {t("statusUpcoming")}
                         </Badge>
                       )}
                     </td>
@@ -215,7 +219,7 @@ export default function BuyerDueDatesPage() {
                           onClick={() => handleOpenLedger(item)}
                           className="text-xs bg-slate-50 hover:bg-slate-100"
                         >
-                          <FileText className="w-3.5 h-3.5 mr-1 text-blue-600" /> Settle / Ledger
+                          <FileText className="w-3.5 h-3.5 me-1 text-blue-600" /> {t("settleLedger")}
                         </Button>
                       ) : (
                         <span className="text-slate-400 text-[11px]">Walk-in</span>

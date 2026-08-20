@@ -7,12 +7,16 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
-import { Plus, Edit, Trash2, FileText, Search, Download, MapPin, X } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Search, Download, MapPin, X, Users } from "lucide-react";
 import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { generatePartiesPDF } from "@/lib/pdfExport";
+import { useTranslations } from "next-intl";
 
 export default function BuyersPage() {
+  const t = useTranslations("buyers");
+  const tc = useTranslations("common");
+
   const searchParams = useSearchParams();
   const initialFilter = searchParams.get("filter");
 
@@ -100,249 +104,252 @@ export default function BuyersPage() {
       companyName: b.companyName,
       contactNumber: b.contactNumber,
       address: b.address,
-      outstandingAmount: Number(b.totalOutstanding || 0),
-      isActive: b.isActive,
+      outstandingAmount: Number(b.totalOutstanding) || 0,
     }));
 
     generatePartiesPDF({
       partyType: "Customers",
       areaQuery: areaSearch,
-      filterType,
+      filterType: filterType,
       items,
       totalOutstanding: totalOutstandingSum,
+      storeName: "FATIMA TRADERS",
     });
   };
 
-  const handleDownloadCSV = () => {
+  const handleExportCSV = () => {
     if (filteredBuyers.length === 0) {
       alert("No customers to export.");
       return;
     }
 
-    const headers = ["#", "Customer Name", "Company / Firm", "Contact Number", "Address / Area", "Outstanding Due (PKR)", "Status"];
-    const rows = filteredBuyers.map((b, index) => [
-      index + 1,
-      `"${(b.name || "").replace(/"/g, '""')}"`,
-      `"${(b.companyName || "").replace(/"/g, '""')}"`,
-      `"${(b.contactNumber || "").replace(/"/g, '""')}"`,
+    const headers = ["Customer Name", "Company / Shop", "Contact Phone", "City / Address", "Outstanding Balance (PKR)"];
+    const rows = filteredBuyers.map((b) => [
+      `"${b.name || ""}"`,
+      `"${b.companyName || ""}"`,
+      `"${b.contactNumber || ""}"`,
       `"${(b.address || "").replace(/"/g, '""')}"`,
-      Number(b.totalOutstanding || 0),
-      b.isActive !== false ? "Active" : "Inactive",
+      b.totalOutstanding || 0,
     ]);
-
-    rows.push(["", '"TOTAL"', "", "", "", totalOutstandingSum, `"${filteredBuyers.length} Customers"`]);
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
-    const sanitizedArea = areaSearch.trim() ? `_${areaSearch.trim().replace(/[^a-zA-Z0-9_-]/g, "_")}` : "";
-    link.download = `Customers_List${sanitizedArea}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Fatima_Traders_Customers_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-8 pt-6 space-y-4">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Buyers & Customer Accounts</h1>
-          <p className="text-slate-500 text-sm">Manage customers, view chronological financial ledgers, and settle outstanding receivables.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+            <Users className="w-7 h-7 text-blue-600" /> {t("title")}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={handleDownloadCSV}
             variant="outline"
-            disabled={filteredBuyers.length === 0}
-            className="bg-white hover:bg-slate-50 border-slate-300 text-slate-800 font-semibold shadow-xs gap-1.5"
-            title="Download CSV / Excel spreadsheet of the filtered customers list"
+            size="sm"
+            onClick={handleExportCSV}
+            className="text-xs font-semibold gap-1.5 bg-white shadow-2xs"
           >
-            <Download className="h-4 w-4 text-blue-600" />
-            Export Excel (CSV)
+            <Download className="w-3.5 h-3.5 text-emerald-600" /> {t("exportCsv")}
           </Button>
           <Button
+            variant="outline"
+            size="sm"
             onClick={handleDownloadPDF}
-            variant="outline"
-            disabled={filteredBuyers.length === 0}
-            className="bg-white hover:bg-slate-50 border-slate-300 text-slate-800 font-semibold shadow-xs gap-1.5"
-            title="Download PDF report of the filtered customers list"
+            className="text-xs font-semibold gap-1.5 bg-white shadow-2xs"
           >
-            <Download className="h-4 w-4 text-rose-600" />
-            Download PDF
-            {areaSearch.trim() ? ` (${filteredBuyers.length})` : ""}
+            <Download className="w-3.5 h-3.5 text-blue-600" /> {t("downloadPdf")}
           </Button>
-          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
-            <Plus className="mr-2 h-4 w-4" /> Add New Customer
+          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-sm">
+            <Plus className="w-4 h-4" /> {t("addBuyer")}
           </Button>
         </div>
       </div>
 
-      {/* KPI Receivables Summary Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-emerald-800 uppercase block">
-              {areaSearch.trim() ? `Outstanding in "${areaSearch.trim()}"` : "Total Outstanding Receivables"}
-            </span>
-            <span className="text-2xl font-bold text-emerald-700">{formatCurrency(totalOutstandingSum)}</span>
-          </div>
-          <Badge variant="success" className="text-xs font-bold py-1 px-3">
-            {debtorsCount} Debtors Outstanding
-          </Badge>
+      {/* Filter Tabs & Search & Area Filter */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        {/* Toggle Pills: All vs Outstanding */}
+        <div className="md:col-span-3 flex gap-1.5 p-1 bg-slate-200/70 rounded-xl">
+          <button
+            onClick={() => setFilterType("ALL")}
+            className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all ${
+              filterType === "ALL"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {t("allBuyers")} ({buyers.length})
+          </button>
+          <button
+            onClick={() => setFilterType("OUTSTANDING")}
+            className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all ${
+              filterType === "OUTSTANDING"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {t("debtorsOnly")} ({buyers.filter((b) => Number(b.totalOutstanding) > 0).length})
+          </button>
         </div>
 
-        {/* Search & Area Filter Controls */}
-        <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col gap-2.5">
-          <div className="flex items-center gap-1.5">
+        {/* Customer Search Bar */}
+        <div className="md:col-span-5 relative">
+          <Search className="absolute start-3.5 top-3 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder={t("searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="ps-10 pe-9 text-xs bg-white border-slate-200 shadow-xs h-10 rounded-xl"
+          />
+          {search && (
             <button
-              onClick={() => setFilterType("ALL")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                filterType === "ALL"
-                  ? "bg-slate-900 text-white shadow-xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              onClick={() => setSearch("")}
+              className="absolute end-3 top-3 text-slate-400 hover:text-slate-600"
             >
-              All ({buyers.length})
+              <X className="w-4 h-4" />
             </button>
+          )}
+        </div>
+
+        {/* Area / Address Search Filter */}
+        <div className="md:col-span-4 relative">
+          <MapPin className="absolute start-3.5 top-3 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder={t("areaFilterPlaceholder")}
+            value={areaSearch}
+            onChange={(e) => setAreaSearch(e.target.value)}
+            className="ps-10 pe-9 text-xs bg-white border-slate-200 shadow-xs h-10 rounded-xl"
+          />
+          {areaSearch && (
             <button
-              onClick={() => setFilterType("OUTSTANDING")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                filterType === "OUTSTANDING"
-                  ? "bg-rose-600 text-white shadow-xs"
-                  : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
-              }`}
+              onClick={() => setAreaSearch("")}
+              className="absolute end-3 top-3 text-slate-400 hover:text-slate-600"
             >
-              ⚠️ Outstanding Debtors Only
+              <X className="w-4 h-4" />
             </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* Area Search Bar */}
-            <div className="relative">
-              <MapPin className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-500" />
-              <Input
-                placeholder="Search by Area / Address (e.g. Gulberg, Saddar)..."
-                value={areaSearch}
-                onChange={(e) => setAreaSearch(e.target.value)}
-                className="pl-8 pr-7 text-xs py-1 h-8 bg-blue-50/40 border-blue-200 focus:bg-white"
-              />
-              {areaSearch && (
-                <button
-                  onClick={() => setAreaSearch("")}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* General Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                placeholder="Search by name, company, or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 pr-7 text-xs py-1 h-8"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Customer List Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-xs text-left">
-          <thead className="bg-slate-50 border-b text-slate-600 font-semibold uppercase">
-            <tr>
-              <th className="p-3.5">Customer Name</th>
-              <th className="p-3.5">Company / Firm</th>
-              <th className="p-3.5">Contact Number</th>
-              <th className="p-3.5">Address</th>
-              <th className="p-3.5 text-right">Outstanding (PKR)</th>
-              <th className="p-3.5 text-center">Status</th>
-              <th className="p-3.5 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 font-medium">
-            {isLoading ? (
-              <TableLoader colSpan={7} text="Loading buyers list..." />
-            ) : filteredBuyers.length === 0 ? (
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-semibold">{t("totalReceivables")}:</span>
+          <span className="text-base font-extrabold font-mono text-rose-600">
+            {formatCurrency(totalOutstandingSum)}
+          </span>
+        </div>
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-semibold">{t("activeDebtors")}:</span>
+          <span className="text-base font-extrabold font-mono text-slate-900">
+            {debtorsCount} {t("allBuyers")}
+          </span>
+        </div>
+      </div>
+
+      {/* Buyers Data Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="relative w-full overflow-auto">
+          <table className="w-full caption-bottom text-xs text-left">
+            <thead className="bg-slate-50/80 text-slate-600 border-b font-bold uppercase">
               <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-400">
-                  {areaSearch
-                    ? `No customers found in area "${areaSearch}"`
-                    : search
-                    ? `No customers found matching "${search}"`
-                    : filterType === "OUTSTANDING"
-                    ? "🎉 No customers currently have outstanding debt!"
-                    : "No buyers found."}
-                </td>
+                <th className="h-11 px-4">{t("colName")}</th>
+                <th className="h-11 px-4">{t("colCompany")}</th>
+                <th className="h-11 px-4">{t("colContact")}</th>
+                <th className="h-11 px-4">{t("colAddress")}</th>
+                <th className="h-11 px-4 text-right">{t("colOutstanding")}</th>
+                <th className="h-11 px-4">{t("colStatus")}</th>
+                <th className="h-11 px-4 text-right">{t("colActions")}</th>
               </tr>
-            ) : (
-              filteredBuyers.map((buyer) => (
-                <tr key={buyer.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3.5 font-bold text-slate-900">{buyer.name}</td>
-                  <td className="p-3.5 text-slate-600">{buyer.companyName || "-"}</td>
-                  <td className="p-3.5 text-slate-600 font-mono">{buyer.contactNumber || "-"}</td>
-                  <td className="p-3.5 text-slate-600 truncate max-w-[180px]">{buyer.address || "-"}</td>
-                  <td
-                    className={`p-3.5 text-right font-mono font-bold text-sm ${
-                      buyer.totalOutstanding > 0 ? "text-rose-600" : "text-emerald-700"
-                    }`}
-                  >
-                    {formatCurrency(buyer.totalOutstanding)}
-                  </td>
-                  <td className="p-3.5 text-center">
-                    <Badge variant={buyer.isActive ? "success" : "muted"}>
-                      {buyer.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <div className="flex justify-end space-x-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleLedger(buyer)}
-                        className="text-xs bg-slate-50 hover:bg-slate-100"
-                        title="View Ledger & Settle"
-                      >
-                        <FileText className="h-3.5 w-3.5 mr-1 text-blue-600" /> Ledger / Settle
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(buyer)} title="Edit Buyer">
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="danger" size="sm" onClick={() => handleDelete(buyer.id)} title="Delete Buyer">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {isLoading ? (
+                <TableLoader colSpan={7} text="Loading customers..." />
+              ) : filteredBuyers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-slate-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    {search || areaSearch || filterType === "OUTSTANDING"
+                      ? t("noBuyers")
+                      : "No customers registered in the system yet."}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredBuyers.map((buyer) => {
+                  const outstanding = Number(buyer.totalOutstanding || 0);
+
+                  return (
+                    <tr key={buyer.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="p-4 font-bold text-slate-900">{buyer.name}</td>
+                      <td className="p-4 text-slate-600">{buyer.companyName || "-"}</td>
+                      <td className="p-4 font-mono text-slate-600">{buyer.contactNumber || "-"}</td>
+                      <td className="p-4 text-slate-500 max-w-xs truncate">{buyer.address || "-"}</td>
+                      <td className="p-4 text-right font-extrabold font-mono text-sm">
+                        {outstanding > 0 ? (
+                          <span className="text-rose-600">{formatCurrency(outstanding)}</span>
+                        ) : (
+                          <span className="text-emerald-600">Rs. 0</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <Badge variant={buyer.isActive ? "success" : "outline"}>
+                          {buyer.isActive ? tc("active") : tc("inactive")}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleLedger(buyer)}
+                            className="h-7 text-xs font-semibold border-blue-200 text-blue-700 hover:bg-blue-50"
+                          >
+                            <FileText className="h-3.5 w-3.5 me-1" /> {t("viewLedger")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(buyer)}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"
+                            onClick={() => handleDelete(buyer.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {isFormOpen && (
-        <BuyerFormModal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSuccess={fetchBuyers}
-          buyer={selectedBuyer}
-        />
-      )}
+      {/* Modals */}
+      <BuyerFormModal
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSuccess={fetchBuyers}
+        buyer={selectedBuyer}
+      />
 
       {isLedgerOpen && selectedBuyer && (
         <BuyerLedgerModal
