@@ -17,7 +17,7 @@ export async function GET() {
         salesReturns: {
           where: { 
             isDeleted: false,
-            refundMethod: { in: ["ADJUSTMENT", "BUYER_CREDIT"] },
+            refundMethod: "ADJUSTMENT",
           },
           select: { totalRefund: true },
         },
@@ -25,28 +25,28 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    const formattedBuyers = buyers.map((buyer) => {
+    const formattedBuyers = buyers.map((buyer: any) => {
       // 1. Total Invoiced Sales (Debit)
       const totalSales = (buyer.sales || []).reduce(
-        (sum, sale) => sum + Number(sale.grandTotal || sale.subtotal || 0),
+        (sum: number, sale: any) => sum + Number(sale.grandTotal || sale.subtotal || 0),
         0
       );
 
       // 2. Total Initial Paid at POS Checkout (Credit)
       const totalPaidAtCheckout = (buyer.sales || []).reduce(
-        (sum, sale) => sum + Number(sale.amountPaid || 0),
+        (sum: number, sale: any) => sum + Number(sale.amountPaid || 0),
         0
       );
 
       // 3. Total Subsequent Ledger Payments (Credit)
       const totalSubsequentPayments = (buyer.buyerPayments || []).reduce(
-        (sum, payment) => sum + Number(payment.amount || 0),
+        (sum: number, payment: any) => sum + Number(payment.amount || 0),
         0
       );
 
       // 4. Total Sales Returns Adjusted in Pending Credit (Credit)
       const totalAdjustedReturns = (buyer.salesReturns || []).reduce(
-        (sum, ret) => sum + Number(ret.totalRefund || 0),
+        (sum: number, ret: any) => sum + Number(ret.totalRefund || 0),
         0
       );
 

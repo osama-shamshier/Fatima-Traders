@@ -42,7 +42,7 @@ export async function GET(
       where: { 
         buyerId: id, 
         isDeleted: false,
-        refundMethod: { in: ["ADJUSTMENT", "BUYER_CREDIT"] }
+        refundMethod: "ADJUSTMENT",
       },
       select: {
         id: true,
@@ -58,7 +58,7 @@ export async function GET(
     const ledger: any[] = [];
 
     // Format Sales & initial checkout payments
-    sales.forEach(sale => {
+    sales.forEach((sale: any) => {
       // 1. Invoiced Sale (Debit)
       ledger.push({
         id: `sale-${sale.id}`,
@@ -86,7 +86,7 @@ export async function GET(
     });
 
     // Format Subsequent Ledger Payments (Credit)
-    payments.forEach(payment => {
+    payments.forEach((payment: any) => {
       ledger.push({
         id: `pay-${payment.id}`,
         date: payment.paymentDate,
@@ -99,7 +99,7 @@ export async function GET(
     });
 
     // Format Adjusted Returns (Credit)
-    returns.forEach(ret => {
+    returns.forEach((ret: any) => {
       ledger.push({
         id: `ret-${ret.id}`,
         date: ret.returnDate,
