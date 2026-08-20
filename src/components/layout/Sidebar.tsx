@@ -45,7 +45,7 @@ interface SidebarProps {
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   isCollapsed: boolean;
-  setIsCollapsed: (collapsed: boolean) => void;
+  setIsCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const navSections = [
@@ -313,13 +313,13 @@ export function Sidebar({
       {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed top-0 start-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-transform duration-300 ease-in-out shadow-2xl",
-          // Mobile state:
-          isMobileOpen 
-            ? "translate-x-0" 
-            : "ltr:-translate-x-full rtl:translate-x-full md:translate-x-0",
-          // Desktop collapsed state:
-          isCollapsed && "md:ltr:-translate-x-full md:rtl:translate-x-full"
+          "fixed top-0 z-50 flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-slate-300 transition-all duration-300 ease-in-out shadow-2xl",
+          // Default state: Hidden on mobile (-start-64), Visible on desktop (md:start-0)
+          "-start-64 md:start-0",
+          // Mobile open:
+          isMobileOpen && "start-0",
+          // Desktop collapsed:
+          isCollapsed && "md:-start-64"
         )}
       >
         {/* Logo & Close/Collapse area */}
@@ -335,7 +335,7 @@ export function Sidebar({
           <div className="flex items-center gap-1">
             {/* Desktop Collapse Trigger */}
             <button 
-              onClick={() => setIsCollapsed(!isCollapsed)} 
+              onClick={() => setIsCollapsed((prev) => !prev)} 
               className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title={t("toggleSidebar")}
             >
