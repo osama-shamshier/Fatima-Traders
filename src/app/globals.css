@@ -66,6 +66,24 @@
     font-family: "Jameel Noori Nastaleeq", "Jameel Noori Nastaleeq Regular", "Noto Nastaliq Urdu", "Segoe UI", Tahoma, sans-serif;
   }
 
+  html[dir="rtl"],
+  html[lang="ur"] {
+    direction: rtl;
+    text-align: right;
+  }
+
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3,
+  html[dir="rtl"] h4,
+  html[dir="rtl"] h5,
+  html[dir="rtl"] h6,
+  html[dir="rtl"] p,
+  html[dir="rtl"] label,
+  html[dir="rtl"] .text-left {
+    text-align: right !important;
+  }
+
   /* Specific Larger Font for Urdu Sidebar Navigation ONLY */
   html[lang="ur"] aside nav a,
   html[lang="ur"] aside nav button,

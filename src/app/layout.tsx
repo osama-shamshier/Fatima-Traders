@@ -16,10 +16,11 @@ export default async function RootLayout({
 }) {
   const locale = (await getLocale()) as Locale;
   const messages = await getMessages();
+  const dir = locale === "ur" ? "rtl" : "ltr";
 
   return (
-    <html lang={locale} dir="ltr">
-      <body>
+    <html lang={locale} dir={dir}>
+      <body className={locale === "ur" ? "font-urdu" : ""}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
