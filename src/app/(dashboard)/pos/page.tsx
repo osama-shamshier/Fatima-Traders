@@ -2,32 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import {
-  Search,
-  ShoppingCart,
-  Trash2,
-  Plus,
-  CreditCard,
-  Store,
-  AlertCircle,
-  RefreshCw,
-  X,
-  Wifi,
-  WifiOff,
-  Database,
-  Cloud,
-} from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, CreditCard, Store, AlertCircle, RefreshCw, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { POSCheckoutModal } from "./components/POSCheckoutModal";
 import { ReceiptModal } from "./components/ReceiptModal";
-import { OfflineSyncModal } from "@/components/pos/OfflineSyncModal";
 import { CustomerSearchSelect } from "@/components/pos/CustomerSearchSelect";
 import { useTranslations } from "next-intl";
-import { useOfflineSync, saveOfflineSale } from "@/lib/offlineSync";
-import { offlineDb } from "@/lib/offlineDb";
 
 interface Product {
   id: string;
@@ -59,33 +42,19 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<number>(0);
-
+  
   // Custom quantity & item discount modal state
   const [selectedProductForQty, setSelectedProductForQty] = useState<Product | null>(null);
   const [inputQty, setInputQty] = useState<string>("1");
   const [inputItemDiscount, setInputItemDiscount] = useState<string>("0");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Checkout, Receipt & Sync Modals
+  // Checkout & Receipt Modals
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<any>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Offline Hook
-  const {
-    isOnline,
-    isSyncing,
-    pendingCount,
-    failedCount,
-    outboxItems,
-    triggerSync,
-    clearSyncedSales,
-    refreshCounts,
-    cacheCatalog,
-  } = useOfflineSync(selectedBranchId);
 
   useEffect(() => {
     fetchInitialData();
@@ -93,7 +62,7 @@ export default function POSPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [selectedBranchId, selectedCategoryId, search, isOnline]);
+  }, [selectedBranchId, selectedCategoryId, search]);
 
   const fetchInitialData = async () => {
     try {
@@ -106,30 +75,12 @@ export default function POSPage() {
       if (branchesRes.ok) {
         const bData = await branchesRes.json();
         setBranches(bData);
-        if (bData.length > 0 && !selectedBranchId) setSelectedBranchId(bData[0].id);
+        if (bData.length > 0) setSelectedBranchId(bData[0].id);
       }
       if (categoriesRes.ok) setCategories(await categoriesRes.json());
       if (buyersRes.ok) setBuyers(await buyersRes.json());
     } catch (error) {
-      console.warn("Offline fallback for initial POS data:", error);
-      // Offline fallback from IndexedDB
-      if (offlineDb) {
-        try {
-          const [cachedBranches, cachedBuyers] = await Promise.all([
-            offlineDb.branches.toArray(),
-            offlineDb.buyers.toArray(),
-          ]);
-          if (cachedBranches.length > 0) {
-            setBranches(cachedBranches);
-            if (!selectedBranchId) setSelectedBranchId(cachedBranches[0].id);
-          }
-          if (cachedBuyers.length > 0) {
-            setBuyers(cachedBuyers);
-          }
-        } catch (dbErr) {
-          console.error("Failed to read from offlineDb:", dbErr);
-        }
-      }
+      console.error("Failed to fetch POS initial data", error);
     }
   };
 
@@ -144,45 +95,9 @@ export default function POSPage() {
       if (res.ok) {
         const data = await res.json();
         setProducts(data);
-        return;
       }
     } catch (error) {
-      console.warn("Failed to fetch online POS products, loading from local cache", error);
-    }
-
-    // Offline fallback from IndexedDB
-    if (offlineDb) {
-      try {
-        let cached = await offlineDb.products.toArray();
-        if (selectedBranchId) {
-          cached = cached.filter((p: any) => !p.branchId || p.branchId === selectedBranchId);
-        }
-        if (selectedCategoryId) {
-          cached = cached.filter((p: any) => p.categoryId === selectedCategoryId);
-        }
-        if (search) {
-          const q = search.toLowerCase().trim();
-          cached = cached.filter(
-            (p: any) =>
-              p.name.toLowerCase().includes(q) ||
-              p.sku.toLowerCase().includes(q)
-          );
-        }
-
-        setProducts(
-          cached.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku,
-            sellingPrice: p.sellingPrice,
-            availableStock: p.stock,
-            unit: p.unit,
-            category: p.category,
-          }))
-        );
-      } catch (dbErr) {
-        console.error("IndexedDB product lookup error:", dbErr);
-      }
+      console.error("Failed to fetch POS products", error);
     }
   };
 
@@ -193,106 +108,105 @@ export default function POSPage() {
       setErrorMessage(`⚠️ "${product.name}" ${t("outOfStock")}!`);
       return;
     }
-
-    const existingInCart = cart.find((item) => item.id === product.id);
-    const currentQtyInCart = existingInCart ? existingInCart.cartQuantity : 0;
-
     setSelectedProductForQty(product);
-    setInputQty(currentQtyInCart > 0 ? currentQtyInCart.toString() : "1");
-    setInputItemDiscount(existingInCart ? existingInCart.itemDiscount.toString() : "0");
+    setInputQty("1");
+    setInputItemDiscount("0");
   };
 
-  const handleConfirmQtyAndDiscount = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddWithQty = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!selectedProductForQty) return;
 
-    const qty = parseFloat(inputQty);
-    const discount = parseFloat(inputItemDiscount) || 0;
+    const qty = Number(inputQty);
+    const available = Number(selectedProductForQty.availableStock || 0);
+    const itemDisc = Math.max(0, Number(inputItemDiscount || 0));
 
     if (isNaN(qty) || qty <= 0) {
-      setErrorMessage(t("invalidQty"));
+      alert("Please enter a valid positive quantity");
       return;
     }
 
-    const available = Number(selectedProductForQty.availableStock || 0);
-    if (qty > available) {
-      setErrorMessage(`⚠️ ${t("requestedExceedsStock", { qty, available })}`);
+    const existingIndex = cart.findIndex((item) => item.id === selectedProductForQty.id);
+    const currentInCart = existingIndex > -1 ? cart[existingIndex].cartQuantity : 0;
+    const newTotal = currentInCart + qty;
+
+    if (newTotal > available) {
+      setErrorMessage(
+        `❌ Cannot add ${qty} units. Only ${available} units available in stock (${currentInCart} already in cart).`
+      );
+      setSelectedProductForQty(null);
       return;
     }
 
-    setCart((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === selectedProductForQty.id);
-      if (existingIndex > -1) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
+    if (existingIndex > -1) {
+      const updated = [...cart];
+      updated[existingIndex].cartQuantity = newTotal;
+      updated[existingIndex].itemDiscount = (updated[existingIndex].itemDiscount || 0) + itemDisc;
+      setCart(updated);
+    } else {
+      setCart([
+        ...cart,
+        {
+          ...selectedProductForQty,
           cartQuantity: qty,
-          itemDiscount: discount,
-        };
-        return updated;
-      } else {
-        return [
-          ...prev,
-          {
-            ...selectedProductForQty,
-            cartQuantity: qty,
-            itemDiscount: discount,
-          },
-        ];
-      }
-    });
+          itemDiscount: itemDisc,
+        },
+      ]);
+    }
 
     setSelectedProductForQty(null);
     setInputQty("1");
     setInputItemDiscount("0");
-    setErrorMessage(null);
-    searchInputRef.current?.focus();
   };
 
-  const updateCartItemQty = (productId: string, newQty: number) => {
-    setErrorMessage(null);
+  const updateCartQuantity = (productId: string, newQty: number) => {
     const product = products.find((p) => p.id === productId);
-    if (!product) return;
+    const available = product ? Number(product.availableStock || 0) : 999999;
+
+    if (newQty > available) {
+      setErrorMessage(`❌ Cannot exceed available stock of ${available} units.`);
+      return;
+    }
 
     if (newQty <= 0) {
       removeFromCart(productId);
       return;
     }
 
-    if (newQty > Number(product.availableStock || 0)) {
-      setErrorMessage(`⚠️ ${t("onlyStockAvailable", { stock: product.availableStock, name: product.name })}`);
-      return;
-    }
+    setCart(
+      cart.map((item) =>
+        item.id === productId ? { ...item, cartQuantity: newQty } : item
+      )
+    );
+  };
 
-    setCart((prev) =>
-      prev.map((item) => (item.id === productId ? { ...item, cartQuantity: newQty } : item))
+  const updateCartItemDiscount = (productId: string, discountAmount: number) => {
+    setCart(
+      cart.map((item) =>
+        item.id === productId
+          ? { ...item, itemDiscount: Math.max(0, discountAmount || 0) }
+          : item
+      )
     );
   };
 
   const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== productId));
+    setCart(cart.filter((item) => item.id !== productId));
   };
 
-  const clearCart = () => {
-    setCart([]);
-    setGlobalDiscount(0);
-    setRoundOff(0);
-    setErrorMessage(null);
-    searchInputRef.current?.focus();
-  };
-
-  // Cart Calculations
+  // Financial Calculations
   const itemsGrossTotal = cart.reduce(
-    (sum, item) => sum + item.sellingPrice * item.cartQuantity,
+    (sum, item) => sum + Number(item.sellingPrice) * Number(item.cartQuantity),
     0
   );
+
   const itemsDiscountTotal = cart.reduce(
-    (sum, item) => sum + (item.itemDiscount || 0),
+    (sum, item) => sum + Number(item.itemDiscount || 0),
     0
   );
+
   const subtotal = Math.max(0, itemsGrossTotal - itemsDiscountTotal);
-  const rawTotal = Math.max(0, subtotal - globalDiscount);
-  const grandTotal = Math.max(0, rawTotal + roundOff);
+  const grandTotal = Math.max(0, subtotal - globalDiscount + roundOff);
 
   const handleCheckoutSubmit = async (
     amountPaid: number,
@@ -304,44 +218,25 @@ export default function POSPage() {
   ) => {
     if (cart.length === 0) return;
 
-    const payload = {
-      buyerId: selectedBuyerId || undefined,
-      branchId: selectedBranchId,
-      discount: globalDiscount,
-      roundOff: appliedRoundOff || roundOff,
-      items: cart.map((item) => ({
-        productId: item.id,
-        quantity: item.cartQuantity,
-        sellingPrice: item.sellingPrice,
-        discount: item.itemDiscount || 0,
-      })),
-      amountPaid,
-      paymentMethod,
-      bankName,
-      bankReference,
-      dueDate,
-    };
-
-    // If offline, save directly to IndexedDB outbox
-    if (!isOnline) {
-      try {
-        const { receiptSaleData } = await saveOfflineSale(payload as any);
-        setCompletedSale(receiptSaleData);
-        setIsCheckoutOpen(false);
-        setIsReceiptOpen(true);
-        setCart([]);
-        setGlobalDiscount(0);
-        setRoundOff(0);
-        await refreshCounts();
-        await fetchProducts();
-        return;
-      } catch (offlineErr: any) {
-        alert(`Offline checkout error: ${offlineErr.message}`);
-        return;
-      }
-    }
-
     try {
+      const payload = {
+        buyerId: selectedBuyerId || undefined,
+        branchId: selectedBranchId,
+        discount: globalDiscount,
+        roundOff: appliedRoundOff || roundOff,
+        items: cart.map((item) => ({
+          productId: item.id,
+          quantity: item.cartQuantity,
+          sellingPrice: item.sellingPrice,
+          discount: item.itemDiscount || 0,
+        })),
+        amountPaid,
+        paymentMethod,
+        bankName,
+        bankReference,
+        dueDate,
+      };
+
       const res = await fetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -356,41 +251,28 @@ export default function POSPage() {
         setCart([]);
         setGlobalDiscount(0);
         setRoundOff(0);
-        fetchProducts();
+        fetchProducts(); // Instant stock refresh!
       } else {
         const err = await res.json();
         alert(`Checkout failed: ${err.error || "Server error"}`);
       }
-    } catch (networkError) {
-      console.warn("Network error during checkout, falling back to Offline Mode:", networkError);
-      try {
-        const { receiptSaleData } = await saveOfflineSale(payload as any);
-        setCompletedSale(receiptSaleData);
-        setIsCheckoutOpen(false);
-        setIsReceiptOpen(true);
-        setCart([]);
-        setGlobalDiscount(0);
-        setRoundOff(0);
-        await refreshCounts();
-        await fetchProducts();
-      } catch (fallbackErr: any) {
-        console.error("Offline fallback failed:", fallbackErr);
-        alert("Checkout failed. Please check your device connection.");
-      }
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      alert("Checkout failed");
     }
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-5.5rem)] gap-3 bg-slate-50 p-2 sm:p-4 rounded-xl">
       {/* Top Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-xl shadow-xs border border-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-white rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-3">
           <Store className="w-5 h-5 text-blue-600" />
           <h1 className="text-base font-bold text-slate-900">{t("title")}</h1>
           <select
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="input text-xs py-1 px-2.5 bg-slate-50 border-slate-200 font-semibold rounded-lg"
+            className="input text-xs py-1 px-2.5 bg-slate-50 border-slate-200 font-semibold"
           >
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -400,47 +282,15 @@ export default function POSPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Sync Status Badge / Button */}
-          <button
-            onClick={() => setIsSyncModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border ${
-              isOnline
-                ? pendingCount > 0
-                  ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
-                  : "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                : "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 animate-pulse"
-            }`}
-            title="Click to open Offline Sync Manager"
-          >
-            {isOnline ? (
-              pendingCount > 0 ? (
-                <>
-                  <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isSyncing ? "animate-spin" : ""}`} />
-                  <span>{isSyncing ? "Syncing..." : `${pendingCount} Pending Sync`}</span>
-                </>
-              ) : (
-                <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Cloud Connected</span>
-                </>
-              )
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-white" />
-                <span>Offline Mode ({pendingCount} Queued)</span>
-              </>
-            )}
-          </button>
-
+        <div className="flex items-center gap-3">
           <CustomerSearchSelect
             buyers={buyers}
             selectedBuyerId={selectedBuyerId}
             onSelectBuyer={setSelectedBuyerId}
           />
 
-          <Button variant="outline" size="sm" onClick={fetchProducts} className="h-8 text-xs bg-white">
-            <RefreshCw className="w-3.5 h-3.5 mr-1 text-slate-500" /> Refresh Stock
+          <Button variant="outline" size="sm" onClick={fetchProducts} className="h-8 text-xs">
+            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh Stock
           </Button>
         </div>
       </div>
@@ -461,7 +311,7 @@ export default function POSPage() {
       {/* Main Content: Left Catalog + Right Cart */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0">
         {/* Left Side: Product Catalog (7/12 width) */}
-        <div className="lg:col-span-7 flex flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden min-h-0">
+        <div className="lg:col-span-7 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
           {/* Search & Category Tabs */}
           <div className="p-3 border-b border-slate-100 space-y-2">
             <div className="relative">
@@ -503,212 +353,250 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid */}
-          <div className="flex-1 p-3 overflow-y-auto min-h-0">
-            {products.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                <ShoppingCart className="w-12 h-12 mb-2 stroke-[1.5]" />
-                <p className="text-sm font-medium">{t("noProductsFound")}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+          {/* Product Catalog Table Form */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10">
+                <tr>
+                  <th className="p-3">{t("colProductName")}</th>
+                  <th className="p-3">{t("colSku")}</th>
+                  <th className="p-3 text-center">{t("colStock")}</th>
+                  <th className="p-3 text-right">{t("colPrice")}</th>
+                  <th className="p-3 text-right">{t("colAction")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {products.map((p) => {
-                  const isLowStock = Number(p.availableStock || 0) <= 0;
+                  const inCart = cart.find((item) => item.id === p.id);
+                  const isOutOfStock = Number(p.availableStock || 0) <= 0;
 
                   return (
-                    <button
+                    <tr
                       key={p.id}
-                      onClick={() => openQtyModal(p)}
-                      disabled={isLowStock}
-                      className={`flex flex-col text-left p-3 rounded-xl border transition-all text-xs relative ${
-                        isLowStock
-                          ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200"
-                          : "bg-white border-slate-200 hover:border-blue-500 hover:shadow-md cursor-pointer group"
+                      onClick={() => !isOutOfStock && openQtyModal(p)}
+                      className={`transition-colors cursor-pointer ${
+                        isOutOfStock
+                          ? "opacity-50 bg-slate-50 cursor-not-allowed"
+                          : "hover:bg-blue-50/60"
                       }`}
                     >
-                      <div className="flex justify-between items-start gap-1 w-full">
-                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 line-clamp-2">
-                          {p.name}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">{p.sku}</span>
-
-                      <div className="mt-auto pt-2 flex items-center justify-between w-full border-t border-slate-100">
-                        <span className="font-bold text-blue-700 font-mono">
-                          {formatCurrency(p.sellingPrice)}
-                        </span>
-                        <Badge
-                          variant={isLowStock ? "danger" : "outline"}
-                          className="text-[9px] px-1.5 py-0 h-4 font-mono"
+                      <td className="p-3 font-bold text-slate-900">
+                        {p.name}
+                        {p.category?.name && (
+                          <span className="text-[10px] text-slate-400 font-normal block">{p.category.name}</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-mono text-slate-500">{p.sku}</td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isOutOfStock
+                              ? "bg-rose-100 text-rose-700"
+                              : p.availableStock <= 5
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
                         >
                           {p.availableStock} {p.unit?.abbreviation || ""}
-                        </Badge>
-                      </div>
-                    </button>
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-extrabold font-mono text-blue-700 text-sm whitespace-nowrap">
+                        {formatCurrency(p.sellingPrice)}
+                      </td>
+                      <td className="p-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          disabled={isOutOfStock}
+                          onClick={() => openQtyModal(p)}
+                          className={`h-7 text-xs px-2.5 font-bold ${
+                            inCart
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-0"
+                          }`}
+                        >
+                          {inCart ? `${t("addToCart")} (${inCart.cartQuantity})` : t("addToCart")}
+                        </Button>
+                      </td>
+                    </tr>
                   );
                 })}
-              </div>
-            )}
+                {products.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-12 text-slate-400 text-xs">
+                      {t("noProductsFound")}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Right Side: Interactive Cart (5/12 width) */}
-        <div className="lg:col-span-5 flex flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden min-h-0">
-          <div className="p-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="lg:col-span-5 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
+          <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/70">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-blue-600" />
-              <h2 className="text-sm font-bold text-slate-900">{t("cartTitle")}</h2>
-              <Badge variant="outline" className="text-xs">
-                {cart.length} {t("items")}
-              </Badge>
+              <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
+                {t("cartTitle")} ({cart.length})
+              </h3>
             </div>
             {cart.length > 0 && (
               <button
-                onClick={clearCart}
-                className="text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1 font-semibold"
+                onClick={() => setCart([])}
+                className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold"
               >
-                <Trash2 className="w-3.5 h-3.5" /> {t("clearCart")}
+                {t("clearCart")}
               </button>
             )}
           </div>
 
-          {/* Cart Items List */}
-          <div className="flex-1 p-3 overflow-y-auto divide-y divide-slate-100 min-h-0">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                <ShoppingCart className="w-10 h-10 mb-2 stroke-[1.5]" />
-                <p className="text-xs font-medium">{t("cartEmpty")}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{t("clickToAdd")}</p>
-              </div>
-            ) : (
-              cart.map((item) => {
-                const lineTotal = item.sellingPrice * item.cartQuantity - item.itemDiscount;
+          {/* Cart Item List */}
+          <div className="flex-1 p-3 overflow-y-auto space-y-2 min-h-0">
+            {cart.map((item) => {
+              const lineGross = Number(item.sellingPrice) * Number(item.cartQuantity);
+              const lineNet = Math.max(0, lineGross - Number(item.itemDiscount || 0));
 
-                return (
-                  <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
+              return (
+                <div
+                  key={item.id}
+                  className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-slate-900 truncate">{item.name}</div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                        <span>{formatCurrency(item.sellingPrice)}</span>
-                        {item.itemDiscount > 0 && (
-                          <span className="text-rose-600 font-medium">
-                            -{formatCurrency(item.itemDiscount)} disc
-                          </span>
-                        )}
+                      <h5 className="text-xs font-bold text-slate-900 truncate">{item.name}</h5>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {formatCurrency(item.sellingPrice)} × {item.cartQuantity} {item.unit?.abbreviation || ""}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => updateCartItemQty(item.id, item.cartQuantity - 1)}
-                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center"
+                        type="button"
+                        onClick={() => updateCartQuantity(item.id, item.cartQuantity - 1)}
+                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold"
                       >
                         -
                       </button>
-                      <span className="w-8 text-center font-bold font-mono">
-                        {item.cartQuantity}
-                      </span>
+                      <input
+                        type="number"
+                        min="0.001"
+                        step="any"
+                        value={item.cartQuantity}
+                        onChange={(e) => updateCartQuantity(item.id, Number(e.target.value))}
+                        className="w-14 text-center text-xs font-bold border rounded py-0.5"
+                      />
                       <button
-                        onClick={() => updateCartItemQty(item.id, item.cartQuantity + 1)}
-                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center"
+                        type="button"
+                        onClick={() => updateCartQuantity(item.id, item.cartQuantity + 1)}
+                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold"
                       >
                         +
                       </button>
-                    </div>
 
-                    <div className="text-right shrink-0 min-w-[70px]">
-                      <div className="font-bold text-slate-900 font-mono">
-                        {formatCurrency(lineTotal)}
-                      </div>
                       <button
+                        type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="text-[10px] text-rose-500 hover:text-rose-700"
+                        className="w-6 h-6 rounded bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center text-xs ms-1"
                       >
-                        {t("remove")}
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                );
-              })
+
+                  {/* Discount Per Item & Net Line Total */}
+                  <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-rose-600 uppercase">{t("colDisc")}:</span>
+                      <div className="flex items-center">
+                        <span className="text-[10px] text-slate-400 me-0.5">Rs.</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.itemDiscount === 0 ? "" : item.itemDiscount}
+                          placeholder="0"
+                          onChange={(e) => updateCartItemDiscount(item.id, Number(e.target.value))}
+                          className="w-16 text-right text-xs font-bold font-mono border border-rose-200 bg-rose-50/50 rounded px-1.5 py-0.5 text-rose-700 focus:bg-white focus:border-rose-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      {Number(item.itemDiscount || 0) > 0 && (
+                        <span className="text-[10px] text-slate-400 line-through me-1.5 font-mono">
+                          {formatCurrency(lineGross)}
+                        </span>
+                      )}
+                      <span className="font-extrabold font-mono text-slate-900">
+                        {formatCurrency(lineNet)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {cart.length === 0 && (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
+                <ShoppingCart className="w-10 h-10 mb-2 opacity-30" />
+                <p className="text-xs font-medium">{t("emptyCartTitle")}</p>
+                <p className="text-[11px] text-slate-400">{t("emptyCartSub")}</p>
+              </div>
             )}
           </div>
 
-          {/* Cart Summary & Action */}
-          <div className="p-3 bg-slate-50/80 border-t border-slate-200 space-y-2">
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>{t("subtotal")}:</span>
-                <span className="font-mono font-semibold">{formatCurrency(subtotal)}</span>
+          {/* Cart Totals & Checkout Button */}
+          <div className="p-3.5 border-t border-slate-200 bg-slate-50/50 space-y-2">
+            <div className="flex justify-between text-xs text-slate-600 font-medium">
+              <span>{t("grossSubtotal")}:</span>
+              <span className="font-bold font-mono">{formatCurrency(itemsGrossTotal)}</span>
+            </div>
+
+            {itemsDiscountTotal > 0 && (
+              <div className="flex justify-between text-xs text-rose-600 font-medium">
+                <span>{t("itemDiscounts")} (-):</span>
+                <span className="font-bold font-mono">-{formatCurrency(itemsDiscountTotal)}</span>
               </div>
+            )}
 
-              {itemsDiscountTotal > 0 && (
-                <div className="flex justify-between text-rose-600">
-                  <span>{t("itemDiscounts")}:</span>
-                  <span className="font-mono font-semibold">-{formatCurrency(itemsDiscountTotal)}</span>
-                </div>
-              )}
+            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+              <span>{t("orderDiscount")} (-):</span>
+              <Input
+                type="number"
+                min="0"
+                value={globalDiscount === 0 ? "" : globalDiscount}
+                placeholder="0"
+                onChange={(e) => setGlobalDiscount(Math.max(0, Number(e.target.value)))}
+                className="w-24 text-right text-xs py-1 h-7 font-bold font-mono"
+              />
+            </div>
 
-              <div className="flex justify-between items-center text-slate-600">
-                <span>{t("orderDiscount")}:</span>
-                <div className="flex items-center gap-1 w-28">
-                  <span className="text-[11px] text-slate-400">Rs.</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={globalDiscount === 0 ? "" : globalDiscount}
-                    onChange={(e) => setGlobalDiscount(Math.max(0, Number(e.target.value)))}
-                    className="h-6 text-xs text-right font-mono py-0 px-1 bg-white"
-                  />
-                </div>
-              </div>
-
-              {roundOff !== 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Round Off:</span>
-                  <span className="font-mono font-semibold">
-                    {roundOff > 0 ? `+${formatCurrency(roundOff)}` : `-${formatCurrency(Math.abs(roundOff))}`}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center text-sm font-extrabold text-slate-900 pt-1.5 border-t border-slate-200">
-                <span>{t("grandTotal")}:</span>
-                <span className="text-base text-blue-700 font-mono font-black">
-                  {formatCurrency(grandTotal)}
-                </span>
-              </div>
+            <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
+              <span>{t("grandTotal")}:</span>
+              <span className="text-blue-700 font-mono font-extrabold">{formatCurrency(grandTotal)}</span>
             </div>
 
             <Button
-              onClick={() => setIsCheckoutOpen(true)}
               disabled={cart.length === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 text-sm shadow-md gap-2 mt-2"
+              onClick={() => setIsCheckoutOpen(true)}
+              className="w-full py-3 mt-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 uppercase tracking-wider"
             >
-              <CreditCard className="w-4 h-4" /> {t("checkout")} ({formatCurrency(grandTotal)})
+              <CreditCard className="w-4 h-4 me-2" /> {t("checkoutButton")} ({formatCurrency(grandTotal)})
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Quantity & Custom Discount Modal */}
+      {/* Quantity & Item Discount Entry Dialog */}
       {selectedProductForQty && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">{selectedProductForQty.name}</h3>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedProductForQty.sku}</p>
-              </div>
-              <button
-                onClick={() => setSelectedProductForQty(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="modal-overlay">
+          <div className="modal-content max-w-sm p-5 bg-white rounded-2xl shadow-2xl">
+            <h3 className="text-base font-bold text-slate-900 mb-1">{t("qtyModalTitle")}</h3>
+            <p className="text-xs text-slate-500 mb-3">
+              {selectedProductForQty.name} ({selectedProductForQty.sku})
+            </p>
 
-            <form onSubmit={handleConfirmQtyAndDiscount} className="space-y-3">
+            <form onSubmit={handleAddWithQty} className="space-y-3.5">
               <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex justify-between items-center text-xs">
                 <span className="text-slate-600 font-medium">{t("availableStockLabel")}:</span>
                 <span className="font-bold text-blue-700">
@@ -792,20 +680,6 @@ export default function POSPage() {
           sale={completedSale}
         />
       )}
-
-      {/* Offline Sync & Cache Manager Modal */}
-      <OfflineSyncModal
-        isOpen={isSyncModalOpen}
-        onClose={() => setIsSyncModalOpen(false)}
-        isOnline={isOnline}
-        isSyncing={isSyncing}
-        pendingCount={pendingCount}
-        failedCount={failedCount}
-        outboxItems={outboxItems}
-        onTriggerSync={triggerSync}
-        onClearSynced={clearSyncedSales}
-        onCacheCatalog={cacheCatalog}
-      />
     </div>
   );
 }

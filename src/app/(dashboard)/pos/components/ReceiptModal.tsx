@@ -43,13 +43,6 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
           </div>
 
           <div className="border-t border-b border-dashed py-2 space-y-1 text-slate-800">
-            {sale.isOffline && (
-              <div className="text-center pb-1">
-                <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2 py-0.5 rounded uppercase">
-                  ⚡ Offline Provisional Receipt
-                </span>
-              </div>
-            )}
             <div className="flex justify-between">
               <span>Invoice:</span>
               <span className="font-bold">{sale.invoiceNumber}</span>
