@@ -165,8 +165,8 @@ export async function POST(request: NextRequest) {
         });
 
         const grandTotal = Math.max(0, subtotal - Number(discount) + Number(roundOff));
-        const amountPaidNum = Number(amountPaid);
-        const outstandingAmount = grandTotal - amountPaidNum;
+        const amountPaidNum = Math.min(grandTotal, Math.max(0, Number(amountPaid)));
+        const outstandingAmount = Math.max(0, grandTotal - amountPaidNum);
 
         if (!buyerId && amountPaidNum < grandTotal) {
           throw new Error(

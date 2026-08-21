@@ -267,6 +267,7 @@ export function POSCheckoutModal({
           )}
 
           {/* Amount Paid & Quick Cash Pills */}
+          {/* Amount Paid & Quick Cash Pills */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("amountPaid")} *</Label>
@@ -278,28 +279,45 @@ export function POSCheckoutModal({
                 >
                   {t("exact")} ({formatCurrency(netPayable)})
                 </button>
-                {[500, 1000, 5000].map((note) => (
-                  <button
-                    key={note}
-                    type="button"
-                    onClick={() => setAmountPaid(note)}
-                    className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-semibold text-slate-700"
-                  >
-                    Rs. {note}
-                  </button>
-                ))}
+                {[500, 1000, 5000]
+                  .filter((note) => note <= netPayable)
+                  .map((note) => (
+                    <button
+                      key={note}
+                      type="button"
+                      onClick={() => setAmountPaid(Math.min(note, netPayable))}
+                      className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-semibold text-slate-700"
+                    >
+                      Rs. {note}
+                    </button>
+                  ))}
               </div>
             </div>
 
             <Input
               type="number"
               min="0"
+              max={netPayable}
               step="any"
               value={amountPaid === 0 ? "" : amountPaid}
-              onChange={(e) => setAmountPaid(Number(e.target.value))}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (isNaN(val) || val < 0) {
+                  setAmountPaid(0);
+                } else if (val > netPayable) {
+                  setAmountPaid(netPayable);
+                } else {
+                  setAmountPaid(val);
+                }
+              }}
               className="text-2xl font-black font-mono py-2 text-slate-900 bg-white"
               autoFocus
             />
+            {amountPaid > netPayable && (
+              <p className="text-xs text-amber-600 font-medium">
+                Paid amount cannot exceed total bill of {formatCurrency(netPayable)}
+              </p>
+            )}
           </div>
 
           {/* Walk-in Customer Blocking Alert */}
@@ -334,14 +352,6 @@ export function POSCheckoutModal({
                   className="text-xs mt-1 bg-white font-medium"
                 />
               </div>
-            </div>
-          )}
-
-          {/* Change to Return */}
-          {!isPartial && amountPaid > netPayable && (
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center">
-              <span className="text-xs font-bold text-emerald-900">{t("changeDue")}:</span>
-              <span className="text-xl font-black font-mono text-emerald-700">{formatCurrency(change)}</span>
             </div>
           )}
         </div>

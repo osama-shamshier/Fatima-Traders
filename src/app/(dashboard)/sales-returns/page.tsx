@@ -61,8 +61,8 @@ export default function SalesReturnsPage() {
       {/* Page Header */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <RotateCcw className="w-7 h-7 text-rose-600" /> {t("title")}
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <RotateCcw className="w-6 h-6 text-rose-600" /> {t("title")}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">{t("subtitle")}</p>
         </div>
