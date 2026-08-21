@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPakistanDayBounds, getPakistanPeriodBounds } from "@/lib/dateUtils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,12 +10,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const search = searchParams.get("search");
 
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    const { start: todayStart, end: todayEnd } = getPakistanDayBounds();
 
     const whereClause: any = {
       isDeleted: false,
@@ -38,38 +34,12 @@ export async function GET(request: NextRequest) {
       whereClause.dueDate = {
         lt: todayStart,
       };
-    } else if (period === "this_week") {
-      const weekStart = new Date(now);
-      const day = weekStart.getDay();
-      const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
-      weekStart.setDate(diff);
-      weekStart.setHours(0, 0, 0, 0);
-
-      const weekEnd = new Date(now);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      whereClause.dueDate = {
-        gte: weekStart,
-        lte: weekEnd,
-      };
-    } else if (period === "this_month") {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-      whereClause.dueDate = {
-        gte: monthStart,
-        lte: monthEnd,
-      };
-    } else if (period === "custom") {
-      if (startDate || endDate) {
+    } else if (period === "this_week" || period === "this_month" || period === "custom") {
+      const bounds = getPakistanPeriodBounds(period, startDate, endDate);
+      if (bounds.start || bounds.end) {
         whereClause.dueDate = {};
-        if (startDate) whereClause.dueDate.gte = new Date(startDate);
-        if (endDate) {
-          const e = new Date(endDate);
-          e.setHours(23, 59, 59, 999);
-          whereClause.dueDate.lte = e;
-        }
+        if (bounds.start) whereClause.dueDate.gte = bounds.start;
+        if (bounds.end) whereClause.dueDate.lte = bounds.end;
       }
     }
 

@@ -2,53 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { consumeInventoryFIFO } from "@/lib/fifo";
 import { generateInvoiceNumber } from "@/lib/utils";
+import { getPakistanPeriodBounds } from "@/lib/dateUtils";
 
 function getDateRange(period: string | null, startDate: string | null, endDate: string | null) {
-  const now = new Date();
+  if (!period && !startDate && !endDate) return null;
+  const bounds = getPakistanPeriodBounds(period || "custom", startDate, endDate);
+  if (!bounds.start && !bounds.end) return null;
 
-  if (period === "today") {
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
-    return { gte: start, lte: end };
-  }
-
-  if (period === "this_week") {
-    const start = new Date(now);
-    const day = start.getDay();
-    const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-    start.setDate(diff);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
-    return { gte: start, lte: end };
-  }
-
-  if (period === "this_month") {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    return { gte: start, lte: end };
-  }
-
-  if (period === "last_month") {
-    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-    return { gte: start, lte: end };
-  }
-
-  if (startDate || endDate) {
-    const range: any = {};
-    if (startDate) range.gte = new Date(startDate);
-    if (endDate) {
-      const e = new Date(endDate);
-      e.setHours(23, 59, 59, 999);
-      range.lte = e;
-    }
-    return range;
-  }
-
-  return null;
+  const range: any = {};
+  if (bounds.start) range.gte = bounds.start;
+  if (bounds.end) range.lte = bounds.end;
+  return range;
 }
 
 export async function GET(request: NextRequest) {

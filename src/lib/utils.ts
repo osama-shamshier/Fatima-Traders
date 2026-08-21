@@ -1,5 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { PKT_TIMEZONE, getPakistanDateString, getPakistanDayBounds, getPakistanPeriodBounds } from "./dateUtils";
+
+export { PKT_TIMEZONE, getPakistanDateString, getPakistanDayBounds, getPakistanPeriodBounds };
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -21,6 +24,7 @@ export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "-";
   try {
     return new Intl.DateTimeFormat("en-PK", {
+      timeZone: PKT_TIMEZONE,
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -34,11 +38,13 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return "-";
   try {
     return new Intl.DateTimeFormat("en-PK", {
+      timeZone: PKT_TIMEZONE,
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: true,
     }).format(new Date(date));
   } catch (e) {
     return "-";
@@ -46,10 +52,11 @@ export function formatDateTime(date: Date | string | null | undefined): string {
 }
 
 export function generateInvoiceNumber(): string {
-  const date = new Date();
+  const pktDateStr = getPakistanDateString(); // YYYY-MM-DD
+  const parts = pktDateStr.split("-");
+  const year = parts[0].slice(-2);
+  const month = parts[1];
   const prefix = "INV";
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
   return `${prefix}-${year}${month}-${random}`;
 }
