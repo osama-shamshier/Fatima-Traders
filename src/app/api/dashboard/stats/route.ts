@@ -12,7 +12,7 @@ export async function GET() {
       salesToday,
       buyerPaymentsToday,
       totalRevenueAgg,
-      lowStockProducts,
+      productsData,
       recentSales,
       buyerSalesTotals,
       buyerPaymentTotals,
@@ -63,9 +63,23 @@ export async function GET() {
         where: { isDeleted: false },
         _sum: { grandTotal: true, amountPaid: true },
       }),
-      prisma.inventory.count({
-        where: {
-          quantity: { lte: 10 },
+      prisma.product.findMany({
+        where: { isDeleted: false, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          sellingPrice: true,
+          minStockLevel: true,
+          category: { select: { name: true } },
+          unit: { select: { abbreviation: true, name: true } },
+          inventory: {
+            select: {
+              branchId: true,
+              quantity: true,
+              branch: { select: { name: true } },
+            },
+          },
         },
       }),
       prisma.sale.findMany({
@@ -108,73 +122,131 @@ export async function GET() {
       }),
     ]);
 
+    // Calculate Low and Out of Stock items
+    const lowStockList = productsData
+      .map((p) => {
+        const totalStock = p.inventory.reduce((sum, inv) => sum + Number(inv.quantity), 0);
+        const minStock = Number(p.minStockLevel || 0);
+        const isOutOfStock = totalStock <= 0;
+        const isLowStock = totalStock <= minStock;
+
+        if (isOutOfStock || isLowStock) {
+          return {
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            categoryName: p.category?.name || "General",
+            unitAbbr: p.unit?.abbreviation || "",
+            currentStock: totalStock,
+            minStockLevel: minStock,
+            sellingPrice: Number(p.sellingPrice || 0),
+            status: isOutOfStock ? "OUT_OF_STOCK" : "LOW_STOCK",
+            branches: p.inventory.map((inv) => ({
+              branchName: inv.branch?.name || "Branch",
+              quantity: Number(inv.quantity),
+            })),
+          };
+        }
+        return null;
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((a, b) => a.currentStock - b.currentStock);
+
+    const lowStockProducts = lowStockList.length;
+    const outOfStockCount = lowStockList.filter((i) => i.status === "OUT_OF_STOCK").length;
+
+    // Today's Sales breakdown
     const salesTodayCount = salesToday.length;
     const salesTodayRevenue = salesToday.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
-    const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || totalRevenueAgg._sum.amountPaid || 0);
 
-    // Today's Sales Payment Breakdown (Strictly partitions Today's Billed Sales Revenue)
-    let todayCashSales = 0;
-    let todayBankSales = 0;
-    let todayPendingCredit = 0;
-    const bankDetailsList: any[] = [];
+    const todayCashSales = salesToday
+      .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
+      .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
 
-    // All Today's Sales Orders (Walk-in & Registered Customers)
-    salesToday.forEach((sale) => {
-      const outstanding = Number(sale.outstandingAmount || 0);
-      todayPendingCredit += outstanding;
+    const todayBankSales = salesToday
+      .filter((s) => s.paymentMethod === "BANK_TRANSFER")
+      .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
 
-      const paid = Number(sale.amountPaid || 0);
-      if (paid > 0) {
-        if (sale.paymentMethod === "BANK_TRANSFER") {
-          todayBankSales += paid;
-          bankDetailsList.push({
-            id: sale.id,
-            invoiceNumber: sale.invoiceNumber,
-            customerName: sale.buyer?.name || "Walk-in Customer",
-            amount: paid,
-            paymentMethod: "Bank Transfer",
-            reference: sale.notes || "Bank Transfer Sale",
-            createdAt: sale.createdAt,
-          });
-        } else {
-          todayCashSales += paid;
+    const todayPendingCredit = salesToday.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
+
+    // Bank Transactions breakdown
+    const bankSalesDetails = salesToday
+      .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
+      .map((s) => {
+        let bankName = "";
+        let referenceNumber = "";
+
+        if (s.notes) {
+          const bankMatch = s.notes.match(/Bank\/Wallet:\s*([^|]+)/i);
+          if (bankMatch) bankName = bankMatch[1].trim();
+
+          const refMatch = s.notes.match(/Ref:\s*([^|]+)/i);
+          if (refMatch) referenceNumber = refMatch[1].trim();
         }
-      }
+
+        return {
+          id: s.id,
+          type: "POS_SALE" as const,
+          invoiceNumber: s.invoiceNumber,
+          customerName: s.buyer?.name || "Walk-in Customer",
+          branchName: s.branch?.name || "Main Branch",
+          amount: Number(s.amountPaid),
+          bankName: bankName || "Bank Transfer",
+          referenceNumber: referenceNumber || "-",
+          createdAt: s.createdAt,
+        };
+      });
+
+    const bankPaymentDetails = buyerPaymentsToday
+      .filter((p) => p.paymentMethod === "BANK_TRANSFER" && Number(p.amount || 0) > 0)
+      .map((p) => ({
+        id: p.id,
+        type: "DEBT_COLLECTION" as const,
+        invoiceNumber: p.sale?.invoiceNumber || "Customer Payment",
+        customerName: p.buyer?.name || "Customer",
+        branchName: "Main Branch",
+        amount: Number(p.amount),
+        bankName: "Bank Transfer",
+        referenceNumber: p.bankReference || p.notes || "-",
+        createdAt: p.createdAt,
+      }));
+
+    const bankDetailsList = [...bankSalesDetails, ...bankPaymentDetails].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || 0);
+
+    // Exact Customer Outstanding Debtors Calculation
+    const buyerSalesMap = new Map(
+      buyerSalesTotals.filter((row) => row.buyerId !== null).map((row) => [row.buyerId!, Number(row._sum.grandTotal || 0)])
+    );
+    const buyerPaymentsMap = new Map(
+      buyerPaymentTotals.filter((row) => row.buyerId !== null).map((row) => [row.buyerId!, Number(row._sum.amount || 0)])
+    );
+    const buyerReturnsMap = new Map(
+      buyerReturnTotals.filter((row) => row.buyerId !== null).map((row) => [row.buyerId!, Number(row._sum.totalRefund || 0)])
+    );
+
+    const allBuyerIds = Array.from(
+      new Set([
+        ...Array.from(buyerSalesMap.keys()),
+        ...Array.from(buyerPaymentsMap.keys()),
+        ...Array.from(buyerReturnsMap.keys()),
+      ])
+    );
+
+    const buyersInfo = await prisma.buyer.findMany({
+      where: { id: { in: allBuyerIds }, isDeleted: false },
+      select: { id: true, name: true, companyName: true, contactNumber: true },
     });
 
-    const buyerIds = Array.from(
-      new Set([
-        ...buyerSalesTotals.map((row) => row.buyerId).filter(Boolean),
-        ...buyerPaymentTotals.map((row) => row.buyerId),
-        ...buyerReturnTotals.map((row) => row.buyerId).filter(Boolean),
-      ])
-    ) as string[];
-
-    const buyersById = new Map(
-      (
-        await prisma.buyer.findMany({
-          where: { id: { in: buyerIds }, isDeleted: false },
-          select: { id: true, name: true, companyName: true, contactNumber: true },
-        })
-      ).map((buyer) => [buyer.id, buyer])
-    );
-
-    const buyerPaymentById = new Map(buyerPaymentTotals.map((row) => [row.buyerId, Number(row._sum.amount || 0)]));
-    const buyerReturnById = new Map(
-      buyerReturnTotals.map((row) => [row.buyerId, Number(row._sum.totalRefund || 0)])
-    );
-
-    const outstandingDebtors = buyerSalesTotals
-      .map((row) => {
-        if (!row.buyerId) return null;
-        const buyer = buyersById.get(row.buyerId);
-        if (!buyer) return null;
-
-        const totalSales = Number(row._sum.grandTotal || 0);
-        const totalPayments = buyerPaymentById.get(row.buyerId) || 0;
-        const totalReturns = buyerReturnById.get(row.buyerId) || 0;
+    const outstandingDebtors = buyersInfo
+      .map((buyer) => {
+        const totalSales = buyerSalesMap.get(buyer.id) || 0;
+        const totalPayments = buyerPaymentsMap.get(buyer.id) || 0;
+        const totalReturns = buyerReturnsMap.get(buyer.id) || 0;
         const outstanding = totalSales - totalPayments - totalReturns;
-
         return {
           id: buyer.id,
           name: buyer.name,
@@ -212,6 +284,8 @@ export async function GET() {
       totalSupplierPayables,
       totalBuyerReceivables,
       lowStockProducts,
+      outOfStockCount,
+      lowStockList,
       recentSales,
       outstandingDebtors,
     });

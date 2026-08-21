@@ -1,11 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, ShoppingCart, TrendingUp, Building2, Users, ArrowRight, Truck, CreditCard, RefreshCw, Landmark, Wallet } from "lucide-react";
+import {
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  Building2,
+  Users,
+  ArrowRight,
+  Truck,
+  CreditCard,
+  RefreshCw,
+  Landmark,
+  Wallet,
+  AlertTriangle,
+} from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { LowStockModal } from "@/components/dashboard/LowStockModal";
 import { useTranslations } from "next-intl";
 
 export default function DashboardPage() {
@@ -15,6 +35,9 @@ export default function DashboardPage() {
 
   // Bank Transfer Details Modal State
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+
+  // Low Stock Items Modal State
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -40,7 +63,8 @@ export default function DashboardPage() {
       value: `${stats?.totalProducts || 0}`,
       icon: Package,
       color: "bg-blue-600",
-      subtext: `${stats?.lowStockProducts || 0} ${t("totalProductsSub")}`,
+      subtext: t("totalProductsSub"),
+      clickable: false,
     },
     {
       title: t("todaySalesCount"),
@@ -48,6 +72,7 @@ export default function DashboardPage() {
       icon: ShoppingCart,
       color: "bg-emerald-600",
       subtext: `${stats?.salesTodayCount || 0} ${t("todaySalesCountSub")}`,
+      clickable: false,
     },
     {
       title: t("customerOutstanding"),
@@ -55,6 +80,7 @@ export default function DashboardPage() {
       icon: CreditCard,
       color: "bg-purple-600",
       subtext: t("customerOutstandingSub"),
+      clickable: false,
     },
     {
       title: t("activeBranches"),
@@ -62,14 +88,51 @@ export default function DashboardPage() {
       icon: Building2,
       color: "bg-orange-600",
       subtext: t("activeBranchesSub"),
+      clickable: false,
+    },
+    {
+      title: t("lowStockAlert"),
+      value: `${stats?.lowStockProducts || 0} Items`,
+      icon: AlertTriangle,
+      color: (stats?.outOfStockCount || 0) > 0 ? "bg-rose-600" : "bg-amber-500",
+      subtext: (stats?.lowStockProducts || 0) > 0 
+        ? `${stats?.outOfStockCount || 0} ${t("outOfStock")} • ${t("viewLowStockList", { count: stats?.lowStockProducts || 0 })} ➔`
+        : t("noLowStock"),
+      clickable: true,
+      onClick: () => setIsLowStockModalOpen(true),
+      highlight: (stats?.lowStockProducts || 0) > 0,
     },
   ];
 
   const quickActions = [
-    { name: t("actionPos"), sub: t("actionPosSub"), href: "/pos", icon: ShoppingCart, color: "text-emerald-600 bg-emerald-100" },
-    { name: t("actionPurchase"), sub: t("actionPurchaseSub"), href: "/purchases", icon: Truck, color: "text-blue-600 bg-blue-100" },
-    { name: t("actionProduct"), sub: t("actionProductSub"), href: "/products", icon: Package, color: "text-orange-600 bg-orange-100" },
-    { name: t("actionReports"), sub: t("actionReportsSub"), href: "/reports", icon: TrendingUp, color: "text-purple-600 bg-purple-100" },
+    {
+      name: t("actionPos"),
+      sub: t("actionPosSub"),
+      href: "/pos",
+      icon: ShoppingCart,
+      color: "text-emerald-600 bg-emerald-100",
+    },
+    {
+      name: t("actionPurchase"),
+      sub: t("actionPurchaseSub"),
+      href: "/purchases",
+      icon: Truck,
+      color: "text-blue-600 bg-blue-100",
+    },
+    {
+      name: t("actionProduct"),
+      sub: t("actionProductSub"),
+      href: "/products",
+      icon: Package,
+      color: "text-orange-600 bg-orange-100",
+    },
+    {
+      name: t("actionReports"),
+      sub: t("actionReportsSub"),
+      href: "/reports",
+      icon: TrendingUp,
+      color: "text-purple-600 bg-purple-100",
+    },
   ];
 
   return (
@@ -84,21 +147,47 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Metric Cards (5 Cards) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {statCards.map((card, index) => {
           const Icon = card.icon;
           return (
-            <div key={index} className="rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md">
+            <div
+              key={index}
+              onClick={card.clickable ? card.onClick : undefined}
+              className={`rounded-xl border p-4.5 shadow-xs transition-all ${
+                card.clickable
+                  ? "cursor-pointer hover:shadow-md hover:border-amber-400 bg-white group hover:bg-amber-50/20"
+                  : "bg-white"
+              } ${card.highlight ? "border-amber-300 bg-amber-50/10" : "border-slate-200"}`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{card.title}</span>
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color} text-white shadow-sm`}>
-                  <Icon className="h-5 w-5" />
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  {card.title}
+                </span>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${card.color} text-white shadow-2xs`}
+                >
+                  <Icon className="h-4.5 w-4.5" />
                 </div>
               </div>
-              <div className="mt-3">
-                <span className="text-2xl font-extrabold text-slate-900 font-mono">{isLoading ? "..." : card.value}</span>
-                <p className="text-xs text-slate-400 mt-1">{card.subtext}</p>
+              <div className="mt-2.5">
+                <span
+                  className={`text-xl font-extrabold font-mono ${
+                    card.highlight ? "text-rose-700" : "text-slate-900"
+                  }`}
+                >
+                  {isLoading ? "..." : card.value}
+                </span>
+                <p
+                  className={`text-[11px] mt-1 line-clamp-1 font-medium ${
+                    card.clickable && (stats?.lowStockProducts || 0) > 0
+                      ? "text-amber-700 group-hover:text-amber-900 group-hover:underline"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {card.subtext}
+                </p>
               </div>
             </div>
           );
@@ -115,160 +204,220 @@ export default function DashboardPage() {
           <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-800 uppercase">💵 {t("todayCash")}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-bold">{t("todayCashBadge")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-bold">
+                {t("todayCashBadge")}
+              </span>
             </div>
             <div className="text-2xl font-extrabold text-emerald-700 mt-2 font-mono">
-              {formatCurrency(stats?.todayCashSales || 0)}
+              {isLoading ? "..." : formatCurrency(stats?.todayCashSales || 0)}
             </div>
-            <p className="text-[11px] text-emerald-600 mt-1 font-medium">{t("todayCashSub")}</p>
+            <p className="text-xs text-emerald-600 mt-1">{t("todayCashSub")}</p>
           </div>
 
-          {/* Today's Bank Transfer (CLICKABLE FOR DETAILS!) */}
+          {/* Today's Bank */}
           <div
-            onClick={() => setIsBankModalOpen(true)}
-            className="p-4 bg-blue-50/80 border border-blue-200 rounded-xl shadow-xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group"
+            onClick={() => (stats?.todayBankSales || 0) > 0 && setIsBankModalOpen(true)}
+            className={`p-4 bg-blue-50/80 border border-blue-200 rounded-xl shadow-xs transition-all ${
+              (stats?.todayBankSales || 0) > 0
+                ? "cursor-pointer hover:bg-blue-100/70 hover:shadow-md hover:border-blue-300 group"
+                : ""
+            }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-900 uppercase flex items-center gap-1">
-                🏦 {t("todayBank")}
+              <span className="text-xs font-bold text-blue-800 uppercase flex items-center gap-1.5">
+                <Landmark className="w-4 h-4 text-blue-600" /> {t("todayBank")}
               </span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-bold group-hover:bg-blue-700">
-                {t("clickForDetails")}
-              </span>
+              {(stats?.todayBankSales || 0) > 0 ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 font-bold group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  {t("clickForDetails")}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 font-bold">
+                  BANK
+                </span>
+              )}
             </div>
             <div className="text-2xl font-extrabold text-blue-700 mt-2 font-mono">
-              {formatCurrency(stats?.todayBankSales || 0)}
+              {isLoading ? "..." : formatCurrency(stats?.todayBankSales || 0)}
             </div>
-            <p className="text-[11px] text-blue-600 mt-1 font-medium">
+            <p className="text-xs text-blue-600 mt-1">
               {t("todayBankSub", { count: stats?.bankDetailsList?.length || 0 })}
             </p>
           </div>
 
-          {/* Today's Pending Credit */}
+          {/* Today's Credit */}
           <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 uppercase">⏳ {t("todayCredit")}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">{t("todayCreditBadge")}</span>
+              <span className="text-xs font-bold text-amber-800 uppercase">⏳ {t("todayCredit")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">
+                {t("todayCreditBadge")}
+              </span>
             </div>
             <div className="text-2xl font-extrabold text-amber-700 mt-2 font-mono">
-              {formatCurrency(stats?.todayPendingCredit || 0)}
+              {isLoading ? "..." : formatCurrency(stats?.todayPendingCredit || 0)}
             </div>
-            <p className="text-[11px] text-amber-600 mt-1 font-medium">{t("todayCreditSub")}</p>
+            <p className="text-xs text-amber-600 mt-1">{t("todayCreditSub")}</p>
           </div>
         </div>
       </div>
 
-      {/* Financial Receivables & Payables Summary Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-rose-800 uppercase block">{t("totalSupplierPayables")}</span>
-            <span className="text-xl font-bold text-rose-700">{formatCurrency(stats?.totalSupplierPayables || 0)}</span>
+      {/* Payables & Receivables Summary Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border bg-white p-5 shadow-xs">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            {t("totalSupplierPayables")}
+          </span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-extrabold text-rose-600 font-mono">
+              {isLoading ? "..." : formatCurrency(stats?.totalSupplierPayables || 0)}
+            </span>
+            <Link
+              href="/suppliers"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              {t("viewSuppliers")} <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-          <Link href="/suppliers" className="text-xs font-bold text-rose-700 hover:underline flex items-center">
-            {t("viewSuppliers")} <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Link>
         </div>
 
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-emerald-800 uppercase block">{t("totalBuyerReceivables")}</span>
-            <span className="text-xl font-bold text-emerald-700">{formatCurrency(stats?.totalBuyerReceivables || 0)}</span>
+        <div className="rounded-xl border bg-white p-5 shadow-xs">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            {t("totalBuyerReceivables")}
+          </span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span
+              className={`text-2xl font-extrabold font-mono ${
+                (stats?.totalBuyerReceivables || 0) < 0 ? "text-emerald-600" : "text-purple-600"
+              }`}
+            >
+              {isLoading ? "..." : formatCurrency(stats?.totalBuyerReceivables || 0)}
+            </span>
+            <Link
+              href="/buyers"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              {t("viewDebtors", { count: stats?.outstandingDebtors?.length || 0 })}{" "}
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-          <Link href="/buyers?filter=outstanding" className="text-xs font-bold text-emerald-700 hover:underline flex items-center">
-            {t("viewDebtors", { count: stats?.outstandingDebtors?.length || 0 })} <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Link>
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions Grid */}
       <div>
-        <h2 className="mb-3 text-base font-bold text-slate-900">{t("quickActionsTitle")}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <h2 className="text-base font-bold text-slate-900 mb-3">{t("quickActions")}</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action, index) => {
             const Icon = action.icon;
             return (
               <Link
                 key={index}
                 href={action.href}
-                className="group flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm transition-all hover:border-blue-400 hover:shadow-md"
+                className="flex items-center gap-4 rounded-xl border bg-white p-4 shadow-xs transition-all hover:shadow-md hover:border-blue-500 group"
               >
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${action.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">{action.name}</span>
-                    <span className="text-[11px] text-slate-400 font-normal">{action.sub}</span>
-                  </div>
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${action.color}`}
+                >
+                  <Icon className="h-5 w-5" />
                 </div>
-                <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
+                <div>
+                  <span className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
+                    {action.name}
+                  </span>
+                  <p className="text-xs text-slate-400">{action.sub}</p>
+                </div>
               </Link>
             );
           })}
         </div>
       </div>
 
-      {/* BANK TRANSFER PAYMENTS DETAILS MODAL */}
+      {/* Bank Details Modal */}
       <Dialog open={isBankModalOpen} onOpenChange={setIsBankModalOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white rounded-2xl p-6">
-          <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
-            <div>
-              <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Landmark className="w-5 h-5 text-blue-600" /> {t("bankModalTitle")}
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white">
+          <DialogHeader className="p-5 bg-slate-900 text-white flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <Landmark className="w-5 h-5 text-blue-400" /> {t("bankModalTitle")}
               </DialogTitle>
-              <p className="text-xs text-slate-500">{t("bankModalSub")}</p>
+              <p className="text-xs text-slate-300">{t("bankModalSub")}</p>
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-500 font-semibold block uppercase">{t("todayBank")}</span>
-              <span className="text-lg font-extrabold text-blue-700 font-mono">
+              <span className="text-xs text-slate-400 uppercase font-semibold block">
+                {t("totalReceived")}
+              </span>
+              <span className="text-lg font-extrabold text-emerald-400 font-mono">
                 {formatCurrency(stats?.todayBankSales || 0)}
               </span>
             </div>
           </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[60vh] py-3">
-            <table className="w-full text-xs text-left border rounded-xl overflow-hidden">
-              <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
-                <tr>
-                  <th className="p-3">{t("colReference")}</th>
-                  <th className="p-3">{t("colCustomer")}</th>
-                  <th className="p-3">{t("colPaymentType")}</th>
-                  <th className="p-3 text-right">{t("colAmount")}</th>
-                  <th className="p-3 text-right">{t("colTime")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {(stats?.bankDetailsList || []).length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-400">
-                      {t("noBankToday")}
-                    </td>
-                  </tr>
-                ) : (
-                  (stats?.bankDetailsList || []).map((item: any, idx: number) => (
-                    <tr key={item.id || idx} className="hover:bg-slate-50">
-                      <td className="p-3 font-mono font-bold text-blue-600">{item.invoiceNumber}</td>
-                      <td className="p-3 font-bold text-slate-900">{item.customerName}</td>
-                      <td className="p-3 text-slate-700">{item.reference || item.paymentMethod}</td>
-                      <td className="p-3 text-right font-mono font-bold text-blue-700 text-sm">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-500">{formatDateTime(item.createdAt)}</td>
+          <div className="p-5 overflow-y-auto flex-1 space-y-3">
+            {stats?.bankDetailsList?.length === 0 ? (
+              <p className="text-center py-6 text-slate-500 text-sm">{t("noBankTransfers")}</p>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                    <tr>
+                      <th className="py-2.5 px-3">{t("colTime")}</th>
+                      <th className="py-2.5 px-3">{t("colSource")}</th>
+                      <th className="py-2.5 px-3">{t("colCustomerBranch")}</th>
+                      <th className="py-2.5 px-3">{t("colBankWallet")}</th>
+                      <th className="py-2.5 px-3">{t("colRefNumber")}</th>
+                      <th className="py-2.5 px-3 text-right">{t("colAmount")}</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stats?.bankDetailsList?.map((item: any) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80">
+                        <td className="py-2.5 px-3 whitespace-nowrap font-mono text-slate-500">
+                          {formatDateTime(item.createdAt)}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                              item.type === "POS_SALE"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
+                            {item.type === "POS_SALE" ? t("badgePosSale") : t("badgeDebtCollection")}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">
+                          {item.customerName}
+                          <span className="block text-[10px] text-slate-400 font-normal">
+                            {item.branchName} • {item.invoiceNumber}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-slate-700">{item.bankName}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{item.referenceNumber}</td>
+                        <td className="py-2.5 px-3 text-right font-extrabold font-mono text-emerald-700 text-sm">
+                          {formatCurrency(item.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          <DialogFooter className="border-t pt-3">
-            <Button variant="outline" onClick={() => setIsBankModalOpen(false)} size="sm">
-              {t("close")}
+          <DialogFooter className="p-3 bg-slate-50 border-t border-slate-200">
+            <Button variant="outline" size="sm" onClick={() => setIsBankModalOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Low & Out of Stock Items Modal */}
+      <LowStockModal
+        isOpen={isLowStockModalOpen}
+        onClose={() => setIsLowStockModalOpen(false)}
+        items={stats?.lowStockList || []}
+      />
     </div>
   );
 }
