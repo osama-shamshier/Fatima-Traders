@@ -121,50 +121,52 @@ export async function GET() {
     let todayPendingCredit = 0;
     const bankDetailsList: any[] = [];
 
-    // 1. Walk-in / Guest Sales Today (no registered buyerId account)
+    // 1. All Today's Sales Checkouts (Walk-in & Registered Customers)
     salesToday.forEach((sale) => {
       const outstanding = Number(sale.outstandingAmount || 0);
       todayPendingCredit += outstanding;
 
-      if (!sale.buyerId) {
-        const paid = Number(sale.amountPaid || 0);
+      const paid = Number(sale.amountPaid || 0);
+      if (paid > 0) {
         if (sale.paymentMethod === "BANK_TRANSFER") {
           todayBankSales += paid;
-          if (paid > 0) {
-            bankDetailsList.push({
-              id: sale.id,
-              invoiceNumber: sale.invoiceNumber,
-              customerName: "Walk-in Customer",
-              amount: paid,
-              paymentMethod: "Bank Transfer",
-              reference: sale.notes || "Bank Transfer Sale",
-              createdAt: sale.createdAt,
-            });
-          }
+          bankDetailsList.push({
+            id: sale.id,
+            invoiceNumber: sale.invoiceNumber,
+            customerName: sale.buyer?.name || "Walk-in Customer",
+            amount: paid,
+            paymentMethod: "Bank Transfer",
+            reference: sale.notes || "Bank Transfer Sale",
+            createdAt: sale.createdAt,
+          });
         } else {
           todayCashSales += paid;
         }
       }
     });
 
-    // 2. All Registered Customer Payments Received Today
+    // 2. Standalone Subsequent Credit Settlement Payments Received Today (from Ledger / Payments page)
     buyerPaymentsToday.forEach((bp) => {
-      const paid = Number(bp.amount || 0);
-      if (bp.paymentMethod === "BANK_TRANSFER") {
-        todayBankSales += paid;
+      // If payment was a separate settlement (not already part of today's sale invoice checkout)
+      const isAlreadyInSales = bp.saleId && salesToday.some((s) => s.id === bp.saleId);
+      if (!isAlreadyInSales) {
+        const paid = Number(bp.amount || 0);
         if (paid > 0) {
-          bankDetailsList.push({
-            id: bp.id,
-            invoiceNumber: bp.sale?.invoiceNumber || (bp.saleId ? `Sale #${bp.saleId.slice(0, 6)}` : "Credit Settlement"),
-            customerName: bp.buyer?.name || "Customer",
-            amount: paid,
-            paymentMethod: bp.saleId ? "Bank Payment (Checkout)" : "Bank Transfer Settlement",
-            reference: bp.bankReference || bp.notes || "Bank Transfer",
-            createdAt: bp.createdAt,
-          });
+          if (bp.paymentMethod === "BANK_TRANSFER") {
+            todayBankSales += paid;
+            bankDetailsList.push({
+              id: bp.id,
+              invoiceNumber: bp.sale?.invoiceNumber || (bp.saleId ? `Sale #${bp.saleId.slice(0, 6)}` : "Credit Settlement"),
+              customerName: bp.buyer?.name || "Customer",
+              amount: paid,
+              paymentMethod: bp.saleId ? "Bank Payment (Sale)" : "Bank Transfer Settlement",
+              reference: bp.bankReference || bp.notes || "Bank Transfer",
+              createdAt: bp.createdAt,
+            });
+          } else {
+            todayCashSales += paid;
+          }
         }
-      } else {
-        todayCashSales += paid;
       }
     });
 
