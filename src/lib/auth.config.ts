@@ -28,7 +28,22 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const pathname = nextUrl.pathname;
 
-      const publicRoutes = ["/login", "/api/auth", "/api/debug-db"];
+      const publicRoutes = [
+        "/login",
+        "/api/auth",
+        "/api/debug-db",
+        "/manifest.json",
+        "/site.webmanifest",
+        "/icon-192.png",
+        "/icon-192-maskable.png",
+        "/icon-512.png",
+        "/icon-512-maskable.png",
+        "/apple-touch-icon.png",
+        "/favicon.png",
+        "/favicon.ico",
+        "/logo.png",
+        "/logo.jpg",
+      ];
       const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
       if (isPublicRoute) return true;
@@ -43,5 +58,5 @@ export const authConfig = {
   session: {
     strategy: "jwt" as const,
   },
-  providers: [], // Providers added in auth.ts (not in Edge)
+  providers: [],
 } satisfies NextAuthConfig;
