@@ -112,13 +112,13 @@ export async function GET() {
     const salesTodayRevenue = salesToday.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
     const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || totalRevenueAgg._sum.amountPaid || 0);
 
-    // Today's Sales Payment Breakdown
+    // Today's Sales Payment Breakdown (Strictly partitions Today's Billed Sales Revenue)
     let todayCashSales = 0;
     let todayBankSales = 0;
     let todayPendingCredit = 0;
     const bankDetailsList: any[] = [];
 
-    // 1. All Today's Sales Checkouts (Walk-in & Registered Customers)
+    // All Today's Sales Orders (Walk-in & Registered Customers)
     salesToday.forEach((sale) => {
       const outstanding = Number(sale.outstandingAmount || 0);
       todayPendingCredit += outstanding;
@@ -138,31 +138,6 @@ export async function GET() {
           });
         } else {
           todayCashSales += paid;
-        }
-      }
-    });
-
-    // 2. Standalone Subsequent Credit Settlement Payments Received Today (from Ledger / Payments page)
-    buyerPaymentsToday.forEach((bp) => {
-      // If payment was a separate settlement (not already part of today's sale invoice checkout)
-      const isAlreadyInSales = bp.saleId && salesToday.some((s) => s.id === bp.saleId);
-      if (!isAlreadyInSales) {
-        const paid = Number(bp.amount || 0);
-        if (paid > 0) {
-          if (bp.paymentMethod === "BANK_TRANSFER") {
-            todayBankSales += paid;
-            bankDetailsList.push({
-              id: bp.id,
-              invoiceNumber: bp.sale?.invoiceNumber || (bp.saleId ? `Sale #${bp.saleId.slice(0, 6)}` : "Credit Settlement"),
-              customerName: bp.buyer?.name || "Customer",
-              amount: paid,
-              paymentMethod: bp.saleId ? "Bank Payment (Sale)" : "Bank Transfer Settlement",
-              reference: bp.bankReference || bp.notes || "Bank Transfer",
-              createdAt: bp.createdAt,
-            });
-          } else {
-            todayCashSales += paid;
-          }
         }
       }
     });
