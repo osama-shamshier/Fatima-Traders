@@ -546,6 +546,13 @@ model Sale {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Offline Sync Identification
+  offlineId            String?   @unique
+  offlineInvoiceNumber String?
+  offlineCreatedAt     DateTime?
+  isOfflineSync        Boolean   @default(false)
+  syncedAt             DateTime?
+
   buyer       Buyer?              @relation(fields: [buyerId], references: [id])
   branch      Branch              @relation(fields: [branchId], references: [id])
   cashCounter CashCounter?        @relation(fields: [cashCounterId], references: [id])
