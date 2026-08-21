@@ -44,8 +44,8 @@ export async function GET() {
         0
       );
 
-      // 4. Exact Outstanding Balance (Ground Truth)
-      const totalOutstanding = Math.max(0, totalSales - totalPayments - totalAdjustedReturns);
+      // 4. Exact Outstanding Balance (Allows negative balance if customer has excess return/credit)
+      const totalOutstanding = totalSales - totalPayments - totalAdjustedReturns;
 
       return {
         id: buyer.id,

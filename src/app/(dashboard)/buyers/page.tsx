@@ -90,13 +90,13 @@ export default function BuyersPage() {
     const matchesArea = !a || (buyer.address || "").toLowerCase().includes(a);
 
     if (filterType === "OUTSTANDING") {
-      return matchesSearch && matchesArea && Number(buyer.totalOutstanding) > 0;
+      return matchesSearch && matchesArea && Number(buyer.totalOutstanding) !== 0;
     }
     return matchesSearch && matchesArea;
   });
 
   const totalOutstandingSum = filteredBuyers.reduce((sum, b) => sum + Number(b.totalOutstanding || 0), 0);
-  const debtorsCount = filteredBuyers.filter((b) => Number(b.totalOutstanding) > 0).length;
+  const debtorsCount = filteredBuyers.filter((b) => Number(b.totalOutstanding) !== 0).length;
 
   const handleDownloadPDF = () => {
     const items = filteredBuyers.map((b) => ({
@@ -297,8 +297,10 @@ export default function BuyersPage() {
                       <td className="p-4 text-right font-extrabold font-mono text-sm">
                         {outstanding > 0 ? (
                           <span className="text-rose-600">{formatCurrency(outstanding)}</span>
+                        ) : outstanding < 0 ? (
+                          <span className="text-emerald-600 font-bold">{formatCurrency(outstanding)}</span>
                         ) : (
-                          <span className="text-emerald-600">Rs. 0</span>
+                          <span className="text-slate-400 font-medium">Rs. 0</span>
                         )}
                       </td>
                       <td className="p-4">

@@ -199,7 +199,7 @@ export async function GET() {
         const totalSales = Number(row._sum.grandTotal || 0);
         const totalPayments = buyerPaymentById.get(row.buyerId) || 0;
         const totalReturns = buyerReturnById.get(row.buyerId) || 0;
-        const outstanding = Math.max(0, totalSales - totalPayments - totalReturns);
+        const outstanding = totalSales - totalPayments - totalReturns;
 
         return {
           id: buyer.id,
@@ -210,7 +210,7 @@ export async function GET() {
         };
       })
       .filter((buyer): buyer is NonNullable<typeof buyer> => Boolean(buyer))
-      .filter((b) => b.totalOutstanding > 0)
+      .filter((b) => b.totalOutstanding !== 0)
       .sort((a, b) => b.totalOutstanding - a.totalOutstanding);
 
     const totalBuyerReceivables = outstandingDebtors.reduce((sum, b) => sum + b.totalOutstanding, 0);
