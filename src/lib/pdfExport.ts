@@ -234,7 +234,8 @@ export function generateSalesSummaryPDF({
   doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(203, 213, 225); // slate-300
-  doc.text(`Sales Summary Report • Filter: ${periodLabel}`, 14, 17);
+  const safePeriod = cleanAscii(periodLabel, "All Time");
+  doc.text(`Sales Summary Report • Filter: ${safePeriod}`, 14, 17);
 
   // Metadata right aligned
   doc.setFontSize(8);
@@ -290,9 +291,9 @@ export function generateSalesSummaryPDF({
       (index + 1).toString(),
       sale.invoiceNumber,
       saleDateStr,
-      sale.buyerName || "Walk-in Customer",
-      sale.branchName || "Main Branch",
-      sale.cashierName || "Admin",
+      cleanAscii(sale.buyerName, "Walk-in Customer"),
+      cleanAscii(sale.branchName, "Main Branch"),
+      cleanAscii(sale.cashierName, "Admin"),
       Number(sale.grandTotal || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
       Number(sale.amountPaid || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
       Number(sale.outstandingAmount || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
@@ -502,6 +503,25 @@ export interface ProfitLossPDFOptions {
   storeName?: string;
 }
 
+function cleanAscii(str: string | null | undefined, fallback: string = ""): string {
+  if (!str) return fallback;
+  const s = str.trim();
+  const dict: Record<string, string> = {
+    "شروع سے اب تک": "All Time",
+    "آج": "Today",
+    "اس ہفتے": "This Week",
+    "اس مہینے": "This Month",
+    "پچھلے مہینے": "Last Month",
+    "مخصوص مدت": "Custom Range",
+    "تمام برانچز": "All Branches",
+    "تمام پروڈکٹس": "All Products",
+    "مین برانچ": "Main Branch",
+  };
+  if (dict[s]) return dict[s];
+  const ascii = s.replace(/[^\x20-\x7E]/g, "").trim();
+  return ascii.length > 0 ? ascii : fallback || s;
+}
+
 /**
  * Generates and downloads a clean, formatted Profit & Loss Statement PDF
  */
@@ -529,6 +549,10 @@ export function generateProfitLossPDF({
     minute: "2-digit",
   });
 
+  const safePeriodLabel = cleanAscii(periodLabel, "All Time");
+  const safeBranchName = cleanAscii(branchName, "All Branches");
+  const safeProductName = cleanAscii(productName, "All Products");
+
   // Top Dark Banner Header (297mm width)
   doc.setFillColor(15, 23, 42); // slate-900
   doc.rect(0, 0, 297, 24, "F");
@@ -543,7 +567,7 @@ export function generateProfitLossPDF({
   doc.setFont("helvetica", "normal");
   doc.setTextColor(203, 213, 225); // slate-300
   doc.text(
-    `Profit & Loss Statement (P&L) • Period: ${periodLabel} • Branch: ${branchName}`,
+    `Profit & Loss Statement (P&L) • Period: ${safePeriodLabel} • Branch: ${safeBranchName}`,
     14,
     17
   );
@@ -551,7 +575,7 @@ export function generateProfitLossPDF({
   // Metadata right aligned
   doc.setFontSize(8);
   doc.text(`Generated: ${dateStr} at ${timeStr}`, 283, 10, { align: "right" });
-  doc.text(`Product Filter: ${productName}`, 283, 17, { align: "right" });
+  doc.text(`Product Filter: ${safeProductName}`, 283, 17, { align: "right" });
 
   const formatPKR = (num: number) =>
     `Rs. ${Number(num || 0).toLocaleString("en-PK", {
@@ -610,8 +634,11 @@ export function generateProfitLossPDF({
   // Itemized Product Breakdown Table
   const items = plData.itemizedBreakdown || [];
   const tableRows = items.map((item: any, index: number) => {
-    const name = item.productName || item.name || "Product";
-    const qty = Number(item.totalQuantitySold ?? item.netQuantitySold ?? item.quantitySold ?? item.totalQty ?? 0);
+    const name = cleanAscii(item.productName || item.name, "Product");
+    const rawQty = Number(item.totalQuantitySold ?? item.netQuantitySold ?? item.quantitySold ?? item.totalQty ?? 0);
+    const qtyFormatted = Number.isInteger(rawQty)
+      ? rawQty.toString()
+      : Number(rawQty.toFixed(2)).toString();
     const rev = Number(item.netRevenue ?? item.totalRevenue ?? item.grossRevenue ?? item.revenue ?? 0);
     const cost = Number(item.netCogs ?? item.totalFifoCost ?? item.grossCogs ?? item.fifoCost ?? 0);
     const profit = Number(item.grossProfit ?? item.profit ?? 0);
@@ -620,12 +647,12 @@ export function generateProfitLossPDF({
     return [
       (index + 1).toString(),
       name,
-      item.sku || "-",
-      item.categoryName || "General",
-      qty.toString(),
-      rev.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
-      cost.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
-      profit.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      cleanAscii(item.sku, "-"),
+      cleanAscii(item.categoryName, "General"),
+      qtyFormatted,
+      rev.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      cost.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      profit.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       `${margin.toFixed(1)}%`,
       item.isLoss ? "LOSS" : "PROFIT",
     ];
@@ -636,6 +663,9 @@ export function generateProfitLossPDF({
       sum + Number(i.totalQuantitySold ?? i.netQuantitySold ?? i.quantitySold ?? i.totalQty ?? 0),
     0
   );
+  const totalQtyFormatted = Number.isInteger(totalQtySold)
+    ? totalQtySold.toString()
+    : Number(totalQtySold.toFixed(2)).toString();
 
   autoTable(doc, {
     startY: 48,
@@ -660,7 +690,7 @@ export function generateProfitLossPDF({
         "TOTAL / NET SUMMARY",
         "",
         `${items.length} Products`,
-        totalQtySold.toString(),
+        totalQtyFormatted,
         formatPKR(netRevenue),
         formatPKR(cogs),
         formatPKR(grossProfit),

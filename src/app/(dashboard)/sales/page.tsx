@@ -89,19 +89,19 @@ export default function SalesPage() {
   const getPeriodLabel = (): string => {
     switch (period) {
       case "today":
-        return t("today");
+        return "Today";
       case "this_week":
-        return t("thisWeek");
+        return "This Week";
       case "this_month":
-        return t("thisMonth");
+        return "This Month";
       case "last_month":
-        return t("lastMonth");
+        return "Last Month";
       case "custom":
         return startDate && endDate
           ? `${startDate} to ${endDate}`
-          : t("customRange");
+          : "Custom Range";
       default:
-        return t("allTime");
+        return "All Time";
     }
   };
 

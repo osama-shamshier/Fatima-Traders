@@ -101,30 +101,30 @@ export default function ProfitLossPage() {
   const getPeriodLabel = (): string => {
     switch (period) {
       case "today":
-        return tc("today");
+        return "Today";
       case "this_week":
-        return tc("thisWeek");
+        return "This Week";
       case "this_month":
-        return tc("thisMonth");
+        return "This Month";
       case "last_month":
-        return tc("lastMonth");
+        return "Last Month";
       case "custom":
-        return startDate && endDate ? `${startDate} to ${endDate}` : tc("customRange");
+        return startDate && endDate ? `${startDate} to ${endDate}` : "Custom Range";
       default:
-        return tc("allTime");
+        return "All Time";
     }
   };
 
   const getBranchLabel = (): string => {
-    if (!selectedBranchId) return t("allBranches");
+    if (!selectedBranchId) return "All Branches";
     const found = branches.find((b) => b.id === selectedBranchId);
-    return found ? found.name : t("allBranches");
+    return found ? found.name : "All Branches";
   };
 
   const getProductLabel = (): string => {
-    if (!selectedProductId) return t("allProducts");
+    if (!selectedProductId) return "All Products";
     const found = products.find((p) => p.id === selectedProductId);
-    return found ? found.name : t("allProducts");
+    return found ? found.name : "All Products";
   };
 
   const handleDownloadPDF = () => {
