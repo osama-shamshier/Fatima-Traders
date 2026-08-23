@@ -228,16 +228,17 @@ export async function POST(request: NextRequest) {
         const consumedItems = await consumeInventoryFIFO(tx, branchId, fifoItems);
 
         let subtotal = 0;
-        const saleItemsData = consumedItems.map((item) => {
+        const saleItemsData = fifoItems.map((item: any, idx: number) => {
           const lineTotal = item.quantity * item.sellingPrice - item.discount;
           subtotal += lineTotal;
+          const consumed = consumedItems[idx] || { fifoCost: 0 };
           return {
             productId: item.productId,
             quantity: item.quantity,
             sellingPrice: item.sellingPrice,
             discount: item.discount,
             lineTotal,
-            fifoCost: item.fifoCost,
+            fifoCost: consumed.fifoCost,
           };
         });
 
