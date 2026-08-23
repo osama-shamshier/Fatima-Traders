@@ -390,7 +390,7 @@ export default function SalesPage() {
                       </Badge>
                     </td>
                     <td className="p-3.5 text-right">
-                      <InvoiceModalWrapper sale={sale} />
+                      <InvoiceModalWrapper sale={sale} saleId={sale.id} />
                     </td>
                   </tr>
                 ))
