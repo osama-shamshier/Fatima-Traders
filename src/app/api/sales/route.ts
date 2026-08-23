@@ -50,7 +50,34 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(sales);
+    // Normalize sales: Walk-in customers (no buyer) have 0 outstanding credit
+    const normalizedSales = sales.map((sale) => {
+      if (!sale.buyerId && !sale.buyer) {
+        return {
+          ...sale,
+          amountPaid: sale.grandTotal,
+          outstandingAmount: 0,
+          paymentStatus: "PAID",
+        };
+      }
+      return sale;
+    });
+
+    // Asynchronously self-heal any unassigned walk-in testing sales in DB
+    const orphanWalkinIds = sales
+      .filter((s) => !s.buyerId && !s.buyer && Number(s.outstandingAmount || 0) > 0)
+      .map((s) => s.id);
+
+    if (orphanWalkinIds.length > 0) {
+      prisma.sale
+        .updateMany({
+          where: { id: { in: orphanWalkinIds } },
+          data: { outstandingAmount: 0, paymentStatus: "PAID" },
+        })
+        .catch((err) => console.error("Self-heal sales error:", err));
+    }
+
+    return NextResponse.json(normalizedSales);
   } catch (error) {
     console.error("Error fetching sales:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

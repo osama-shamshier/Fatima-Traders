@@ -71,8 +71,10 @@ export default function SalesPage() {
   };
 
   const totalSalesAmount = sales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
-  const totalPaidAmount = sales.reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
-  const totalOutstandingAmount = sales.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
+  const totalOutstandingAmount = sales
+    .filter((s) => s.buyerId || s.buyer)
+    .reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
+  const totalPaidAmount = Math.max(0, totalSalesAmount - totalOutstandingAmount);
 
   // Round Off Audit Statistics
   const totalRoundOffAmount = sales.reduce((sum, s) => sum + Number(s.roundOff || 0), 0);
