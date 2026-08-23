@@ -34,47 +34,131 @@ export async function GET(request: NextRequest) {
       whereClause.createdAt = dateRange;
     }
 
-    const sales = await prisma.sale.findMany({
-      where: whereClause,
-      include: {
-        buyer: { select: { id: true, name: true, companyName: true, contactNumber: true } },
-        branch: { select: { id: true, name: true } },
-        cashCounter: { select: { id: true, name: true } },
-        createdBy: { select: { id: true, name: true } },
-        items: {
-          include: {
-            product: { select: { id: true, name: true, sku: true } },
+    // Fetch buyer payments and returns to reconcile buyer sales dynamically
+    const [sales, allBuyers] = await Promise.all([
+      prisma.sale.findMany({
+        where: whereClause,
+        include: {
+          buyer: { select: { id: true, name: true, companyName: true, contactNumber: true } },
+          branch: { select: { id: true, name: true } },
+          cashCounter: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, name: true } },
+          items: {
+            include: {
+              product: { select: { id: true, name: true, sku: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.buyer.findMany({
+        where: { isDeleted: false },
+        include: {
+          sales: {
+            where: { isDeleted: false },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, grandTotal: true, subtotal: true },
+          },
+          buyerPayments: {
+            where: { isDeleted: false },
+            select: { amount: true },
+          },
+          salesReturns: {
+            where: { isDeleted: false, refundMethod: "ADJUSTMENT" },
+            select: { totalRefund: true },
+          },
+        },
+      }),
+    ]);
 
-    // Normalize sales: Walk-in customers (no buyer) have 0 outstanding credit
+    // Build map of reconciled sales for all buyers (FIFO allocation of payments & returns)
+    const reconciledSaleMap = new Map<
+      string,
+      { amountPaid: number; outstandingAmount: number; paymentStatus: string }
+    >();
+
+    const dbUpdatesToRun: Array<{ id: string; amountPaid: number; outstandingAmount: number; paymentStatus: string }> = [];
+
+    for (const buyer of allBuyers) {
+      const totalPayments = (buyer.buyerPayments || []).reduce(
+        (sum, p) => sum + Number(p.amount || 0),
+        0
+      );
+      const totalReturns = (buyer.salesReturns || []).reduce(
+        (sum, r) => sum + Number(r.totalRefund || 0),
+        0
+      );
+      let totalCredit = totalPayments + totalReturns;
+
+      for (const bSale of buyer.sales) {
+        const grandTotal = Number(bSale.grandTotal || bSale.subtotal || 0);
+        const allocatedPaid = Math.min(totalCredit, grandTotal);
+        const outstanding = Math.max(0, grandTotal - allocatedPaid);
+        const status = outstanding <= 0 ? "PAID" : allocatedPaid > 0 ? "PARTIAL" : "PENDING";
+
+        reconciledSaleMap.set(bSale.id, {
+          amountPaid: allocatedPaid,
+          outstandingAmount: outstanding,
+          paymentStatus: status,
+        });
+
+        totalCredit -= allocatedPaid;
+      }
+    }
+
+    // Format sales with 100% reconciled amounts
     const normalizedSales = sales.map((sale) => {
+      // 1. Walk-in customers (no buyer): Always paid, 0 outstanding credit
       if (!sale.buyerId && !sale.buyer) {
         return {
           ...sale,
-          amountPaid: sale.grandTotal,
+          amountPaid: Number(sale.grandTotal || 0),
           outstandingAmount: 0,
           paymentStatus: "PAID",
         };
       }
+
+      // 2. Registered buyer sales: Use reconciled status
+      const reconciled = reconciledSaleMap.get(sale.id);
+      if (reconciled) {
+        if (
+          Number(sale.amountPaid) !== reconciled.amountPaid ||
+          Number(sale.outstandingAmount) !== reconciled.outstandingAmount ||
+          sale.paymentStatus !== reconciled.paymentStatus
+        ) {
+          dbUpdatesToRun.push({
+            id: sale.id,
+            amountPaid: reconciled.amountPaid,
+            outstandingAmount: reconciled.outstandingAmount,
+            paymentStatus: reconciled.paymentStatus,
+          });
+        }
+
+        return {
+          ...sale,
+          amountPaid: reconciled.amountPaid,
+          outstandingAmount: reconciled.outstandingAmount,
+          paymentStatus: reconciled.paymentStatus,
+        };
+      }
+
       return sale;
     });
 
-    // Asynchronously self-heal any unassigned walk-in testing sales in DB
-    const orphanWalkinIds = sales
-      .filter((s) => !s.buyerId && !s.buyer && Number(s.outstandingAmount || 0) > 0)
-      .map((s) => s.id);
-
-    if (orphanWalkinIds.length > 0) {
-      prisma.sale
-        .updateMany({
-          where: { id: { in: orphanWalkinIds } },
-          data: { outstandingAmount: 0, paymentStatus: "PAID" },
-        })
-        .catch((err) => console.error("Self-heal sales error:", err));
+    // Self-heal database in background if discrepancies were detected
+    if (dbUpdatesToRun.length > 0) {
+      Promise.all(
+        dbUpdatesToRun.map((u) =>
+          prisma.sale.update({
+            where: { id: u.id },
+            data: {
+              amountPaid: u.amountPaid,
+              outstandingAmount: u.outstandingAmount,
+              paymentStatus: u.paymentStatus as any,
+            },
+          })
+        )
+      ).catch((err) => console.error("Database reconciliation update error:", err));
     }
 
     return NextResponse.json(normalizedSales);
@@ -137,21 +221,23 @@ export async function POST(request: NextRequest) {
         const fifoItems = items.map((i: any) => ({
           productId: i.productId,
           quantity: Number(i.quantity),
+          sellingPrice: Number(i.sellingPrice),
+          discount: Number(i.discount || 0),
         }));
 
-        const fifoResult = await consumeInventoryFIFO(tx as any, branchId, fifoItems);
+        const consumedItems = await consumeInventoryFIFO(tx, branchId, fifoItems);
 
         let subtotal = 0;
-        const saleItemsData = items.map((item: any, index: number) => {
-          const lineTotal = Number(item.quantity) * Number(item.sellingPrice) - Number(item.discount || 0);
+        const saleItemsData = consumedItems.map((item) => {
+          const lineTotal = item.quantity * item.sellingPrice - item.discount;
           subtotal += lineTotal;
           return {
             productId: item.productId,
             quantity: item.quantity,
             sellingPrice: item.sellingPrice,
-            discount: item.discount || 0,
+            discount: item.discount,
             lineTotal,
-            fifoCost: fifoResult[index].fifoCost,
+            fifoCost: item.fifoCost,
           };
         });
 
@@ -210,19 +296,32 @@ export async function POST(request: NextRequest) {
             outstandingAmount: true,
             paymentStatus: true,
             paymentMethod: true,
+            dueDate: true,
             notes: true,
-            buyer: { select: { id: true, name: true } },
-            branch: { select: { id: true, name: true, address: true } },
-            createdBy: { select: { id: true, name: true } },
+            buyer: {
+              select: {
+                id: true,
+                name: true,
+                companyName: true,
+                contactNumber: true,
+                address: true,
+              },
+            },
+            branch: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                phone: true,
+              },
+            },
             items: {
               select: {
                 id: true,
-                productId: true,
                 quantity: true,
                 sellingPrice: true,
                 discount: true,
                 lineTotal: true,
-                fifoCost: true,
                 product: {
                   select: {
                     id: true,
@@ -236,18 +335,31 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        if (amountPaidNum > 0 && buyerId) {
+        // If sale is associated with a buyer and initial payment was made, record in buyer payment history
+        if (buyerId && amountPaidNum > 0) {
           await tx.buyerPayment.create({
             data: {
               buyerId,
               saleId: sale.id,
               amount: amountPaidNum,
               paymentMethod: paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH",
-              bankReference: bankReference || bankName || null,
+              bankReference: bankReference || null,
+              notes: fullNotes || `Payment for Invoice #${invoiceNumber}`,
               createdById: userId,
             },
           });
         }
+
+        // Audit Log
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "CREATE",
+            entity: "sale",
+            entityId: sale.id,
+            newValues: JSON.parse(JSON.stringify(sale)),
+          },
+        });
 
         return sale;
       },
@@ -257,30 +369,12 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    void prisma.auditLog
-      .create({
-        data: {
-          userId,
-          action: "CREATE",
-          entity: "sale",
-          entityId: result.id,
-          branchId,
-          newValues: {
-            id: result.id,
-            invoiceNumber: result.invoiceNumber,
-            grandTotal: result.grandTotal.toString(),
-            amountPaid: result.amountPaid.toString(),
-            paymentStatus: result.paymentStatus,
-          },
-        },
-      })
-      .catch((error) => {
-        console.error("Failed to write sale audit log:", error);
-      });
-
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
     console.error("Error creating sale:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to process sale" },
+      { status: 400 }
+    );
   }
 }
