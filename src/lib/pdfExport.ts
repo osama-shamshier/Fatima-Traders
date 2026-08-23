@@ -609,20 +609,33 @@ export function generateProfitLossPDF({
 
   // Itemized Product Breakdown Table
   const items = plData.itemizedBreakdown || [];
-  const tableRows = items.map((item, index) => {
+  const tableRows = items.map((item: any, index: number) => {
+    const name = item.productName || item.name || "Product";
+    const qty = Number(item.totalQuantitySold ?? item.netQuantitySold ?? item.quantitySold ?? item.totalQty ?? 0);
+    const rev = Number(item.netRevenue ?? item.totalRevenue ?? item.grossRevenue ?? item.revenue ?? 0);
+    const cost = Number(item.netCogs ?? item.totalFifoCost ?? item.grossCogs ?? item.fifoCost ?? 0);
+    const profit = Number(item.grossProfit ?? item.profit ?? 0);
+    const margin = Number(item.marginPercent ?? item.profitMargin ?? 0);
+
     return [
       (index + 1).toString(),
-      item.name,
-      item.sku,
+      name,
+      item.sku || "-",
       item.categoryName || "General",
-      item.totalQty.toString(),
-      Number(item.revenue || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
-      Number(item.fifoCost || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
-      Number(item.profit || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
-      `${Number(item.profitMargin || 0).toFixed(1)}%`,
+      qty.toString(),
+      rev.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      cost.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      profit.toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      `${margin.toFixed(1)}%`,
       item.isLoss ? "LOSS" : "PROFIT",
     ];
   });
+
+  const totalQtySold = items.reduce(
+    (sum: number, i: any) =>
+      sum + Number(i.totalQuantitySold ?? i.netQuantitySold ?? i.quantitySold ?? i.totalQty ?? 0),
+    0
+  );
 
   autoTable(doc, {
     startY: 48,
@@ -647,7 +660,7 @@ export function generateProfitLossPDF({
         "TOTAL / NET SUMMARY",
         "",
         `${items.length} Products`,
-        items.reduce((s, i) => s + i.totalQty, 0).toString(),
+        totalQtySold.toString(),
         formatPKR(netRevenue),
         formatPKR(cogs),
         formatPKR(grossProfit),
@@ -762,15 +775,22 @@ export function exportProfitLossCSV({
 
   const items = plData.itemizedBreakdown || [];
   for (const item of items) {
+    const name = item.productName || item.name || "Product";
+    const qty = Number(item.totalQuantitySold ?? item.netQuantitySold ?? item.quantitySold ?? item.totalQty ?? 0);
+    const rev = Number(item.netRevenue ?? item.totalRevenue ?? item.grossRevenue ?? item.revenue ?? 0);
+    const cost = Number(item.netCogs ?? item.totalFifoCost ?? item.grossCogs ?? item.fifoCost ?? 0);
+    const profit = Number(item.grossProfit ?? item.profit ?? 0);
+    const margin = Number(item.marginPercent ?? item.profitMargin ?? 0);
+
     rows.push([
-      `"${item.name.replace(/"/g, '""')}"`,
-      `"${item.sku}"`,
+      `"${name.replace(/"/g, '""')}"`,
+      `"${item.sku || ""}"`,
       `"${(item.categoryName || "General").replace(/"/g, '""')}"`,
-      item.totalQty,
-      item.revenue,
-      item.fifoCost,
-      item.profit,
-      `"${Number(item.profitMargin || 0).toFixed(1)}%"`,
+      qty,
+      rev,
+      cost,
+      profit,
+      `"${margin.toFixed(1)}%"`,
       `"${item.isLoss ? "LOSS" : "PROFIT"}"`,
     ]);
   }

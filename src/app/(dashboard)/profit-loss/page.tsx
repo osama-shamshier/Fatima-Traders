@@ -128,24 +128,34 @@ export default function ProfitLossPage() {
   };
 
   const handleDownloadPDF = () => {
-    if (!plData) return;
-    generateProfitLossPDF({
-      periodLabel: getPeriodLabel(),
-      branchName: getBranchLabel(),
-      productName: getProductLabel(),
-      plData,
-      storeName: "FATIMA TRADERS",
-    });
+    try {
+      if (!plData) return;
+      generateProfitLossPDF({
+        periodLabel: getPeriodLabel(),
+        branchName: getBranchLabel(),
+        productName: getProductLabel(),
+        plData,
+        storeName: "FATIMA TRADERS",
+      });
+    } catch (err) {
+      console.error("PDF download error:", err);
+      alert("Failed to generate PDF. Please try again.");
+    }
   };
 
   const handleDownloadCSV = () => {
-    if (!plData) return;
-    exportProfitLossCSV({
-      periodLabel: getPeriodLabel(),
-      branchName: getBranchLabel(),
-      productName: getProductLabel(),
-      plData,
-    });
+    try {
+      if (!plData) return;
+      exportProfitLossCSV({
+        periodLabel: getPeriodLabel(),
+        branchName: getBranchLabel(),
+        productName: getProductLabel(),
+        plData,
+      });
+    } catch (err) {
+      console.error("CSV download error:", err);
+      alert("Failed to export CSV. Please try again.");
+    }
   };
 
   return (
