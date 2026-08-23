@@ -7,10 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableLoader } from "@/components/ui/loader";
-import { Plus, Filter, RefreshCw, ShoppingCart, Calculator, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import {
+  Plus,
+  Filter,
+  RefreshCw,
+  ShoppingCart,
+  Calculator,
+  ArrowUpRight,
+  ArrowDownRight,
+  Download,
+  FileText,
+  FileSpreadsheet,
+} from "lucide-react";
 import Link from "next/link";
 import { InvoiceModalWrapper } from "./components/InvoiceModalWrapper";
 import { useTranslations } from "next-intl";
+import {
+  generateSalesSummaryPDF,
+  exportSalesSummaryCSV,
+  SalesSummaryItem,
+} from "@/lib/pdfExport";
 
 export default function SalesPage() {
   const t = useTranslations("sales");
@@ -56,6 +72,7 @@ export default function SalesPage() {
 
   const totalSalesAmount = sales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
   const totalPaidAmount = sales.reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
+  const totalOutstandingAmount = sales.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
 
   // Round Off Audit Statistics
   const totalRoundOffAmount = sales.reduce((sum, s) => sum + Number(s.roundOff || 0), 0);
@@ -67,23 +84,112 @@ export default function SalesPage() {
     .reduce((sum, s) => sum + Number(s.roundOff), 0);
   const roundOffCount = sales.filter((s) => Number(s.roundOff || 0) !== 0).length;
 
+  const getPeriodLabel = (): string => {
+    switch (period) {
+      case "today":
+        return t("today");
+      case "this_week":
+        return t("thisWeek");
+      case "this_month":
+        return t("thisMonth");
+      case "last_month":
+        return t("lastMonth");
+      case "custom":
+        return startDate && endDate
+          ? `${startDate} to ${endDate}`
+          : t("customRange");
+      default:
+        return t("allTime");
+    }
+  };
+
+  const prepareSummaryItems = (): SalesSummaryItem[] => {
+    return sales.map((s) => ({
+      id: s.id,
+      invoiceNumber: s.invoiceNumber,
+      saleDate: s.saleDate,
+      buyerName: s.buyer ? s.buyer.name : "Walk-in Cash Customer",
+      branchName: s.branch?.name || "Main Branch",
+      cashierName: s.createdBy?.name || "Admin",
+      grandTotal: Number(s.grandTotal || 0),
+      amountPaid: Number(s.amountPaid || 0),
+      outstandingAmount: Number(s.outstandingAmount || 0),
+      roundOff: Number(s.roundOff || 0),
+      paymentMethod: s.paymentMethod === "BANK_TRANSFER" ? "BANK" : "CASH",
+      paymentStatus: s.paymentStatus || "PAID",
+    }));
+  };
+
+  const handleDownloadPDF = () => {
+    const summaryItems = prepareSummaryItems();
+    generateSalesSummaryPDF({
+      periodLabel: getPeriodLabel(),
+      sales: summaryItems,
+      totalSales: totalSalesAmount,
+      totalPaid: totalPaidAmount,
+      totalOutstanding: totalOutstandingAmount,
+      totalRoundOff: totalRoundOffAmount,
+      storeName: "FATIMA TRADERS",
+    });
+  };
+
+  const handleDownloadCSV = () => {
+    const summaryItems = prepareSummaryItems();
+    exportSalesSummaryCSV({
+      periodLabel: getPeriodLabel(),
+      sales: summaryItems,
+      totalSales: totalSalesAmount,
+      totalPaid: totalPaidAmount,
+      totalOutstanding: totalOutstandingAmount,
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Header with Title and Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
-        <Link href="/pos">
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0">
-            <Plus className="me-2 h-4 w-4" /> {t("newSale")}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Download PDF Button */}
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={sales.length === 0}
+            variant="outline"
+            className="bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-xs border-slate-300 text-xs h-9 gap-1.5"
+            title="Download formatted PDF sales report"
+          >
+            <FileText className="h-4 w-4 text-rose-600" />
+            <span>{t("downloadPdf")}</span>
           </Button>
-        </Link>
+
+          {/* Export CSV Button */}
+          <Button
+            onClick={handleDownloadCSV}
+            disabled={sales.length === 0}
+            variant="outline"
+            className="bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-xs border-slate-300 text-xs h-9 gap-1.5"
+            title="Export sales data to CSV/Excel spreadsheet"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>{t("downloadCsv")}</span>
+          </Button>
+
+          {/* New POS Sale */}
+          <Link href="/pos">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs text-xs h-9 gap-1.5">
+              <Plus className="h-4 w-4" /> {t("newSale")}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Date Filter Bar */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-bold text-slate-900 uppercase">{t("filterTitle")}</span>
@@ -102,7 +208,7 @@ export default function SalesPage() {
               <button
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   period === p.id
                     ? "bg-blue-600 text-white shadow-xs"
                     : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
@@ -144,38 +250,56 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* Sales Summary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+      {/* Sales Summary Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Total Sales */}
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalSales")}</span>
-            <span className="text-xl font-bold font-mono text-slate-900 block mt-1">
+            <span className="text-xs font-bold text-slate-500 uppercase">{t("totalSales")}</span>
+            <div className="text-xl font-extrabold text-slate-900 mt-1 font-mono">
               {formatCurrency(totalSalesAmount)}
-            </span>
+            </div>
+            <span className="text-[11px] text-slate-400">{sales.length} Invoices ({getPeriodLabel()})</span>
           </div>
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
             <ShoppingCart className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        {/* Total Collected */}
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-slate-500 text-xs font-medium uppercase">{t("totalPaid")}</span>
-            <span className="text-xl font-bold font-mono text-emerald-600 block mt-1">
+            <span className="text-xs font-bold text-slate-500 uppercase">{t("totalPaid")}</span>
+            <div className="text-xl font-extrabold text-emerald-600 mt-1 font-mono">
               {formatCurrency(totalPaidAmount)}
-            </span>
+            </div>
+            <span className="text-[11px] text-emerald-600 font-medium">Cash & Bank Received</span>
           </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
             <ShoppingCart className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Round-Off Net Impact Card */}
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        {/* Total Outstanding */}
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-slate-500 text-xs font-medium uppercase">{t("netRoundOff")}</span>
-            <span
-              className={`text-xl font-bold font-mono block mt-1 ${
+            <span className="text-xs font-bold text-slate-500 uppercase">{t("totalOutstanding")}</span>
+            <div className="text-xl font-extrabold text-rose-600 mt-1 font-mono">
+              {formatCurrency(totalOutstandingAmount)}
+            </div>
+            <span className="text-[11px] text-rose-500 font-medium">Pending Customer Debt</span>
+          </div>
+          <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+            <ShoppingCart className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Net Round Off Adjustment */}
+        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase">{t("netRoundOff")}</span>
+            <div
+              className={`text-xl font-extrabold mt-1 font-mono ${
                 totalRoundOffAmount > 0
                   ? "text-emerald-600"
                   : totalRoundOffAmount < 0
@@ -183,39 +307,23 @@ export default function SalesPage() {
                   : "text-slate-700"
               }`}
             >
-              {totalRoundOffAmount > 0 ? `+${formatCurrency(totalRoundOffAmount)}` : formatCurrency(totalRoundOffAmount)}
-            </span>
+              {totalRoundOffAmount > 0
+                ? `+${formatCurrency(totalRoundOffAmount)}`
+                : formatCurrency(totalRoundOffAmount)}
+            </div>
+            <span className="text-[10px] text-slate-400">{t("roundedBillsCount", { count: roundOffCount })}</span>
           </div>
-          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
+          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl">
             <Calculator className="w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Round-Off Breakdown (Up vs Down) */}
-        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 flex flex-col justify-between text-xs">
-          <div className="flex justify-between items-center text-slate-600">
-            <span className="flex items-center gap-1 text-[11px] font-semibold">
-              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" /> {t("roundedUp")}:
-            </span>
-            <span className="font-mono font-bold text-emerald-700">+{formatCurrency(roundOffUpAmount)}</span>
-          </div>
-          <div className="flex justify-between items-center text-slate-600 mt-1">
-            <span className="flex items-center gap-1 text-[11px] font-semibold">
-              <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" /> {t("roundedDown")}:
-            </span>
-            <span className="font-mono font-bold text-rose-700">{formatCurrency(roundOffDownAmount)}</span>
-          </div>
-          <div className="text-[10px] text-slate-400 font-medium text-end mt-1 border-t border-slate-200 pt-1">
-            {t("roundedBillsCount", { count: roundOffCount })}
           </div>
         </div>
       </div>
 
       {/* Sales Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 border-b font-semibold uppercase">
+            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold uppercase">
               <tr>
                 <th className="p-3.5">{t("colInvoice")}</th>
                 <th className="p-3.5">{t("colDate")}</th>
@@ -241,7 +349,7 @@ export default function SalesPage() {
                 </tr>
               ) : (
                 sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3.5 font-mono font-bold text-blue-600">{sale.invoiceNumber}</td>
                     <td className="p-3.5 text-slate-500 font-mono whitespace-nowrap">{formatDate(sale.saleDate)}</td>
                     <td className="p-3.5 font-bold text-slate-900">
@@ -260,16 +368,12 @@ export default function SalesPage() {
                           {Number(sale.roundOff) > 0 ? `+${Number(sale.roundOff)}` : Number(sale.roundOff)}
                         </span>
                       ) : (
-                        <span className="text-slate-300">-</span>
+                        "-"
                       )}
                     </td>
                     <td className="p-3.5 text-right font-mono text-emerald-600 font-bold">{formatCurrency(sale.amountPaid)}</td>
-                    <td className="p-3.5 text-right font-mono font-bold">
-                      {Number(sale.outstandingAmount) > 0 ? (
-                        <span className="text-rose-600">{formatCurrency(sale.outstandingAmount)}</span>
-                      ) : (
-                        <span className="text-slate-400 font-normal">Rs. 0</span>
-                      )}
+                    <td className="p-3.5 text-right font-mono text-rose-600 font-bold">
+                      {Number(sale.outstandingAmount) > 0 ? formatCurrency(sale.outstandingAmount) : "-"}
                     </td>
                     <td className="p-3.5 text-center">
                       <Badge
@@ -280,13 +384,13 @@ export default function SalesPage() {
                             ? "warning"
                             : "danger"
                         }
-                        className="text-[10px] font-bold uppercase"
+                        className="text-[10px] px-2 py-0.5"
                       >
                         {sale.paymentStatus}
                       </Badge>
                     </td>
                     <td className="p-3.5 text-right">
-                      <InvoiceModalWrapper saleId={sale.id} />
+                      <InvoiceModalWrapper sale={sale} />
                     </td>
                   </tr>
                 ))
