@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { getDefaultUserRoute } from "@/lib/rbac";
 
 export default async function Home() {
   const session = await auth();
@@ -9,12 +10,8 @@ export default async function Home() {
   }
 
   const roles = ((session.user as any).roles as string[]) || [];
-  const isBillCounterManager = roles.includes("Bill Counter Manager");
-  const isOwner = roles.includes("Owner") || roles.includes("Admin");
+  const permissions = ((session.user as any).permissions as string[]) || [];
 
-  if (!isOwner && isBillCounterManager) {
-    redirect("/pos");
-  }
-
-  redirect("/dashboard");
+  const targetRoute = getDefaultUserRoute(roles, permissions);
+  redirect(targetRoute);
 }

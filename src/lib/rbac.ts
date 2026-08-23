@@ -66,7 +66,7 @@ export const ACTIONS = {
 
 // Dynamic Route Permission Map
 export const ROUTE_PERMISSIONS: Record<string, string[]> = {
-  "/dashboard": [],
+  "/dashboard": ["audit:read", "settings:read"],
   "/pos": ["pos:create", "pos:read", "sales:create", "sales:read"],
   "/branches": ["branches:read", "branches:create"],
   "/counters": ["counters:read", "counters:create"],
@@ -109,6 +109,11 @@ export function canAccessRoute(
   // Exact or prefix match (ignoring query parameters)
   const cleanPath = pathname.split("?")[0];
 
+  // Dashboard is strictly restricted to Owner / Admin
+  if (cleanPath === "/dashboard") {
+    return false;
+  }
+
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(
     (route) => cleanPath === route || (route !== "/dashboard" && cleanPath.startsWith(`${route}/`))
   );
@@ -119,8 +124,7 @@ export function canAccessRoute(
 
   const required = ROUTE_PERMISSIONS[matchedRoute];
   if (!required || required.length === 0) {
-    // If dashboard, check if user has access to anything, otherwise redirect to their first tool
-    return true;
+    return false;
   }
 
   return required.some((perm) => userPermissions.includes(perm));
