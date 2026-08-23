@@ -38,10 +38,13 @@ import {
   PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { canAccessRoute, getDefaultUserRoute } from "@/lib/rbac";
 
 interface SidebarProps {
   userName?: string;
   userRole?: string;
+  userRoles?: string[];
+  userPermissions?: string[];
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   isCollapsed: boolean;
@@ -232,6 +235,8 @@ function CollapsibleSection({
 export function Sidebar({ 
   userName = "User", 
   userRole = "Owner", 
+  userRoles = [],
+  userPermissions = [],
   isMobileOpen, 
   setIsMobileOpen,
   isCollapsed,
@@ -240,18 +245,7 @@ export function Sidebar({
   const pathname = usePathname();
   const t = useTranslations("header");
 
-  const isBillCounterManager = userRole === "Bill Counter Manager";
-  const isOwner = userRole === "Owner" || userRole === "Admin";
-
-  const allowedHrefs = [
-    "/pos",
-    "/sales",
-    "/sales-returns",
-    "/buyers",
-    "/buyers?filter=outstanding",
-    "/buyer-due-dates",
-    "/buyer-payments",
-  ];
+  const effectiveRoles = userRoles.length > 0 ? userRoles : [userRole];
 
   const visibleSections = useMemo(
     () =>
@@ -259,14 +253,11 @@ export function Sidebar({
         .map((section) => ({
           ...section,
           items: section.items.filter((item) => {
-            if (!isOwner && isBillCounterManager) {
-              return allowedHrefs.includes(item.href);
-            }
-            return true;
+            return canAccessRoute(item.href, effectiveRoles, userPermissions);
           }),
         }))
         .filter((section) => section.items.length > 0),
-    [isOwner, isBillCounterManager]
+    [effectiveRoles, userPermissions]
   );
 
   // Auto-expand the section that contains the active route
@@ -279,7 +270,7 @@ export function Sidebar({
       if (hasActive) expanded.add(idx);
     });
     return expanded;
-  }, []);
+  }, [visibleSections, pathname]);
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(initialExpanded);
 
@@ -299,6 +290,8 @@ export function Sidebar({
   useEffect(() => {
     setIsMobileOpen(false);
   }, [pathname, setIsMobileOpen]);
+
+  const homeRoute = getDefaultUserRoute(effectiveRoles, userPermissions);
 
   return (
     <>
@@ -325,7 +318,7 @@ export function Sidebar({
         {/* Logo & Close/Collapse area */}
         <div className="flex h-16 shrink-0 items-center justify-between px-4 py-3 border-b border-slate-800">
           <Link
-            href={!isOwner && isBillCounterManager ? "/pos" : "/dashboard"}
+            href={homeRoute}
             className="flex items-center gap-2.5 text-white transition-opacity hover:opacity-90 group"
           >
             <div className="h-9 w-9 rounded-xl overflow-hidden bg-white/95 p-0.5 shadow-xs flex items-center justify-center shrink-0 border border-slate-700/60 group-hover:scale-105 transition-transform">

@@ -26,7 +26,7 @@ export function hasAnyRole(userRoles: string[], roles: string[]): boolean {
 }
 
 export function isOwner(userRoles: string[]): boolean {
-  return userRoles.includes("Owner");
+  return userRoles.includes("Owner") || userRoles.includes("Admin");
 }
 
 // RBAC module constants matching permissions table
@@ -63,3 +63,96 @@ export const ACTIONS = {
   DELETE: "delete",
   EXPORT: "export",
 } as const;
+
+// Dynamic Route Permission Map
+export const ROUTE_PERMISSIONS: Record<string, string[]> = {
+  "/dashboard": [],
+  "/pos": ["pos:create", "pos:read", "sales:create", "sales:read"],
+  "/branches": ["branches:read", "branches:create"],
+  "/counters": ["counters:read", "counters:create"],
+  "/products": ["products:read", "products:create", "products:update", "products:delete"],
+  "/categories": ["categories:read", "categories:create"],
+  "/units": ["units:read", "units:create"],
+  "/buyers": ["buyers:read", "buyers:create", "buyers:update", "buyers:delete"],
+  "/buyer-due-dates": ["buyers:read"],
+  "/buyer-payments": ["buyer_payments:read", "buyer_payments:create"],
+  "/suppliers": ["suppliers:read", "suppliers:create", "suppliers:update", "suppliers:delete"],
+  "/supplier-payments": ["supplier_payments:read", "supplier_payments:create"],
+  "/sales": ["sales:read", "sales:create"],
+  "/sales-returns": ["returns:read", "returns:create"],
+  "/purchases": ["purchases:read", "purchases:create", "purchases:update", "purchases:delete"],
+  "/inventory": ["inventory:read", "stock_adjustments:read", "stock_adjustments:create"],
+  "/stock-transfers": ["stock_transfers:read", "stock_transfers:create"],
+  "/expenses": ["expenses:read", "expenses:create"],
+  "/profit-loss": ["reports:read"],
+  "/financials": ["reports:read"],
+  "/reports": ["reports:read"],
+  "/users": ["users:read", "users:create", "users:update", "users:delete"],
+  "/roles": ["roles:read", "roles:create", "roles:update", "roles:delete"],
+  "/audit-logs": ["audit:read"],
+  "/settings": ["settings:read"],
+  "/backups": ["backups:read"],
+};
+
+/**
+ * Validates if the user's live permissions allow accessing a route
+ */
+export function canAccessRoute(
+  pathname: string,
+  userRoles: string[] = [],
+  userPermissions: string[] = []
+): boolean {
+  if (isOwner(userRoles)) {
+    return true;
+  }
+
+  // Exact or prefix match (ignoring query parameters)
+  const cleanPath = pathname.split("?")[0];
+
+  const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(
+    (route) => cleanPath === route || (route !== "/dashboard" && cleanPath.startsWith(`${route}/`))
+  );
+
+  if (!matchedRoute) {
+    return true;
+  }
+
+  const required = ROUTE_PERMISSIONS[matchedRoute];
+  if (!required || required.length === 0) {
+    // If dashboard, check if user has access to anything, otherwise redirect to their first tool
+    return true;
+  }
+
+  return required.some((perm) => userPermissions.includes(perm));
+}
+
+/**
+ * Returns the default fallback landing route for the user based on permissions
+ */
+export function getDefaultUserRoute(
+  userRoles: string[] = [],
+  userPermissions: string[] = []
+): string {
+  if (isOwner(userRoles)) {
+    return "/dashboard";
+  }
+
+  const priorityRoutes = [
+    "/pos",
+    "/dashboard",
+    "/products",
+    "/sales",
+    "/buyers",
+    "/inventory",
+    "/purchases",
+    "/expenses",
+  ];
+
+  for (const route of priorityRoutes) {
+    if (canAccessRoute(route, userRoles, userPermissions)) {
+      return route;
+    }
+  }
+
+  return "/pos";
+}

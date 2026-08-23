@@ -5,44 +5,37 @@ import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { cn } from "@/lib/utils";
+import { canAccessRoute, getDefaultUserRoute, isOwner } from "@/lib/rbac";
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
   userName?: string;
   userRole?: string;
+  userRoles?: string[];
+  userPermissions?: string[];
 }
 
 export function DashboardLayoutClient({ 
   children,
   userName = "User",
-  userRole = "Admin"
+  userRole = "User",
+  userRoles = [],
+  userPermissions = [],
 }: DashboardLayoutClientProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  const isBillCounterManager = userRole === "Bill Counter Manager";
-  const isOwner = userRole === "Owner" || userRole === "Admin";
-
   useEffect(() => {
-    if (!isOwner && isBillCounterManager) {
-      const allowedPaths = [
-        "/pos",
-        "/sales",
-        "/sales-returns",
-        "/buyers",
-        "/buyer-due-dates",
-        "/buyer-payments",
-      ];
-
-      const isAllowed = allowedPaths.some((path) => pathname === path || pathname?.startsWith(`${path}/`));
-
-      if (!isAllowed) {
-        router.replace("/pos");
+    if (!isOwner(userRoles)) {
+      const allowed = canAccessRoute(pathname, userRoles, userPermissions);
+      if (!allowed) {
+        const fallbackRoute = getDefaultUserRoute(userRoles, userPermissions);
+        router.replace(fallbackRoute);
       }
     }
-  }, [pathname, isBillCounterManager, isOwner, router]);
+  }, [pathname, userRoles, userPermissions, router]);
 
   // Handle toggle logic
   const handleToggleSidebar = () => {
@@ -62,6 +55,8 @@ export function DashboardLayoutClient({
         setIsCollapsed={setIsSidebarCollapsed}
         userName={userName}
         userRole={userRole}
+        userRoles={userRoles}
+        userPermissions={userPermissions}
       />
       <div 
         className={cn(

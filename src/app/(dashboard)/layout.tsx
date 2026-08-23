@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardLayoutClient } from "./DashboardLayoutClient";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({
   children,
@@ -13,13 +14,64 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const roles = (session.user as any).roles as string[] || [];
+  const userId = session.user.id;
+  const userEmail = session.user.email?.toLowerCase();
+
+  // Fetch real-time roles and permissions from database so changes apply instantly
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(userId ? [{ id: userId }] : []),
+        ...(userEmail ? [{ email: { equals: userEmail, mode: "insensitive" as const } }] : []),
+      ],
+      isDeleted: false,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      userRoles: {
+        select: {
+          role: {
+            select: {
+              name: true,
+              rolePermissions: {
+                select: {
+                  permission: {
+                    select: {
+                      module: true,
+                      action: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const roles = user.userRoles.map((ur) => ur.role.name);
   const userRole = roles[0] || "User";
+  const permissions = Array.from(
+    new Set(
+      user.userRoles.flatMap((ur) =>
+        ur.role.rolePermissions.map((rp) => `${rp.permission.module}:${rp.permission.action}`)
+      )
+    )
+  );
 
   return (
     <DashboardLayoutClient 
-      userName={session.user.name || "User"} 
+      userName={user.name || session.user.name || "User"} 
       userRole={userRole}
+      userRoles={roles}
+      userPermissions={permissions}
     >
       {children}
     </DashboardLayoutClient>
