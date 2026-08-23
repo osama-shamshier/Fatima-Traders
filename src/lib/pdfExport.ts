@@ -461,3 +461,331 @@ export function exportSalesSummaryCSV({
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export interface ProfitLossPDFOptions {
+  periodLabel: string;
+  branchName?: string;
+  productName?: string;
+  plData: {
+    totalSalesRevenue?: number;
+    grossRevenue?: number;
+    totalSalesReturns?: number;
+    totalReturns?: number;
+    netRevenue?: number;
+    revenue?: number;
+    totalCOGS?: number;
+    cogs?: number;
+    grossProfit: number;
+    grossProfitMargin?: number;
+    grossMarginPercent?: number;
+    operatingExpenses: number;
+    netProfit: number;
+    netProfitMargin?: number;
+    netMarginPercent?: number;
+    itemizedBreakdown?: Array<{
+      id: string;
+      name: string;
+      sku: string;
+      categoryName?: string;
+      totalQty: number;
+      revenue: number;
+      fifoCost: number;
+      profit: number;
+      profitMargin: number;
+      isLoss?: boolean;
+    }>;
+    expenseBreakdown?: Array<{
+      categoryName: string;
+      amount: number;
+    }>;
+  };
+  storeName?: string;
+}
+
+/**
+ * Generates and downloads a clean, formatted Profit & Loss Statement PDF
+ */
+export function generateProfitLossPDF({
+  periodLabel,
+  branchName = "All Branches",
+  productName = "All Products",
+  plData,
+  storeName = "FATIMA TRADERS",
+}: ProfitLossPDFOptions) {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-PK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-PK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Top Dark Banner Header (297mm width)
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, 297, 24, "F");
+
+  // Store & Statement Title
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(storeName.toUpperCase(), 14, 10);
+
+  doc.setFontSize(9.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(203, 213, 225); // slate-300
+  doc.text(
+    `Profit & Loss Statement (P&L) • Period: ${periodLabel} • Branch: ${branchName}`,
+    14,
+    17
+  );
+
+  // Metadata right aligned
+  doc.setFontSize(8);
+  doc.text(`Generated: ${dateStr} at ${timeStr}`, 283, 10, { align: "right" });
+  doc.text(`Product Filter: ${productName}`, 283, 17, { align: "right" });
+
+  const formatPKR = (num: number) =>
+    `Rs. ${Number(num || 0).toLocaleString("en-PK", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const grossSales = plData.totalSalesRevenue ?? plData.grossRevenue ?? 0;
+  const salesReturns = plData.totalSalesReturns ?? plData.totalReturns ?? 0;
+  const netRevenue = plData.netRevenue ?? plData.revenue ?? 0;
+  const cogs = plData.totalCOGS ?? plData.cogs ?? 0;
+  const grossProfit = plData.grossProfit ?? 0;
+  const grossMargin = plData.grossProfitMargin ?? plData.grossMarginPercent ?? 0;
+  const expenses = plData.operatingExpenses ?? 0;
+  const netProfit = plData.netProfit ?? 0;
+  const netMargin = plData.netProfitMargin ?? plData.netMarginPercent ?? 0;
+
+  // Key Financial Metric Cards Box
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.roundedRect(14, 28, 269, 15, 2, 2, "FD");
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+
+  // Net Revenue
+  doc.setTextColor(71, 85, 105);
+  doc.text("Net Revenue:", 18, 35);
+  doc.setTextColor(15, 23, 42);
+  doc.text(formatPKR(netRevenue), 18, 40);
+
+  // FIFO COGS
+  doc.setTextColor(71, 85, 105);
+  doc.text("Cost of Goods (COGS):", 75, 35);
+  doc.setTextColor(234, 88, 12); // orange-600
+  doc.text(formatPKR(cogs), 75, 40);
+
+  // Gross Profit
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Gross Profit (${Number(grossMargin).toFixed(1)}%):`, 140, 35);
+  doc.setTextColor(5, 150, 105); // emerald-600
+  doc.text(formatPKR(grossProfit), 140, 40);
+
+  // Operating Expenses
+  doc.setTextColor(71, 85, 105);
+  doc.text("Operating Expenses:", 200, 35);
+  doc.setTextColor(225, 29, 72); // rose-600
+  doc.text(formatPKR(expenses), 200, 40);
+
+  // Net Profit
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Net Profit (${Number(netMargin).toFixed(1)}%):`, 250, 35);
+  doc.setTextColor(netProfit >= 0 ? 5 : 225, netProfit >= 0 ? 150 : 29, netProfit >= 0 ? 105 : 72);
+  doc.text(formatPKR(netProfit), 250, 40);
+
+  // Itemized Product Breakdown Table
+  const items = plData.itemizedBreakdown || [];
+  const tableRows = items.map((item, index) => {
+    return [
+      (index + 1).toString(),
+      item.name,
+      item.sku,
+      item.categoryName || "General",
+      item.totalQty.toString(),
+      Number(item.revenue || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      Number(item.fifoCost || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      Number(item.profit || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+      `${Number(item.profitMargin || 0).toFixed(1)}%`,
+      item.isLoss ? "LOSS" : "PROFIT",
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 48,
+    head: [
+      [
+        "#",
+        "Product Name",
+        "SKU",
+        "Category",
+        "Qty Sold",
+        "Revenue (PKR)",
+        "FIFO Cost (PKR)",
+        "Gross Profit (PKR)",
+        "Margin (%)",
+        "Status",
+      ],
+    ],
+    body: tableRows,
+    foot: [
+      [
+        "",
+        "TOTAL / NET SUMMARY",
+        "",
+        `${items.length} Products`,
+        items.reduce((s, i) => s + i.totalQty, 0).toString(),
+        formatPKR(netRevenue),
+        formatPKR(cogs),
+        formatPKR(grossProfit),
+        `${Number(grossMargin).toFixed(1)}%`,
+        grossProfit >= 0 ? "PROFIT" : "LOSS",
+      ],
+    ],
+    theme: "striped",
+    headStyles: {
+      fillColor: [30, 41, 59], // slate-800
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 8,
+      halign: "left",
+    },
+    footStyles: {
+      fillColor: [241, 245, 249], // slate-100
+      textColor: [15, 23, 42],
+      fontStyle: "bold",
+      fontSize: 8.5,
+    },
+    styles: {
+      fontSize: 7.5,
+      cellPadding: 2,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 54, fontStyle: "bold" },
+      2: { cellWidth: 26, fontStyle: "normal" },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 16, halign: "center" },
+      5: { cellWidth: 30, halign: "right", fontStyle: "bold" },
+      6: { cellWidth: 30, halign: "right", textColor: [234, 88, 12] },
+      7: { cellWidth: 32, halign: "right", fontStyle: "bold", textColor: [5, 150, 105] },
+      8: { cellWidth: 20, halign: "center", fontStyle: "bold" },
+      9: { cellWidth: 18, halign: "center" },
+    },
+    didDrawPage: (data) => {
+      const pageNumber = (doc as any).internal.getNumberOfPages();
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text(
+        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        148,
+        202,
+        { align: "center" }
+      );
+    },
+  });
+
+  const sanitizedPeriod = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const dateStamp = now.toISOString().slice(0, 10);
+  const filename = `Profit_Loss_Statement_${sanitizedPeriod}_${dateStamp}.pdf`;
+
+  doc.save(filename);
+}
+
+/**
+ * Exports Profit & Loss Statement & Item Profitability to CSV
+ */
+export function exportProfitLossCSV({
+  periodLabel,
+  branchName = "All Branches",
+  productName = "All Products",
+  plData,
+}: {
+  periodLabel: string;
+  branchName?: string;
+  productName?: string;
+  plData: any;
+}) {
+  const grossSales = plData.totalSalesRevenue ?? plData.grossRevenue ?? 0;
+  const salesReturns = plData.totalSalesReturns ?? plData.totalReturns ?? 0;
+  const netRevenue = plData.netRevenue ?? plData.revenue ?? 0;
+  const cogs = plData.totalCOGS ?? plData.cogs ?? 0;
+  const grossProfit = plData.grossProfit ?? 0;
+  const grossMargin = plData.grossProfitMargin ?? plData.grossMarginPercent ?? 0;
+  const expenses = plData.operatingExpenses ?? 0;
+  const netProfit = plData.netProfit ?? 0;
+  const netMargin = plData.netProfitMargin ?? plData.netMarginPercent ?? 0;
+
+  const rows: any[] = [
+    [`"PROFIT & LOSS STATEMENT"`],
+    [`"Period: ${periodLabel}"`, `"Branch: ${branchName}"`, `"Product Filter: ${productName}"`],
+    [],
+    [`"FINANCIAL OVERVIEW"`],
+    [`"Metric"`, `"Amount (PKR)"`, `"Margin %"`],
+    [`"Gross Sales Revenue"`, grossSales, `""`],
+    [`"Sales Returns & Refunds"`, -salesReturns, `""`],
+    [`"Net Billed Revenue"`, netRevenue, `""`],
+    [`"Cost of Goods Sold (FIFO COGS)"`, -cogs, `""`],
+    [`"Gross Profit"`, grossProfit, `"${Number(grossMargin).toFixed(1)}%"`],
+    [`"Operating Expenses"`, -expenses, `""`],
+    [`"Net Operating Profit"`, netProfit, `"${Number(netMargin).toFixed(1)}%"`],
+    [],
+    [`"ITEM-WISE PRODUCT PROFITABILITY"`],
+    [
+      `"Product Name"`,
+      `"SKU"`,
+      `"Category"`,
+      `"Quantity Sold"`,
+      `"Revenue (PKR)"`,
+      `"FIFO Cost (PKR)"`,
+      `"Gross Profit (PKR)"`,
+      `"Margin %"`,
+      `"Status"`,
+    ],
+  ];
+
+  const items = plData.itemizedBreakdown || [];
+  for (const item of items) {
+    rows.push([
+      `"${item.name.replace(/"/g, '""')}"`,
+      `"${item.sku}"`,
+      `"${(item.categoryName || "General").replace(/"/g, '""')}"`,
+      item.totalQty,
+      item.revenue,
+      item.fifoCost,
+      item.profit,
+      `"${Number(item.profitMargin || 0).toFixed(1)}%"`,
+      `"${item.isLoss ? "LOSS" : "PROFIT"}"`,
+    ]);
+  }
+
+  const csvContent =
+    "\uFEFF" + rows.map((r) => r.join(",")).join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const sanitizedPeriod = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
+  link.download = `Profit_Loss_${sanitizedPeriod}_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

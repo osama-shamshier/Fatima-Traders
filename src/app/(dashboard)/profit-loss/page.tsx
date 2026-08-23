@@ -7,9 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
-import { TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, DollarSign, Filter, AlertTriangle, Package, RotateCcw } from "lucide-react";
+import {
+  TrendingUp,
+  RefreshCw,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
+  Filter,
+  AlertTriangle,
+  Package,
+  RotateCcw,
+  FileText,
+  FileSpreadsheet,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import { generateProfitLossPDF, exportProfitLossCSV } from "@/lib/pdfExport";
 
 export default function ProfitLossPage() {
   const t = useTranslations("profitLoss");
@@ -85,6 +98,56 @@ export default function ProfitLossPage() {
 
   const lossCount = plData?.lossItemsCount || 0;
 
+  const getPeriodLabel = (): string => {
+    switch (period) {
+      case "today":
+        return tc("today");
+      case "this_week":
+        return tc("thisWeek");
+      case "this_month":
+        return tc("thisMonth");
+      case "last_month":
+        return tc("lastMonth");
+      case "custom":
+        return startDate && endDate ? `${startDate} to ${endDate}` : tc("customRange");
+      default:
+        return tc("allTime");
+    }
+  };
+
+  const getBranchLabel = (): string => {
+    if (!selectedBranchId) return t("allBranches");
+    const found = branches.find((b) => b.id === selectedBranchId);
+    return found ? found.name : t("allBranches");
+  };
+
+  const getProductLabel = (): string => {
+    if (!selectedProductId) return t("allProducts");
+    const found = products.find((p) => p.id === selectedProductId);
+    return found ? found.name : t("allProducts");
+  };
+
+  const handleDownloadPDF = () => {
+    if (!plData) return;
+    generateProfitLossPDF({
+      periodLabel: getPeriodLabel(),
+      branchName: getBranchLabel(),
+      productName: getProductLabel(),
+      plData,
+      storeName: "FATIMA TRADERS",
+    });
+  };
+
+  const handleDownloadCSV = () => {
+    if (!plData) return;
+    exportProfitLossCSV({
+      periodLabel: getPeriodLabel(),
+      branchName: getBranchLabel(),
+      productName: getProductLabel(),
+      plData,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -92,8 +155,32 @@ export default function ProfitLossPage() {
           <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchProfitLoss}>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Download PDF Button */}
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={!plData || isLoading}
+            variant="outline"
+            className="bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-xs border-slate-300 text-xs h-9 gap-1.5"
+            title="Download formatted Profit & Loss PDF report"
+          >
+            <FileText className="h-4 w-4 text-rose-600" />
+            <span>{t("downloadPdf")}</span>
+          </Button>
+
+          {/* Export CSV Button */}
+          <Button
+            onClick={handleDownloadCSV}
+            disabled={!plData || isLoading}
+            variant="outline"
+            className="bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-xs border-slate-300 text-xs h-9 gap-1.5"
+            title="Export P&L statement to CSV/Excel spreadsheet"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span>{t("downloadCsv")}</span>
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={fetchProfitLoss} className="h-9">
             <RefreshCw className="w-4 h-4 me-2" /> {t("refreshData")}
           </Button>
         </div>

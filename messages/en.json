@@ -757,6 +757,8 @@
     "title": "Profit & Loss Statement & Item Profitability",
     "subtitle": "Net revenue and gross margin analysis accounting for sales returns and FIFO cost of goods sold.",
     "refreshData": "Refresh Data",
+    "downloadPdf": "Download P&L Statement (PDF)",
+    "downloadCsv": "Export P&L Data (CSV)",
     "filterTitle": "Date Period & Entity Filter",
     "allBranches": "All Branches",
     "allProducts": "All Products",
