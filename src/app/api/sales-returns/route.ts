@@ -93,13 +93,29 @@ export async function POST(req: Request) {
 
     const result = await prisma.$transaction(
       async (tx) => {
-        // 1. Fetch product information for costing & inventory restoration
+        // 1. Fetch product, saleItem, and purchase information for exact costing & inventory restoration
         const productIds = items.map((i: any) => i.productId);
         const products = await tx.product.findMany({
           where: { id: { in: productIds } },
           select: { id: true, name: true, sellingPrice: true },
         });
         const productMap = new Map(products.map((p) => [p.id, p]));
+
+        const saleItemIds = items.map((i: any) => i.saleItemId).filter(Boolean);
+        const saleItems = saleItemIds.length > 0
+          ? await tx.saleItem.findMany({
+              where: { id: { in: saleItemIds } },
+              select: { id: true, fifoCost: true, quantity: true, sellingPrice: true },
+            })
+          : [];
+        const saleItemMap = new Map(saleItems.map((si) => [si.id, si]));
+
+        const latestPurchaseItems = await tx.purchaseItem.findMany({
+          where: { productId: { in: productIds } },
+          orderBy: { createdAt: "desc" },
+          select: { productId: true, purchaseRate: true },
+        });
+        const purchaseRateMap = new Map(latestPurchaseItems.map((pi) => [pi.productId, Number(pi.purchaseRate)]));
 
         let totalRefundAmount = 0;
         const returnItemsForFIFO: any[] = [];
@@ -112,8 +128,16 @@ export async function POST(req: Request) {
           totalRefundAmount += lineRefund;
 
           const prod = productMap.get(item.productId);
-          // FIFO restore cost: use 70% of rate/selling price as standard baseline inventory asset cost
-          const costPerUnit = rate > 0 ? rate * 0.7 : Number(prod?.sellingPrice || 0) * 0.7;
+          const saleItem = item.saleItemId ? saleItemMap.get(item.saleItemId) : null;
+
+          let costPerUnit = 0;
+          if (saleItem && Number(saleItem.fifoCost || 0) > 0 && Number(saleItem.quantity || 0) > 0) {
+            costPerUnit = Number(saleItem.fifoCost) / Number(saleItem.quantity);
+          } else if (purchaseRateMap.has(item.productId)) {
+            costPerUnit = purchaseRateMap.get(item.productId)!;
+          } else {
+            costPerUnit = rate > 0 ? rate * 0.7 : Number(prod?.sellingPrice || 0) * 0.7;
+          }
 
           returnItemsForFIFO.push({
             productId: item.productId,
