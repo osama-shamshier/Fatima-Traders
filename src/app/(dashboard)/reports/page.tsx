@@ -179,71 +179,27 @@ export default function ReportsPage() {
       {/* Tab 1: Valuation */}
       {activeTab === "valuation" && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
-              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 text-xs font-bold uppercase">{t("totalValuation")}</span>
-                <div className="text-2xl font-black font-mono text-blue-600 mt-1">
-                  {formatCurrency(valuationData?.totalValuation || 0)}
-                </div>
+          <div className="p-6 md:p-8 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">
+                {t("totalValuation")}
+              </span>
+              <div className="text-3xl sm:text-4xl font-black font-mono text-blue-600 mt-2">
+                {isLoading ? "..." : formatCurrency(valuationData?.totalValuation || 0)}
               </div>
-              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 text-xs font-bold uppercase">{t("totalStockUnits")}</span>
-                <div className="text-2xl font-black font-mono text-slate-900 mt-1">
-                  {valuationData?.totalUnits?.toLocaleString() || 0}
-                </div>
-              </div>
-              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 text-xs font-bold uppercase">{t("totalBranchesCount")}</span>
-                <div className="text-2xl font-black font-mono text-slate-900 mt-1">
-                  {valuationData?.branches?.length || 0}
-                </div>
-              </div>
+              <p className="text-xs text-slate-400 mt-1.5">
+                Total valuation of active remaining inventory based on FIFO purchase rates
+              </p>
             </div>
-            <div className="ms-3">
+            <div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => exportCSV("inventory-valuation-report", valuationData?.branches || [])}
-                className="text-xs font-semibold"
+                onClick={fetchValuation}
+                className="text-xs font-semibold rounded-xl"
               >
-                <Download className="w-3.5 h-3.5 me-1 text-emerald-600" /> {t("exportExcel")}
+                Refresh
               </Button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-            <div className="relative w-full overflow-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 border-b font-bold uppercase">
-                  <tr>
-                    <th className="p-3.5">{t("colBranch")}</th>
-                    <th className="p-3.5 text-center">{t("colProductCount")}</th>
-                    <th className="p-3.5 text-center">{t("colTotalUnits")}</th>
-                    <th className="p-3.5 text-right">{t("colFifoValuation")}</th>
-                    <th className="p-3.5 text-right">{t("colAvgUnitCost")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {isLoading ? (
-                    <TableLoader colSpan={5} text="Calculating valuation..." />
-                  ) : (
-                    valuationData?.branches?.map((b: any) => (
-                      <tr key={b.branchId} className="hover:bg-slate-50">
-                        <td className="p-3.5 font-bold text-slate-900">{b.branchName}</td>
-                        <td className="p-3.5 text-center font-mono">{b.productCount}</td>
-                        <td className="p-3.5 text-center font-mono font-bold text-slate-900">{b.totalQuantity}</td>
-                        <td className="p-3.5 text-right font-mono font-black text-blue-600 text-sm">
-                          {formatCurrency(b.totalValuation)}
-                        </td>
-                        <td className="p-3.5 text-right font-mono text-slate-600">
-                          {formatCurrency(b.totalQuantity > 0 ? b.totalValuation / b.totalQuantity : 0)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
