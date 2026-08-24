@@ -120,10 +120,17 @@ export default function DashboardPage() {
       color: "text-orange-600 bg-orange-100",
     },
     {
+      name: t("actionProfitLoss"),
+      sub: t("actionProfitLossSub"),
+      href: "/profit-loss",
+      icon: TrendingUp,
+      color: "text-rose-600 bg-rose-100",
+    },
+    {
       name: t("actionReports"),
       sub: t("actionReportsSub"),
       href: "/reports",
-      icon: TrendingUp,
+      icon: BarChart3,
       color: "text-purple-600 bg-purple-100",
     },
   ];
@@ -296,10 +303,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick Actions Grid */}
+      {/* Quick Actions Grid (5 Actions) */}
       <div>
         <h2 className="text-base font-bold text-slate-900 mb-3">{t("quickActions")}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {quickActions.map((action, index) => {
             const Icon = action.icon;
             return (
