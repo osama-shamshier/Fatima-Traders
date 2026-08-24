@@ -165,7 +165,7 @@ export async function GET() {
 
     const todayPendingCredit = salesToday.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
 
-    // 1. Bank transactions from POS sales completed today
+    // POS Sales completed today via Bank Transfer / Digital Wallets
     const bankSalesDetails = salesToday
       .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
       .map((s) => {
@@ -191,49 +191,12 @@ export async function GET() {
           referenceNumber: referenceNumber || "-",
           createdAt: s.createdAt,
         };
-      });
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // Set of sale IDs already counted in POS bank sales to prevent duplicate display of auto-generated buyer payment
-    const todayPosSaleIds = new Set(salesToday.map((s) => s.id));
+    const bankDetailsList = bankSalesDetails;
 
-    // 2. Bank transactions from Customer Debt Payments completed today
-    const bankPaymentDetails = buyerPaymentsToday
-      .filter(
-        (p) =>
-          p.paymentMethod === "BANK_TRANSFER" &&
-          Number(p.amount || 0) > 0 &&
-          (!p.saleId || !todayPosSaleIds.has(p.saleId))
-      )
-      .map((p) => {
-        let bankName = "";
-        let referenceNumber = p.bankReference || "";
-
-        if (p.notes) {
-          const bankMatch = p.notes.match(/Bank\/Wallet:\s*([^|]+)/i);
-          if (bankMatch) bankName = bankMatch[1].trim();
-
-          const refMatch = p.notes.match(/Ref:\s*([^|]+)/i);
-          if (refMatch && !referenceNumber) referenceNumber = refMatch[1].trim();
-        }
-
-        return {
-          id: p.id,
-          type: "DEBT_COLLECTION" as const,
-          invoiceNumber: p.sale?.invoiceNumber || "Customer Payment",
-          customerName: p.buyer?.name || "Customer",
-          branchName: "Main Branch",
-          amount: Number(p.amount),
-          bankName: bankName || "Bank Transfer",
-          referenceNumber: referenceNumber || p.notes || "-",
-          createdAt: p.createdAt,
-        };
-      });
-
-    const bankDetailsList = [...bankSalesDetails, ...bankPaymentDetails].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    // Total digital / bank payments received today across POS and Debt collections
+    // Total actual digital & bank payments from today's POS sales
     const todayBankSales = bankDetailsList.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || 0);
