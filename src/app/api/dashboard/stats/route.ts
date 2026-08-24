@@ -163,13 +163,7 @@ export async function GET() {
       .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
       .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
 
-    const todayBankSales = salesToday
-      .filter((s) => s.paymentMethod === "BANK_TRANSFER")
-      .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
-
-    const todayPendingCredit = salesToday.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
-
-    // Bank Transactions breakdown
+    // 1. Bank transactions from POS sales completed today
     const bankSalesDetails = salesToday
       .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
       .map((s) => {
@@ -197,23 +191,48 @@ export async function GET() {
         };
       });
 
+    // Set of sale IDs already counted in POS bank sales to prevent duplicate display of auto-generated buyer payment
+    const todayPosSaleIds = new Set(salesToday.map((s) => s.id));
+
+    // 2. Bank transactions from Customer Debt Payments completed today
     const bankPaymentDetails = buyerPaymentsToday
-      .filter((p) => p.paymentMethod === "BANK_TRANSFER" && Number(p.amount || 0) > 0)
-      .map((p) => ({
-        id: p.id,
-        type: "DEBT_COLLECTION" as const,
-        invoiceNumber: p.sale?.invoiceNumber || "Customer Payment",
-        customerName: p.buyer?.name || "Customer",
-        branchName: "Main Branch",
-        amount: Number(p.amount),
-        bankName: "Bank Transfer",
-        referenceNumber: p.bankReference || p.notes || "-",
-        createdAt: p.createdAt,
-      }));
+      .filter(
+        (p) =>
+          p.paymentMethod === "BANK_TRANSFER" &&
+          Number(p.amount || 0) > 0 &&
+          (!p.saleId || !todayPosSaleIds.has(p.saleId))
+      )
+      .map((p) => {
+        let bankName = "";
+        let referenceNumber = p.bankReference || "";
+
+        if (p.notes) {
+          const bankMatch = p.notes.match(/Bank\/Wallet:\s*([^|]+)/i);
+          if (bankMatch) bankName = bankMatch[1].trim();
+
+          const refMatch = p.notes.match(/Ref:\s*([^|]+)/i);
+          if (refMatch && !referenceNumber) referenceNumber = refMatch[1].trim();
+        }
+
+        return {
+          id: p.id,
+          type: "DEBT_COLLECTION" as const,
+          invoiceNumber: p.sale?.invoiceNumber || "Customer Payment",
+          customerName: p.buyer?.name || "Customer",
+          branchName: "Main Branch",
+          amount: Number(p.amount),
+          bankName: bankName || "Bank Transfer",
+          referenceNumber: referenceNumber || p.notes || "-",
+          createdAt: p.createdAt,
+        };
+      });
 
     const bankDetailsList = [...bankSalesDetails, ...bankPaymentDetails].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+
+    // Total digital / bank payments received today across POS and Debt collections
+    const todayBankSales = bankDetailsList.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     const totalRevenue = Number(totalRevenueAgg._sum.grandTotal || 0);
 

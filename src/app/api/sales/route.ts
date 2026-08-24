@@ -34,81 +34,24 @@ export async function GET(request: NextRequest) {
       whereClause.createdAt = dateRange;
     }
 
-    // Fetch buyer payments and returns to reconcile buyer sales dynamically
-    const [sales, allBuyers] = await Promise.all([
-      prisma.sale.findMany({
-        where: whereClause,
-        include: {
-          buyer: { select: { id: true, name: true, companyName: true, contactNumber: true } },
-          branch: { select: { id: true, name: true } },
-          cashCounter: { select: { id: true, name: true } },
-          createdBy: { select: { id: true, name: true } },
-          items: {
-            include: {
-              product: { select: { id: true, name: true, sku: true } },
-            },
+    const sales = await prisma.sale.findMany({
+      where: whereClause,
+      include: {
+        buyer: { select: { id: true, name: true, companyName: true, contactNumber: true } },
+        branch: { select: { id: true, name: true } },
+        cashCounter: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, sku: true } },
           },
         },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.buyer.findMany({
-        where: { isDeleted: false },
-        include: {
-          sales: {
-            where: { isDeleted: false },
-            orderBy: { createdAt: "asc" },
-            select: { id: true, grandTotal: true, subtotal: true },
-          },
-          buyerPayments: {
-            where: { isDeleted: false },
-            select: { amount: true },
-          },
-          salesReturns: {
-            where: { isDeleted: false, refundMethod: "ADJUSTMENT" },
-            select: { totalRefund: true },
-          },
-        },
-      }),
-    ]);
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-    // Build map of reconciled sales for all buyers (FIFO allocation of payments & returns)
-    const reconciledSaleMap = new Map<
-      string,
-      { amountPaid: number; outstandingAmount: number; paymentStatus: string }
-    >();
-
-    const dbUpdatesToRun: Array<{ id: string; amountPaid: number; outstandingAmount: number; paymentStatus: string }> = [];
-
-    for (const buyer of allBuyers) {
-      const totalPayments = (buyer.buyerPayments || []).reduce(
-        (sum, p) => sum + Number(p.amount || 0),
-        0
-      );
-      const totalReturns = (buyer.salesReturns || []).reduce(
-        (sum, r) => sum + Number(r.totalRefund || 0),
-        0
-      );
-      let totalCredit = totalPayments + totalReturns;
-
-      for (const bSale of buyer.sales) {
-        const grandTotal = Number(bSale.grandTotal || bSale.subtotal || 0);
-        const allocatedPaid = Math.min(totalCredit, grandTotal);
-        const outstanding = Math.max(0, grandTotal - allocatedPaid);
-        const status = outstanding <= 0 ? "PAID" : allocatedPaid > 0 ? "PARTIAL" : "PENDING";
-
-        reconciledSaleMap.set(bSale.id, {
-          amountPaid: allocatedPaid,
-          outstandingAmount: outstanding,
-          paymentStatus: status,
-        });
-
-        totalCredit -= allocatedPaid;
-      }
-    }
-
-    // Format sales with 100% reconciled amounts
+    // Format sales: Walk-in sales (no registered buyer) are full cash sales
     const normalizedSales = sales.map((sale) => {
-      // 1. Walk-in customers (no buyer): Always paid, 0 outstanding credit
       if (!sale.buyerId && !sale.buyer) {
         return {
           ...sale,
@@ -117,49 +60,8 @@ export async function GET(request: NextRequest) {
           paymentStatus: "PAID",
         };
       }
-
-      // 2. Registered buyer sales: Use reconciled status
-      const reconciled = reconciledSaleMap.get(sale.id);
-      if (reconciled) {
-        if (
-          Number(sale.amountPaid) !== reconciled.amountPaid ||
-          Number(sale.outstandingAmount) !== reconciled.outstandingAmount ||
-          sale.paymentStatus !== reconciled.paymentStatus
-        ) {
-          dbUpdatesToRun.push({
-            id: sale.id,
-            amountPaid: reconciled.amountPaid,
-            outstandingAmount: reconciled.outstandingAmount,
-            paymentStatus: reconciled.paymentStatus,
-          });
-        }
-
-        return {
-          ...sale,
-          amountPaid: reconciled.amountPaid,
-          outstandingAmount: reconciled.outstandingAmount,
-          paymentStatus: reconciled.paymentStatus,
-        };
-      }
-
       return sale;
     });
-
-    // Self-heal database in background if discrepancies were detected
-    if (dbUpdatesToRun.length > 0) {
-      Promise.all(
-        dbUpdatesToRun.map((u) =>
-          prisma.sale.update({
-            where: { id: u.id },
-            data: {
-              amountPaid: u.amountPaid,
-              outstandingAmount: u.outstandingAmount,
-              paymentStatus: u.paymentStatus as any,
-            },
-          })
-        )
-      ).catch((err) => console.error("Database reconciliation update error:", err));
-    }
 
     return NextResponse.json(normalizedSales);
   } catch (error) {

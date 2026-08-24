@@ -406,7 +406,7 @@ export default function DashboardPage() {
 
           <DialogFooter className="p-3 bg-slate-50 border-t border-slate-200">
             <Button variant="outline" size="sm" onClick={() => setIsBankModalOpen(false)}>
-              Close
+              {t("close")}
             </Button>
           </DialogFooter>
         </DialogContent>
