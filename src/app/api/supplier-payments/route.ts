@@ -54,32 +54,40 @@ export async function POST(request: Request) {
         },
       });
 
-      if (purchaseId) {
-        const purchase = await tx.purchase.findUnique({
-          where: { id: purchaseId },
-        });
+      // Update and reconcile supplier purchases
+      const supplierPurchases = await tx.purchase.findMany({
+        where: { supplierId, isDeleted: false },
+        orderBy: [{ purchaseDate: "asc" }, { createdAt: "asc" }],
+      });
 
-        if (purchase) {
-          const newAmountPaid = Number(purchase.amountPaid) + amountNum;
-          const totalAmount = Number(purchase.totalAmount);
-          const newOutstanding = totalAmount - newAmountPaid;
+      const allPayments = await tx.supplierPayment.findMany({
+        where: { supplierId, isDeleted: false },
+      });
 
-          let paymentStatus: "PAID" | "PARTIAL" | "PENDING" = "PENDING";
-          if (newAmountPaid >= totalAmount) {
-            paymentStatus = "PAID";
-          } else if (newAmountPaid > 0) {
-            paymentStatus = "PARTIAL";
-          }
+      let totalCredit = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
+      for (const pur of supplierPurchases) {
+        const totalAmount = Number(pur.totalAmount || 0);
+        const allocatedPaid = Math.min(totalCredit, totalAmount);
+        const outstanding = Math.max(0, totalAmount - allocatedPaid);
+        const status = outstanding <= 0 ? "PAID" : allocatedPaid > 0 ? "PARTIAL" : "PENDING";
+
+        if (
+          Number(pur.amountPaid) !== allocatedPaid ||
+          Number(pur.outstandingAmount) !== outstanding ||
+          pur.paymentStatus !== status
+        ) {
           await tx.purchase.update({
-            where: { id: purchaseId },
+            where: { id: pur.id },
             data: {
-              amountPaid: newAmountPaid,
-              outstandingAmount: newOutstanding,
-              paymentStatus,
+              amountPaid: allocatedPaid,
+              outstandingAmount: outstanding,
+              paymentStatus: status,
             },
           });
         }
+
+        totalCredit -= allocatedPaid;
       }
 
       return newPayment;
