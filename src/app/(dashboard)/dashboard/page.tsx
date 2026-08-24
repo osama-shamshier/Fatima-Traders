@@ -15,6 +15,7 @@ import {
   Wallet,
   AlertTriangle,
   Receipt,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
