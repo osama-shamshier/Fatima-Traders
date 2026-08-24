@@ -163,6 +163,8 @@ export async function GET() {
       .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
       .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
 
+    const todayPendingCredit = salesToday.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
+
     // 1. Bank transactions from POS sales completed today
     const bankSalesDetails = salesToday
       .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
