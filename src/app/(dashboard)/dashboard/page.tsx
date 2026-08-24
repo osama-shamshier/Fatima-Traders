@@ -75,14 +75,6 @@ export default function DashboardPage() {
       clickable: false,
     },
     {
-      title: t("customerOutstanding"),
-      value: formatCurrency(stats?.totalBuyerReceivables || 0),
-      icon: CreditCard,
-      color: "bg-purple-600",
-      subtext: t("customerOutstandingSub"),
-      clickable: false,
-    },
-    {
       title: t("activeBranches"),
       value: `${stats?.activeBranches || 0}`,
       icon: Building2,
@@ -147,8 +139,8 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* KPI Metric Cards (5 Cards) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* KPI Metric Cards (4 Cards) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card, index) => {
           const Icon = card.icon;
           return (
