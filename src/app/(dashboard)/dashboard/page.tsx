@@ -14,6 +14,7 @@ import {
   Landmark,
   Wallet,
   AlertTriangle,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
@@ -98,10 +99,10 @@ export default function DashboardPage() {
 
   const quickActions = [
     {
-      name: t("actionPos"),
-      sub: t("actionPosSub"),
-      href: "/pos",
-      icon: ShoppingCart,
+      name: t("actionSalesHistory"),
+      sub: t("actionSalesHistorySub"),
+      href: "/sales",
+      icon: Receipt,
       color: "text-emerald-600 bg-emerald-100",
     },
     {
