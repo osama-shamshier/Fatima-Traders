@@ -87,6 +87,46 @@ export async function GET(request: NextRequest) {
     let totalReturnsRefund = 0;
     let returnedCogs = 0;
 
+    // 3. Fetch Purchase Items & Active Inventory Layers for exact FIFO Reconciliation
+    const [purchaseItems, inventoryLayers] = await Promise.all([
+      prisma.purchaseItem.findMany({
+        where: {
+          purchase: { isDeleted: false, ...(branchId ? { branchId } : {}) },
+          ...(productId ? { productId } : {}),
+        },
+        select: {
+          productId: true,
+          quantity: true,
+          purchaseRate: true,
+          total: true,
+        },
+      }),
+      prisma.inventoryLayer.findMany({
+        where: {
+          ...(branchId ? { branchId } : {}),
+          ...(productId ? { productId } : {}),
+          remainingQty: { gt: 0 },
+        },
+        select: {
+          productId: true,
+          remainingQty: true,
+          costPerUnit: true,
+        },
+      }),
+    ]);
+
+    const productPurchasedMap = new Map<string, number>();
+    for (const pi of purchaseItems) {
+      const lineTotal = Number(pi.total || Number(pi.quantity) * Number(pi.purchaseRate));
+      productPurchasedMap.set(pi.productId, (productPurchasedMap.get(pi.productId) || 0) + lineTotal);
+    }
+
+    const productRemainingMap = new Map<string, number>();
+    for (const layer of inventoryLayers) {
+      const layerVal = Number(layer.remainingQty) * Number(layer.costPerUnit);
+      productRemainingMap.set(layer.productId, (productRemainingMap.get(layer.productId) || 0) + layerVal);
+    }
+
     const productMap = new Map<string, any>();
 
     // Process Sales
@@ -185,6 +225,24 @@ export async function GET(request: NextRequest) {
         pData.returnedCogs += restockedCost;
       });
     });
+
+    // Exact FIFO All-Time Reconciliation: Total COGS = Total Purchases - Remaining Inventory Valuation
+    if (!dateRange) {
+      let reconciledTotalGrossCogs = 0;
+      for (const [pId, pData] of productMap.entries()) {
+        const purchasedVal = productPurchasedMap.get(pId);
+        const remainingVal = productRemainingMap.get(pId) || 0;
+        if (purchasedVal !== undefined && purchasedVal > 0) {
+          const exactNetCogs = Math.max(0, purchasedVal - remainingVal);
+          pData.grossCogs = exactNetCogs + Number(pData.returnedCogs || 0);
+          pData.netCogs = exactNetCogs;
+        }
+        reconciledTotalGrossCogs += pData.grossCogs;
+      }
+      if (reconciledTotalGrossCogs > 0) {
+        grossCogs = reconciledTotalGrossCogs;
+      }
+    }
 
     // Net Calculations
     const netRevenue = Math.max(0, grossRevenue - totalReturnsRefund);
