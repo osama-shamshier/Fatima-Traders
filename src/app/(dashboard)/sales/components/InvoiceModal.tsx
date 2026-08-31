@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "next-intl";
@@ -74,7 +74,7 @@ export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalPro
                 )}
               </div>
               <div className="text-end space-y-1">
-                <p><span className="text-slate-400 font-medium">{t("invoiceDate")}:</span> <strong className="text-slate-800">{formatDate(sale.saleDate)}</strong></p>
+                <p><span className="text-slate-400 font-medium">{t("invoiceDate")}:</span> <strong className="text-slate-800">{formatDateTime(sale.saleDate || sale.createdAt)}</strong></p>
                 <p><span className="text-slate-400 font-medium">{t("cashier")}:</span> <strong className="text-slate-800">{sale.createdBy?.name || "Admin"}</strong></p>
                 <p><span className="text-slate-400 font-medium">{t("paymentStatus")}:</span> <strong className="text-emerald-700 uppercase">{sale.paymentStatus}</strong></p>
               </div>

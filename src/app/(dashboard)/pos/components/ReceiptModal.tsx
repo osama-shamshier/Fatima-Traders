@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Printer } from "lucide-react";
 
 interface ReceiptModalProps {
@@ -49,7 +49,7 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
             </div>
             <div className="flex justify-between">
               <span>Date:</span>
-              <span>{formatDate(sale.saleDate)}</span>
+              <span>{formatDateTime(sale.saleDate || sale.createdAt)}</span>
             </div>
             <div className="flex justify-between">
               <span>Cashier:</span>
