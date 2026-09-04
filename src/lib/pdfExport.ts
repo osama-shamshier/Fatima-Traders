@@ -970,7 +970,7 @@ export function generateLedgerPDF({
   doc.setTextColor(100, 116, 139);
   doc.text(`Total Entries: ${entries.length + (startDate ? 1 : 0)}`, 192, 42, { align: "right" });
 
-  // Summary Metrics Bar (4 Cards)
+  // Summary Metrics Bar (4 Cards) - Clean, simple white boxes
   const formatPKR = (num: number) =>
     `Rs. ${Number(num || 0).toLocaleString("en-PK", {
       minimumFractionDigits: 2,
@@ -987,6 +987,7 @@ export function generateLedgerPDF({
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(14, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
   doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("OPENING BALANCE", 16, kpiY + 4.5);
   doc.setFontSize(8.5);
@@ -996,38 +997,44 @@ export function generateLedgerPDF({
 
   // Box 2: Period Debit
   const box2X = 14 + kpiW + kpiGap;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
   doc.roundedRect(box2X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
   doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text(isCustomer ? "PERIOD INVOICED (+)" : "PERIOD PURCHASES (+)", box2X + 2, kpiY + 4.5);
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(190, 18, 60); // rose-700
+  doc.setTextColor(15, 23, 42);
   doc.text(formatPKR(periodDebit), box2X + 2, kpiY + 10);
 
   // Box 3: Period Credit
   const box3X = box2X + kpiW + kpiGap;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
   doc.roundedRect(box3X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
   doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text(isCustomer ? "PERIOD RECEIVED (-)" : "PERIOD PAYMENTS (-)", box3X + 2, kpiY + 4.5);
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(5, 150, 105); // emerald-700
+  doc.setTextColor(15, 23, 42);
   doc.text(formatPKR(periodCredit), box3X + 2, kpiY + 10);
 
   // Box 4: Closing Balance
   const box4X = box3X + kpiW + kpiGap;
-  doc.setFillColor(closingBalance > 0 ? 255 : 240, closingBalance > 0 ? 241 : 253, closingBalance > 0 ? 242 : 244);
-  doc.setDrawColor(closingBalance > 0 ? 254 : 167, closingBalance > 0 ? 205 : 243, closingBalance > 0 ? 211 : 208);
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
   doc.roundedRect(box4X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(closingBalance > 0 ? 190 : 5, closingBalance > 0 ? 18 : 150, closingBalance > 0 ? 60 : 105);
-  doc.text(isCustomer ? "NET RECEIVABLE DUE" : "NET PAYABLE DUE", box4X + 2, kpiY + 4.5);
-  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(isCustomer ? "CLOSING RECEIVABLE" : "CLOSING PAYABLE", box4X + 2, kpiY + 4.5);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
   doc.text(formatPKR(closingBalance), box4X + 2, kpiY + 10);
 
   // Prepare Table Rows
@@ -1132,10 +1139,10 @@ export function generateLedgerPDF({
       0: { cellWidth: 7, halign: "center" },
       1: { cellWidth: 22 },
       2: { cellWidth: 18, fontStyle: "bold" },
-      3: { cellWidth: 26, fontStyle: "bold", textColor: [37, 99, 235] },
+      3: { cellWidth: 26, fontStyle: "bold", textColor: [15, 23, 42] },
       4: { cellWidth: 41 },
-      5: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [190, 18, 60] },
-      6: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [5, 150, 105] },
+      5: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [15, 23, 42] },
+      6: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [15, 23, 42] },
       7: { cellWidth: 24, halign: "right", fontStyle: "bold", textColor: [15, 23, 42] },
     },
     didDrawPage: (data) => {
