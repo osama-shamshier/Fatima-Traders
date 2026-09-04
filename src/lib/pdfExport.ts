@@ -829,6 +829,7 @@ export function exportProfitLossCSV({
     "\uFEFF" + rows.map((r) => r.join(",")).join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
   const sanitizedPeriod = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
   const link = document.createElement("a");
   link.href = url;
