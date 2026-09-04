@@ -829,13 +829,353 @@ export function exportProfitLossCSV({
     "\uFEFF" + rows.map((r) => r.join(",")).join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+  const sanitizedPeriod = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
   const link = document.createElement("a");
   link.href = url;
-  const sanitizedPeriod = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
   link.download = `Profit_Loss_${sanitizedPeriod}_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export interface LedgerEntryPDFItem {
+  date: string | Date;
+  type: string;
+  reference?: string;
+  description?: string;
+  debit: number;
+  credit: number;
+  calculatedBalance: number;
+}
+
+export interface GenerateLedgerPDFOptions {
+  partyType: "Customer" | "Supplier";
+  partyName: string;
+  partyPhone?: string;
+  partyAddress?: string;
+  startDate?: string;
+  endDate?: string;
+  openingBalance: number;
+  periodDebit: number;
+  periodCredit: number;
+  closingBalance: number;
+  entries: LedgerEntryPDFItem[];
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
+}
+
+/**
+ * Generates and downloads a clean, multi-page vector PDF Statement for Customer or Supplier Ledgers
+ */
+export function generateLedgerPDF({
+  partyType,
+  partyName,
+  partyPhone,
+  partyAddress,
+  startDate,
+  endDate,
+  openingBalance,
+  periodDebit,
+  periodCredit,
+  closingBalance,
+  entries,
+  storeName = "FATIMA TRADERS",
+  storeAddress = "Purani Ghalla Mandi, Ahmad Pur East",
+  storePhone = "0334-7776934",
+}: GenerateLedgerPDFOptions) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const isCustomer = partyType === "Customer";
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-PK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-PK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Top Dark Banner Header (210mm width for portrait A4)
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, 210, 26, "F");
+
+  // Store Brand Name & Address
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(storeName.toUpperCase(), 14, 11);
+
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(203, 213, 225); // slate-300
+  doc.text(`${storeAddress} | Tel: ${storePhone}`, 14, 18);
+
+  // Statement Title (Right Aligned)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text(
+    isCustomer ? "CUSTOMER ACCOUNT STATEMENT" : "SUPPLIER ACCOUNT STATEMENT",
+    196,
+    11,
+    { align: "right" }
+  );
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(203, 213, 225);
+  doc.text(`Generated: ${dateStr} at ${timeStr}`, 196, 18, { align: "right" });
+
+  // Party Details & Date Range Subheader Box
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.roundedRect(14, 30, 182, 16, 2, 2, "FD");
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text(`${isCustomer ? "Customer" : "Supplier"}: ${cleanAscii(partyName, isCustomer ? "Customer" : "Supplier")}`, 18, 36);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105); // slate-600
+  const contactText = [partyPhone, partyAddress].filter(Boolean).join(" • ");
+  if (contactText) {
+    doc.text(cleanAscii(contactText), 18, 42);
+  }
+
+  // Period label
+  const periodText = startDate
+    ? `${new Date(startDate).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })} to ${
+        endDate
+          ? new Date(endDate).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
+          : "Today"
+      }`
+    : "All Time (Beginning to Today)";
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(37, 99, 235); // blue-600
+  doc.text(`Period: ${cleanAscii(periodText)}`, 192, 36, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Total Entries: ${entries.length + (startDate ? 1 : 0)}`, 192, 42, { align: "right" });
+
+  // Summary Metrics Bar (4 Cards)
+  const formatPKR = (num: number) =>
+    `Rs. ${Number(num || 0).toLocaleString("en-PK", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const kpiY = 49;
+  const kpiW = 43.5;
+  const kpiH = 13;
+  const kpiGap = 2.6;
+
+  // Box 1: Opening Balance
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text("OPENING BALANCE", 16, kpiY + 4.5);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text(formatPKR(openingBalance), 16, kpiY + 10);
+
+  // Box 2: Period Debit
+  const box2X = 14 + kpiW + kpiGap;
+  doc.roundedRect(box2X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(isCustomer ? "PERIOD INVOICED (+)" : "PERIOD PURCHASES (+)", box2X + 2, kpiY + 4.5);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(190, 18, 60); // rose-700
+  doc.text(formatPKR(periodDebit), box2X + 2, kpiY + 10);
+
+  // Box 3: Period Credit
+  const box3X = box2X + kpiW + kpiGap;
+  doc.roundedRect(box3X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(isCustomer ? "PERIOD RECEIVED (-)" : "PERIOD PAYMENTS (-)", box3X + 2, kpiY + 4.5);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(5, 150, 105); // emerald-700
+  doc.text(formatPKR(periodCredit), box3X + 2, kpiY + 10);
+
+  // Box 4: Closing Balance
+  const box4X = box3X + kpiW + kpiGap;
+  doc.setFillColor(closingBalance > 0 ? 255 : 240, closingBalance > 0 ? 241 : 253, closingBalance > 0 ? 242 : 244);
+  doc.setDrawColor(closingBalance > 0 ? 254 : 167, closingBalance > 0 ? 205 : 243, closingBalance > 0 ? 211 : 208);
+  doc.roundedRect(box4X, kpiY, kpiW, kpiH, 1.5, 1.5, "FD");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(closingBalance > 0 ? 190 : 5, closingBalance > 0 ? 18 : 150, closingBalance > 0 ? 60 : 105);
+  doc.text(isCustomer ? "NET RECEIVABLE DUE" : "NET PAYABLE DUE", box4X + 2, kpiY + 4.5);
+  doc.setFontSize(9);
+  doc.text(formatPKR(closingBalance), box4X + 2, kpiY + 10);
+
+  // Prepare Table Rows
+  const tableRows: any[] = [];
+
+  // Opening Balance row if starting date
+  if (startDate) {
+    const openDateStr = new Date(startDate).toLocaleDateString("en-PK", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    tableRows.push([
+      "-",
+      openDateStr,
+      "OPENING",
+      "-",
+      "Opening Balance Brought Forward",
+      "-",
+      "-",
+      Number(openingBalance || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+    ]);
+  }
+
+  entries.forEach((item, index) => {
+    const itemDateStr = item.date
+      ? new Date(item.date).toLocaleDateString("en-PK", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "-";
+
+    tableRows.push([
+      (index + 1).toString(),
+      itemDateStr,
+      item.type || "-",
+      cleanAscii(item.reference, "-"),
+      cleanAscii(item.description, "-"),
+      item.debit > 0
+        ? Number(item.debit).toLocaleString("en-PK", { minimumFractionDigits: 2 })
+        : "-",
+      item.credit > 0
+        ? Number(item.credit).toLocaleString("en-PK", { minimumFractionDigits: 2 })
+        : "-",
+      Number(item.calculatedBalance || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 }),
+    ]);
+  });
+
+  if (tableRows.length === 0) {
+    tableRows.push(["-", "-", "-", "-", "No ledger entries found for this period", "-", "-", "0.00"]);
+  }
+
+  autoTable(doc, {
+    startY: 66,
+    head: [
+      [
+        "#",
+        "Date",
+        "Type",
+        "Ref / Invoice #",
+        "Description / Notes",
+        "Debit (+)",
+        "Credit (-)",
+        "Balance (PKR)",
+      ],
+    ],
+    body: tableRows,
+    foot: [
+      [
+        "",
+        "TOTAL",
+        "",
+        "",
+        `${entries.length} Transactions`,
+        formatPKR(periodDebit),
+        formatPKR(periodCredit),
+        formatPKR(closingBalance),
+      ],
+    ],
+    theme: "striped",
+    headStyles: {
+      fillColor: [30, 41, 59], // slate-800
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 8,
+      halign: "left",
+    },
+    footStyles: {
+      fillColor: [241, 245, 249], // slate-100
+      textColor: [15, 23, 42],
+      fontStyle: "bold",
+      fontSize: 8.5,
+    },
+    styles: {
+      fontSize: 7.5,
+      cellPadding: 2.2,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    columnStyles: {
+      0: { cellWidth: 7, halign: "center" },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 18, fontStyle: "bold" },
+      3: { cellWidth: 26, fontStyle: "bold", textColor: [37, 99, 235] },
+      4: { cellWidth: 41 },
+      5: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [190, 18, 60] },
+      6: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [5, 150, 105] },
+      7: { cellWidth: 24, halign: "right", fontStyle: "bold", textColor: [15, 23, 42] },
+    },
+    didDrawPage: (data) => {
+      const pageNumber = (doc as any).internal.getNumberOfPages();
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text(
+        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        105,
+        290,
+        { align: "center" }
+      );
+    },
+  });
+
+  // Check if we need a new page for signature block or attach to bottom
+  const finalY = (doc as any).lastAutoTable?.finalY || 200;
+  let sigY = finalY + 14;
+  if (sigY > 265) {
+    doc.addPage();
+    sigY = 30;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(71, 85, 105);
+
+  doc.line(16, sigY + 10, 60, sigY + 10);
+  doc.text("Prepared By", 38, sigY + 15, { align: "center" });
+
+  doc.line(83, sigY + 10, 127, sigY + 10);
+  doc.text(isCustomer ? "Customer Signature" : "Vendor Signature", 105, sigY + 15, { align: "center" });
+
+  doc.line(150, sigY + 10, 194, sigY + 10);
+  doc.text("Authorized Signatory", 172, sigY + 15, { align: "center" });
+
+  const sanitizedName = partyName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const dateStamp = now.toISOString().slice(0, 10);
+  const filename = `${partyType}_Ledger_${sanitizedName}_${dateStamp}.pdf`;
+
+  doc.save(filename);
+}
+

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Truck, Download, Calendar, X, FileText } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import { useTranslations } from "next-intl";
+import { generateLedgerPDF } from "@/lib/pdfExport";
 
 interface SupplierLedgerModalProps {
   isOpen: boolean;
@@ -92,7 +93,22 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
   }, [ledger, startDate, endDate]);
 
   const handleDownloadPDF = () => {
-    window.print();
+    if (filteredLedger.length === 0 && openingBalance === 0) {
+      alert("No ledger entries to export for selected dates.");
+      return;
+    }
+
+    generateLedgerPDF({
+      partyType: "Supplier",
+      partyName: supplierName || "Supplier",
+      startDate,
+      endDate,
+      openingBalance,
+      periodDebit,
+      periodCredit,
+      closingBalance,
+      entries: filteredLedger,
+    });
   };
 
   const handleDownloadCSV = () => {
@@ -421,9 +437,45 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
 
         <style dangerouslySetInnerHTML={{__html: `
           @media print {
-            body * { visibility: hidden; }
-            #supplier-ledger-print-area, #supplier-ledger-print-area * { visibility: visible; }
-            #supplier-ledger-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            @page {
+              size: A4 portrait;
+              margin: 10mm;
+            }
+            body {
+              background: white !important;
+              color: black !important;
+            }
+            body * {
+              visibility: hidden;
+            }
+            #supplier-ledger-print-area, #supplier-ledger-print-area * {
+              visibility: visible;
+            }
+            #supplier-ledger-print-area {
+              position: static !important;
+              display: block !important;
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            div[role="dialog"], div[role="dialog"] > div {
+              position: static !important;
+              transform: none !important;
+              max-height: none !important;
+              height: auto !important;
+              overflow: visible !important;
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              box-shadow: none !important;
+              border: none !important;
+            }
+            tr {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
           }
         `}} />
       </DialogContent>
