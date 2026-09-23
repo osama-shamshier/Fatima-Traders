@@ -2,11 +2,11 @@
 // Fatima Traders Retail Management System
 
 const DB_NAME = "fatima_retail_offline_v2";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface OutboxItem {
   id: string; // client UUID (e.g. outbox_1727...)
-  actionType: "SALE" | "EXPENSE" | "STOCK_ADJUSTMENT" | "PURCHASE" | "BUYER" | "SUPPLIER";
+  actionType: "SALE" | "EXPENSE" | "STOCK_ADJUSTMENT" | "PURCHASE" | "BUYER" | "SUPPLIER" | "BUYER_PAYMENT" | "SUPPLIER_PAYMENT";
   endpoint: string;
   method: "POST" | "PUT" | "DELETE";
   payload: any;
@@ -152,6 +152,25 @@ export function openOfflineDB(): Promise<IDBDatabase> {
       // Metadata / Key-Value
       if (!db.objectStoreNames.contains("meta")) {
         db.createObjectStore("meta", { keyPath: "key" });
+      }
+
+      // Buyer Payments (Customer settlements)
+      if (!db.objectStoreNames.contains("buyer_payments")) {
+        const bpStore = db.createObjectStore("buyer_payments", { keyPath: "id" });
+        bpStore.createIndex("buyerId", "buyerId", { unique: false });
+        bpStore.createIndex("createdAt", "createdAt", { unique: false });
+      }
+
+      // Supplier Payments (Supplier settlements)
+      if (!db.objectStoreNames.contains("supplier_payments")) {
+        const spStore = db.createObjectStore("supplier_payments", { keyPath: "id" });
+        spStore.createIndex("supplierId", "supplierId", { unique: false });
+        spStore.createIndex("createdAt", "createdAt", { unique: false });
+      }
+
+      // Cached Ledgers per Party
+      if (!db.objectStoreNames.contains("ledgers")) {
+        db.createObjectStore("ledgers", { keyPath: "partyId" });
       }
     };
 

@@ -11,6 +11,7 @@ import { TableLoader } from "@/components/ui/loader";
 import { Search, Plus, Truck, X, Download, MapPin, Edit, Trash2, FileText } from "lucide-react";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import { cacheCatalogData, getOfflineSuppliers, applyOfflineDisbursementsToSuppliers } from "@/lib/offline/cacheService";
 
 export default function SuppliersPage() {
   const t = useTranslations("suppliers");
@@ -31,13 +32,27 @@ export default function SuppliersPage() {
 
   const fetchSuppliers = async () => {
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const cached = await getOfflineSuppliers();
+        setSuppliers(cached);
+        setLoading(false);
+        return;
+      }
       const res = await fetch("/api/suppliers");
       if (res.ok) {
         const data = await res.json();
-        setSuppliers(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        cacheCatalogData({ suppliers: list });
+        const adjusted = await applyOfflineDisbursementsToSuppliers(list);
+        setSuppliers(adjusted);
+      } else {
+        const cached = await getOfflineSuppliers();
+        setSuppliers(cached);
       }
     } catch (error) {
-      console.error(error);
+      console.warn("Falling back to cached suppliers:", error);
+      const cached = await getOfflineSuppliers();
+      setSuppliers(cached);
     } finally {
       setLoading(false);
     }
@@ -45,6 +60,9 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     fetchSuppliers();
+    const handleOnline = () => fetchSuppliers();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const handleAdd = () => {

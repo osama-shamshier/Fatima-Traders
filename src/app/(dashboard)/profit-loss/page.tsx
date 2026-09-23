@@ -23,6 +23,8 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import { generateProfitLossPDF, exportProfitLossCSV } from "@/lib/pdfExport";
+import { calculateOfflineShiftProfitLoss, getOfflineProducts } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
 
 export default function ProfitLossPage() {
   const t = useTranslations("profitLoss");
@@ -50,22 +52,79 @@ export default function ProfitLossPage() {
     fetchProfitLoss();
   }, [period, selectedBranchId, selectedProductId]);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      fetchBranchesAndProducts();
+      fetchProfitLoss();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [period, selectedBranchId, selectedProductId, startDate, endDate]);
+
   const fetchBranchesAndProducts = async () => {
     try {
       const [bRes, pRes] = await Promise.all([
-        fetch("/api/branches"),
-        fetch("/api/products"),
+        fetch("/api/branches").catch(() => null),
+        fetch("/api/products").catch(() => null),
       ]);
-      if (bRes.ok) setBranches(await bRes.json());
-      if (pRes.ok) setProducts(await pRes.json());
+      if (bRes && bRes.ok) {
+        setBranches(await bRes.json());
+      } else {
+        const cachedB = await getAllFromStore<any>("branches");
+        if (cachedB && cachedB.length > 0) setBranches(cachedB);
+      }
+      if (pRes && pRes.ok) {
+        setProducts(await pRes.json());
+      } else {
+        const cachedP = await getOfflineProducts();
+        if (cachedP && cachedP.length > 0) setProducts(cachedP);
+      }
     } catch (e) {
       console.error(e);
+      const cachedB = await getAllFromStore<any>("branches");
+      if (cachedB && cachedB.length > 0) setBranches(cachedB);
+      const cachedP = await getOfflineProducts();
+      if (cachedP && cachedP.length > 0) setProducts(cachedP);
     }
+  };
+
+  const getFilterBounds = () => {
+    let filterStart: string | undefined = undefined;
+    let filterEnd: string | undefined = undefined;
+    const now = new Date();
+
+    if (period === "today") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      filterStart = d.toISOString();
+    } else if (period === "this_week") {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      filterStart = d.toISOString();
+    } else if (period === "this_month") {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      filterStart = d.toISOString();
+    } else if (period === "last_month") {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      filterStart = first.toISOString();
+      filterEnd = last.toISOString();
+    } else if (period === "custom") {
+      if (startDate) filterStart = new Date(startDate + "T00:00:00").toISOString();
+      if (endDate) filterEnd = new Date(endDate + "T23:59:59").toISOString();
+    }
+    return { filterStart, filterEnd };
   };
 
   const fetchProfitLoss = async () => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        const { filterStart, filterEnd } = getFilterBounds();
+        const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
+        if (offlineReport) setPlData(offlineReport);
+        return;
+      }
+
       const params = new URLSearchParams();
       if (period !== "all") params.append("period", period);
       if (selectedBranchId) params.append("branchId", selectedBranchId);
@@ -78,9 +137,16 @@ export default function ProfitLossPage() {
       const res = await fetch(`/api/reports/profit-loss?${params.toString()}`);
       if (res.ok) {
         setPlData(await res.json());
+      } else {
+        const { filterStart, filterEnd } = getFilterBounds();
+        const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
+        if (offlineReport) setPlData(offlineReport);
       }
     } catch (e) {
-      console.error("Failed to fetch P&L data", e);
+      console.warn("Server P&L fetch failed, falling back to local offline shift calculations:", e);
+      const { filterStart, filterEnd } = getFilterBounds();
+      const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
+      if (offlineReport) setPlData(offlineReport);
     } finally {
       setIsLoading(false);
     }
@@ -292,6 +358,28 @@ export default function ProfitLossPage() {
           )}
         </form>
       </div>
+
+      {/* Offline Mode Indicator Banner */}
+      {plData?.isOfflineEstimate && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                ⚡ Offline Mode Shift Calculation
+              </h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Estimated from local transactions and catalog cost prices. Official multi-branch FIFO ledger will synchronize automatically upon network restoration.
+              </p>
+            </div>
+          </div>
+          <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-300 font-bold shrink-0">
+            Local Estimate
+          </Badge>
+        </div>
+      )}
 
       {/* Loss Warning Banner if any items selling below cost */}
       {lossCount > 0 && (

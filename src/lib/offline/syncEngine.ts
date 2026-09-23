@@ -226,11 +226,12 @@ class SyncEngine {
   // Refresh fresh product stock and buyer balances after sync
   public async refreshCatalogFromServer() {
     try {
-      const [prodRes, buyerRes, catRes, branchRes] = await Promise.all([
+      const [prodRes, buyerRes, catRes, branchRes, suppRes] = await Promise.all([
         fetch("/api/pos/products"),
         fetch("/api/buyers"),
         fetch("/api/categories"),
         fetch("/api/branches"),
+        fetch("/api/suppliers"),
       ]);
 
       const data: any = {};
@@ -238,6 +239,7 @@ class SyncEngine {
       if (buyerRes.ok) data.buyers = await buyerRes.json();
       if (catRes.ok) data.categories = await catRes.json();
       if (branchRes.ok) data.branches = await branchRes.json();
+      if (suppRes.ok) data.suppliers = await suppRes.json();
 
       await cacheCatalogData(data);
     } catch (err) {

@@ -10,6 +10,7 @@ import { RefreshCw, Truck, Download, Calendar, X, FileText } from "lucide-react"
 import { Loader } from "@/components/ui/loader";
 import { useTranslations } from "next-intl";
 import { generateLedgerPDF } from "@/lib/pdfExport";
+import { getCombinedSupplierLedger } from "@/lib/offline/cacheService";
 
 interface SupplierLedgerModalProps {
   isOpen: boolean;
@@ -35,16 +36,36 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
     }
   }, [isOpen, supplierId]);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      if (isOpen && supplierId) fetchLedger();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [isOpen, supplierId]);
+
   const fetchLedger = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/ledger`);
-      if (res.ok) {
-        const data = await res.json();
-        setLedger(Array.isArray(data) ? data : []);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/suppliers/${supplierId}/ledger`);
+        if (res.ok) {
+          const data = await res.json();
+          const combined = await getCombinedSupplierLedger(supplierId, Array.isArray(data) ? data : []);
+          setLedger(combined);
+          setLoading(false);
+          return;
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch supplier ledger", error);
+      console.warn("Online supplier ledger fetch failed, loading offline:", error);
+    }
+
+    try {
+      const combined = await getCombinedSupplierLedger(supplierId, []);
+      setLedger(combined);
+    } catch (err) {
+      console.error("Failed to load offline supplier ledger:", err);
     } finally {
       setLoading(false);
     }
@@ -368,18 +389,25 @@ export function SupplierLedgerModal({ isOpen, onClose, supplierId, supplierName 
                     <tr key={`${entry.id}-${index}`} className="hover:bg-slate-50">
                       <td className="p-3 text-slate-600 font-mono whitespace-nowrap">{formatDate(entry.date)}</td>
                       <td className="p-3">
-                        <Badge
-                          variant={
-                            entry.type === "PURCHASE"
-                              ? "outline"
-                              : entry.type === "PAYMENT"
-                              ? "success"
-                              : "warning"
-                          }
-                          className="text-[11px] font-bold"
-                        >
-                          {entry.type}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Badge
+                            variant={
+                              entry.type === "PURCHASE"
+                                ? "outline"
+                                : entry.type === "PAYMENT"
+                                ? "success"
+                                : "warning"
+                            }
+                            className="text-[11px] font-bold"
+                          >
+                            {entry.type}
+                          </Badge>
+                          {entry.isOfflinePending && (
+                            <Badge variant="warning" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-800 border-amber-300">
+                              ⏳ Offline
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 font-mono font-bold text-blue-600 truncate">{entry.reference || "-"}</td>
                       <td className="p-3 text-slate-700 truncate">{entry.description || "-"}</td>

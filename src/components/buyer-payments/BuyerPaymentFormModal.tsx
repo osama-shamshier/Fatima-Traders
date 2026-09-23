@@ -10,6 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import {
+  recordOfflineBuyerPayment,
+  getOfflineBuyers,
+  applyOfflineCreditsToBuyers,
+} from "@/lib/offline/cacheService";
 
 interface BuyerPaymentFormModalProps {
   isOpen: boolean;
@@ -52,10 +57,22 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/buyers")
-        .then((res) => res.json())
-        .then((data) => setBuyers(Array.isArray(data) ? data.filter((b: any) => b.isActive) : []))
-        .catch(console.error);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        fetch("/api/buyers")
+          .then((res) => res.json())
+          .then(async (data) => {
+            if (Array.isArray(data)) {
+              const active = data.filter((b: any) => b.isActive);
+              const effective = await applyOfflineCreditsToBuyers(active);
+              setBuyers(effective);
+            }
+          })
+          .catch(console.error);
+      } else {
+        getOfflineBuyers().then((cached) => {
+          setBuyers(cached.filter((b: any) => b.isActive !== false));
+        }).catch(console.error);
+      }
     }
   }, [isOpen]);
 
@@ -76,20 +93,38 @@ export function BuyerPaymentFormModal({ isOpen, onClose, onSuccess }: BuyerPayme
         notes: data.notes,
       };
 
-      const res = await fetch("/api/buyer-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to record payment");
+      if (!isOffline) {
+        try {
+          const res = await fetch("/api/buyer-payments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (res.ok) {
+            reset();
+            onSuccess();
+            onClose();
+            return;
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            alert(`Error: ${errData.error || "Failed to record payment"}`);
+            return;
+          }
+        } catch (netErr) {
+          console.warn("Online settlement failed, switching to offline save:", netErr);
+          isOffline = true;
+        }
       }
 
-      reset();
-      onSuccess();
-      onClose();
+      if (isOffline) {
+        await recordOfflineBuyerPayment(payload);
+        reset();
+        onSuccess();
+        onClose();
+      }
     } catch (error: any) {
       console.error(error);
       alert(error.message || "Error recording payment");

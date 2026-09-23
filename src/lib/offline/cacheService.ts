@@ -17,6 +17,7 @@ import {
   CachedExpense,
   CachedBranch,
   CachedCategory,
+  CachedSupplier,
   OutboxItem,
 } from "./db";
 
@@ -42,6 +43,7 @@ export async function cacheCatalogData(data: {
   branches?: CachedBranch[];
   buyers?: CachedBuyer[];
   expenses?: CachedExpense[];
+  suppliers?: CachedSupplier[];
 }): Promise<void> {
   try {
     await openOfflineDB();
@@ -60,6 +62,9 @@ export async function cacheCatalogData(data: {
     }
     if (data.expenses && data.expenses.length > 0) {
       await putManyInStore("expenses", data.expenses);
+    }
+    if (data.suppliers && data.suppliers.length > 0) {
+      await putManyInStore("suppliers", data.suppliers);
     }
 
     await setMeta("lastCachedAt", new Date().toISOString());
@@ -140,6 +145,63 @@ export async function applyOfflineCreditsToBuyers<T extends { id: string; totalO
       totalOutstanding: Number(b.totalOutstanding || 0) + addDebt,
     } as unknown as T;
   });
+}
+
+// Calculate total offline disbursements made per supplier
+export async function getPendingOfflineSupplierDisbursements(): Promise<Record<string, number>> {
+  try {
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const disbursements: Record<string, number> = {};
+    for (const item of outbox) {
+      if ((item.status === "PENDING" || item.status === "FAILED") && item.actionType === "SUPPLIER_PAYMENT" && item.payload?.supplierId) {
+        const suppId = item.payload.supplierId;
+        const amount = Number(item.payload.amount || 0);
+        if (amount > 0) {
+          disbursements[suppId] = (disbursements[suppId] || 0) + amount;
+        }
+      }
+    }
+    return disbursements;
+  } catch (err) {
+    console.error("Error calculating pending offline supplier disbursements:", err);
+    return {};
+  }
+}
+
+// Apply offline disbursements to any supplier list (reducing their outstanding payable balance in real-time)
+export async function applyOfflineDisbursementsToSuppliers<T extends { id: string; totalOutstanding?: number; outstandingBalance?: number }>(
+  suppliers: T[]
+): Promise<T[]> {
+  const disbursements = await getPendingOfflineSupplierDisbursements();
+  return suppliers.map((s) => {
+    const deduct = disbursements[s.id] || 0;
+    const currentOutstanding = Number(s.totalOutstanding !== undefined ? s.totalOutstanding : s.outstandingBalance || 0);
+    const newOutstanding = Math.max(0, currentOutstanding - deduct);
+    return {
+      ...s,
+      totalOutstanding: newOutstanding,
+      outstandingBalance: newOutstanding,
+    } as unknown as T;
+  });
+}
+
+// Retrieve offline suppliers with active disbursement adjustments applied
+export async function getOfflineSuppliers(search?: string): Promise<CachedSupplier[]> {
+  try {
+    const rawSuppliers = await getAllFromStore<CachedSupplier>("suppliers");
+    const suppliers = await applyOfflineDisbursementsToSuppliers(rawSuppliers);
+    if (!search) return suppliers;
+    const q = search.toLowerCase().trim();
+    return suppliers.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.companyName && s.companyName.toLowerCase().includes(q)) ||
+        (s.contactNumber && s.contactNumber.includes(q))
+    );
+  } catch (err) {
+    console.error("Error retrieving offline suppliers:", err);
+    return [];
+  }
 }
 
 // Retrieve offline products with filtering and active deductions applied
@@ -394,5 +456,410 @@ export async function getCombinedSales(liveSales: any[] = []): Promise<any[]> {
   } catch (err) {
     console.error("Error combining sales:", err);
     return liveSales;
+  }
+}
+
+// Record an offline Buyer Settlement Payment
+export async function recordOfflineBuyerPayment(payload: {
+  buyerId: string;
+  amount: number;
+  paymentMethod: string;
+  bankName?: string;
+  bankReference?: string;
+  notes?: string;
+  paymentDate?: string;
+}): Promise<any> {
+  const clientPaymentId = generateClientUUID("pay");
+  const now = new Date().toISOString();
+  const paymentAmount = Number(payload.amount);
+
+  // 1. Immediately reduce buyer's totalOutstanding in local storage
+  const buyer = await getFromStore<CachedBuyer>("buyers", payload.buyerId);
+  if (buyer) {
+    buyer.totalOutstanding = Math.max(0, Number(buyer.totalOutstanding || 0) - paymentAmount);
+    await putInStore("buyers", buyer);
+  }
+
+  // 2. Save payment record in local store
+  const paymentRecord = {
+    id: clientPaymentId,
+    clientPaymentId,
+    buyerId: payload.buyerId,
+    amount: paymentAmount,
+    paymentMethod: payload.paymentMethod || "CASH",
+    bankReference: payload.bankReference || null,
+    notes: payload.notes || "Offline Customer Settlement",
+    paymentDate: payload.paymentDate || now,
+    createdAt: now,
+    isOffline: true,
+  };
+  await putInStore("buyer_payments", paymentRecord);
+
+  // 3. Enqueue to Outbox for server sync
+  await enqueueOutbox({
+    id: clientPaymentId,
+    actionType: "BUYER_PAYMENT",
+    endpoint: "/api/buyer-payments",
+    method: "POST",
+    payload: {
+      ...payload,
+      amount: paymentAmount,
+      clientPaymentId,
+      isOffline: true,
+    },
+  });
+
+  return paymentRecord;
+}
+
+// Record an offline Supplier Settlement Payment
+export async function recordOfflineSupplierPayment(payload: {
+  supplierId: string;
+  purchaseId?: string;
+  amount: number;
+  paymentMethod: string;
+  bankReference?: string;
+  notes?: string;
+  paymentDate?: string;
+}): Promise<any> {
+  const clientPaymentId = generateClientUUID("spay");
+  const now = new Date().toISOString();
+  const paymentAmount = Number(payload.amount);
+
+  const paymentRecord = {
+    id: clientPaymentId,
+    clientPaymentId,
+    supplierId: payload.supplierId,
+    purchaseId: payload.purchaseId || null,
+    amount: paymentAmount,
+    paymentMethod: payload.paymentMethod || "CASH",
+    bankReference: payload.bankReference || null,
+    notes: payload.notes || "Offline Supplier Settlement",
+    paymentDate: payload.paymentDate || now,
+    createdAt: now,
+    isOffline: true,
+  };
+  await putInStore("supplier_payments", paymentRecord);
+
+  await enqueueOutbox({
+    id: clientPaymentId,
+    actionType: "SUPPLIER_PAYMENT",
+    endpoint: "/api/supplier-payments",
+    method: "POST",
+    payload: {
+      ...payload,
+      amount: paymentAmount,
+      clientPaymentId,
+      isOffline: true,
+    },
+  });
+
+  return paymentRecord;
+}
+
+// Cache ledger data for offline browsing
+export async function cachePartyLedger(partyId: string, entries: any[]): Promise<void> {
+  try {
+    await putInStore("ledgers", { partyId, entries, cachedAt: new Date().toISOString() });
+  } catch (e) {
+    console.warn("Failed to cache ledger:", e);
+  }
+}
+
+// Combine server ledger with real-time pending offline transactions (Debits & Credits)
+export async function getCombinedBuyerLedger(buyerId: string, liveLedger: any[] = []): Promise<any[]> {
+  try {
+    // 1. If live ledger was passed, cache it
+    if (liveLedger.length > 0) {
+      cachePartyLedger(buyerId, liveLedger);
+    }
+
+    // 2. If offline and no live ledger, load from cache
+    let baseLedger = liveLedger;
+    if (baseLedger.length === 0) {
+      const cached = await getFromStore<{ partyId: string; entries: any[] }>("ledgers", buyerId);
+      if (cached?.entries) {
+        baseLedger = cached.entries;
+      }
+    }
+
+    // 3. Find pending offline sales for this buyer (Debits)
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const pendingSales = outbox.filter(
+      (o) => (o.status === "PENDING" || o.status === "FAILED") && o.actionType === "SALE" && o.payload?.buyerId === buyerId
+    );
+
+    // 4. Find pending offline payments for this buyer (Credits)
+    const pendingPayments = outbox.filter(
+      (o) => (o.status === "PENDING" || o.status === "FAILED") && o.actionType === "BUYER_PAYMENT" && o.payload?.buyerId === buyerId
+    );
+
+    // If no pending offline items, return base
+    if (pendingSales.length === 0 && pendingPayments.length === 0) {
+      return baseLedger;
+    }
+
+    // Create synthetic ledger rows for pending sales
+    const offlineDebitRows = pendingSales.map((item) => {
+      const p = item.payload;
+      return {
+        id: item.id,
+        date: p.offlineCreatedAt || item.createdAt,
+        type: "SALE",
+        reference: p.offlineInvoiceNumber || "Offline Invoice",
+        description: `Offline Purchase (${p.items?.length || 0} items)`,
+        debit: Number(p.grandTotal || 0),
+        credit: 0,
+        isOfflinePending: true,
+      };
+    });
+
+    // Create synthetic ledger rows for pending payments
+    const offlineCreditRows = pendingPayments.map((item) => {
+      const p = item.payload;
+      return {
+        id: item.id,
+        date: p.paymentDate || item.createdAt,
+        type: "PAYMENT",
+        reference: `VOUCHER-${item.id.slice(-6).toUpperCase()}`,
+        description: p.notes || "Offline Cash Settlement",
+        debit: 0,
+        credit: Number(p.amount || 0),
+        isOfflinePending: true,
+      };
+    });
+
+    // Combine all entries and sort chronologically
+    const allEntries = [...baseLedger, ...offlineDebitRows, ...offlineCreditRows].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Recompute accurate running balance
+    let runningBalance = 0;
+    return allEntries.map((row) => {
+      runningBalance = runningBalance + Number(row.debit || 0) - Number(row.credit || 0);
+      return {
+        ...row,
+        balance: runningBalance,
+      };
+    });
+  } catch (err) {
+    console.error("Error creating combined ledger:", err);
+    return liveLedger;
+  }
+}
+
+// Combine server supplier ledger with real-time pending offline disbursements (Credits)
+export async function getCombinedSupplierLedger(supplierId: string, liveLedger: any[] = []): Promise<any[]> {
+  try {
+    // 1. If live ledger was passed, cache it
+    if (liveLedger.length > 0) {
+      await cachePartyLedger(`supplier_${supplierId}`, liveLedger);
+    }
+
+    // 2. If offline and no live ledger, load from cache
+    let baseLedger = liveLedger;
+    if (baseLedger.length === 0) {
+      const cached = await getFromStore<{ partyId: string; entries: any[] }>("ledgers", `supplier_${supplierId}`);
+      if (cached?.entries) {
+        baseLedger = cached.entries;
+      }
+    }
+
+    // 3. Find pending offline payments for this supplier (Credits: reducing payable balance)
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const pendingPayments = outbox.filter(
+      (o) => (o.status === "PENDING" || o.status === "FAILED") && o.actionType === "SUPPLIER_PAYMENT" && o.payload?.supplierId === supplierId
+    );
+
+    if (pendingPayments.length === 0) {
+      return baseLedger;
+    }
+
+    // Create synthetic ledger rows for pending payments
+    const offlineCreditRows = pendingPayments.map((item) => {
+      const p = item.payload;
+      return {
+        id: item.id,
+        date: p.paymentDate || item.createdAt,
+        type: "PAYMENT",
+        reference: p.bankReference || `VOUCHER-${item.id.slice(-6).toUpperCase()}`,
+        description: p.notes || "Offline Cash Disbursement",
+        debit: 0,
+        credit: Number(p.amount || 0),
+        isOfflinePending: true,
+      };
+    });
+
+    // Combine all entries and sort chronologically
+    const allEntries = [...baseLedger, ...offlineCreditRows].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Recompute accurate running balance: running += debit - credit
+    let runningBalance = 0;
+    return allEntries.map((row) => {
+      runningBalance = runningBalance + Number(row.debit || 0) - Number(row.credit || 0);
+      return {
+        ...row,
+        calculatedBalance: runningBalance,
+      };
+    });
+  } catch (err) {
+    console.error("Error creating combined supplier ledger:", err);
+    return liveLedger;
+  }
+}
+
+// Combine server supplier payments with pending offline supplier payments
+export async function getCombinedSupplierPayments(livePayments: any[] = []): Promise<any[]> {
+  try {
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const pendingSupplierPayments = outbox.filter(
+      (o) => (o.status === "PENDING" || o.status === "FAILED") && o.actionType === "SUPPLIER_PAYMENT"
+    );
+
+    const suppliers = await getAllFromStore<CachedSupplier>("suppliers");
+    const supplierMap = new Map<string, CachedSupplier>();
+    suppliers.forEach((s) => supplierMap.set(s.id, s));
+
+    const pendingPaymentRecords = pendingSupplierPayments.map((item) => {
+      const p = item.payload;
+      const supp = supplierMap.get(p.supplierId);
+      return {
+        id: item.id,
+        supplierId: p.supplierId,
+        supplier: supp ? { id: supp.id, name: supp.name, companyName: supp.companyName } : { id: p.supplierId, name: "Supplier" },
+        purchaseId: p.purchaseId || null,
+        amount: Number(p.amount || 0),
+        paymentMethod: p.paymentMethod || "CASH",
+        bankReference: p.bankReference || null,
+        notes: p.notes || "Offline Cash Disbursement",
+        paymentDate: p.paymentDate || item.createdAt,
+        createdAt: item.createdAt,
+        isOfflinePending: true,
+      };
+    });
+
+    const liveIds = new Set(livePayments.map((p) => p.id));
+    const uniquePending = pendingPaymentRecords.filter((p) => !liveIds.has(p.id));
+
+    return [...uniquePending, ...livePayments].sort(
+      (a, b) => new Date(b.paymentDate || b.createdAt).getTime() - new Date(a.paymentDate || a.createdAt).getTime()
+    );
+  } catch (err) {
+    console.error("Error creating combined supplier payments:", err);
+    return livePayments;
+  }
+}
+
+// Calculate Shift Profit & Loss in Offline Mode
+export async function calculateOfflineShiftProfitLoss(startDate?: string, endDate?: string) {
+  try {
+    const [sales, expenses] = await Promise.all([
+      getAllFromStore<any>("sales"),
+      getAllFromStore<any>("expenses"),
+    ]);
+
+    const start = startDate ? new Date(startDate).getTime() : 0;
+    const end = endDate ? new Date(endDate).getTime() : Infinity;
+
+    // Filter sales in date range
+    const filteredSales = sales.filter((s) => {
+      const time = new Date(s.saleDate || s.createdAt).getTime();
+      return time >= start && time <= end;
+    });
+
+    // Filter expenses in date range
+    const filteredExpenses = expenses.filter((e) => {
+      const time = new Date(e.date || e.createdAt).getTime();
+      return time >= start && time <= end;
+    });
+
+    let totalRevenue = 0;
+    let totalEstimatedCOGS = 0;
+    const itemMap = new Map<string, {
+      productId: string;
+      productName: string;
+      sku: string;
+      totalQuantitySold: number;
+      totalRevenue: number;
+      totalFifoCost: number;
+      grossProfit: number;
+      marginPercent: number;
+      isLoss: boolean;
+    }>();
+
+    for (const sale of filteredSales) {
+      totalRevenue += Number(sale.grandTotal || 0);
+      if (sale.items && Array.isArray(sale.items)) {
+        for (const line of sale.items) {
+          const qty = Number(line.quantity || 1);
+          const rev = Number(line.subtotal || (Number(line.unitPrice || line.sellingPrice || 0) * qty));
+          // If FIFO cost was calculated, use it; otherwise estimate cost as 70% of selling price
+          const lineCost = line.fifoCost
+            ? Number(line.fifoCost)
+            : Number(line.costPrice || line.purchasePrice || (Number(line.unitPrice || line.sellingPrice || 0) * 0.7)) * qty;
+          totalEstimatedCOGS += lineCost;
+
+          const pId = line.productId || line.product?.id || `prod_${line.productName || line.sku || "item"}`;
+          const existing = itemMap.get(pId) || {
+            productId: pId,
+            productName: line.product?.name || line.productName || "Product",
+            sku: line.product?.sku || line.sku || "-",
+            totalQuantitySold: 0,
+            totalRevenue: 0,
+            totalFifoCost: 0,
+            grossProfit: 0,
+            marginPercent: 0,
+            isLoss: false,
+          };
+
+          existing.totalQuantitySold += qty;
+          existing.totalRevenue += rev;
+          existing.totalFifoCost += lineCost;
+          existing.grossProfit = existing.totalRevenue - existing.totalFifoCost;
+          existing.marginPercent = existing.totalRevenue > 0 ? (existing.grossProfit / existing.totalRevenue) * 100 : 0;
+          existing.isLoss = existing.grossProfit < 0;
+          itemMap.set(pId, existing);
+        }
+      }
+    }
+
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const grossProfit = totalRevenue - totalEstimatedCOGS;
+    const netProfit = grossProfit - totalExpenses;
+    const grossProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const itemizedBreakdown = Array.from(itemMap.values());
+    const lossItemsCount = itemizedBreakdown.filter((i) => i.isLoss).length;
+
+    return {
+      grossRevenue: totalRevenue,
+      totalSalesRevenue: totalRevenue,
+      totalSalesReturns: 0,
+      totalReturns: 0,
+      netRevenue: totalRevenue,
+      revenue: totalRevenue,
+      totalCOGS: totalEstimatedCOGS,
+      cogs: totalEstimatedCOGS,
+      grossProfit,
+      grossProfitMargin,
+      grossMarginPercent: grossProfitMargin,
+      operatingExpenses: totalExpenses,
+      expenses: totalExpenses,
+      netProfit,
+      netProfitMargin: netMargin,
+      netMarginPercent: netMargin,
+      totalSalesCount: filteredSales.length,
+      totalExpensesCount: filteredExpenses.length,
+      itemizedBreakdown,
+      lossItemsCount,
+      isEstimated: true,
+      isOfflineEstimate: true,
+    };
+  } catch (err) {
+    console.error("Error calculating offline profit/loss:", err);
+    return null;
   }
 }

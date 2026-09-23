@@ -10,6 +10,7 @@ import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, Plus, Truck, RefreshCw, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { getCombinedSupplierPayments, recordOfflineSupplierPayment, getOfflineSuppliers } from "@/lib/offline/cacheService";
 
 export default function SupplierPaymentsPage() {
   const t = useTranslations("supplierPayments");
@@ -40,16 +41,37 @@ export default function SupplierPaymentsPage() {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      fetchPayments();
+      fetchInitialData();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
+
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const combined = await getCombinedSupplierPayments([]);
+        setPayments(combined);
+        setIsLoading(false);
+        return;
+      }
       const res = await fetch("/api/supplier-payments");
       if (res.ok) {
         const data = await res.json();
-        setPayments(Array.isArray(data) ? data : []);
+        const combined = await getCombinedSupplierPayments(Array.isArray(data) ? data : []);
+        setPayments(combined);
+      } else {
+        const combined = await getCombinedSupplierPayments([]);
+        setPayments(combined);
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Falling back to offline supplier payments:", e);
+      const combined = await getCombinedSupplierPayments([]);
+      setPayments(combined);
     } finally {
       setIsLoading(false);
     }
@@ -58,13 +80,24 @@ export default function SupplierPaymentsPage() {
   const fetchInitialData = async () => {
     try {
       const [suppRes, purRes] = await Promise.all([
-        fetch("/api/suppliers"),
-        fetch("/api/purchases"),
+        fetch("/api/suppliers").catch(() => null),
+        fetch("/api/purchases").catch(() => null),
       ]);
-      if (suppRes.ok) setSuppliers(await suppRes.json());
-      if (purRes.ok) setPurchases(await purRes.json());
+      if (suppRes && suppRes.ok) {
+        const sData = await suppRes.json();
+        setSuppliers(Array.isArray(sData) ? sData : []);
+      } else {
+        const cachedS = await getOfflineSuppliers();
+        if (cachedS && cachedS.length > 0) setSuppliers(cachedS);
+      }
+      if (purRes && purRes.ok) {
+        const pData = await purRes.json();
+        setPurchases(Array.isArray(pData) ? pData : []);
+      }
     } catch (e) {
       console.error(e);
+      const cachedS = await getOfflineSuppliers();
+      if (cachedS && cachedS.length > 0) setSuppliers(cachedS);
     }
   };
 
@@ -119,6 +152,25 @@ export default function SupplierPaymentsPage() {
         notes: formData.notes,
       };
 
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await recordOfflineSupplierPayment(payload);
+        setIsModalOpen(false);
+        setFormData({
+          supplierId: "",
+          purchaseId: "",
+          amount: "",
+          paymentMethod: "CASH",
+          bankName: "",
+          bankReference: "",
+          notes: "",
+        });
+        await fetchPayments();
+        await fetchInitialData();
+        alert("Payment recorded offline! It will automatically sync to the server when connection is restored.");
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch("/api/supplier-payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,11 +191,57 @@ export default function SupplierPaymentsPage() {
         fetchPayments();
         fetchInitialData();
       } else {
-        alert("Failed to record supplier payment.");
+        // Fallback to offline on server error
+        await recordOfflineSupplierPayment(payload);
+        setIsModalOpen(false);
+        setFormData({
+          supplierId: "",
+          purchaseId: "",
+          amount: "",
+          paymentMethod: "CASH",
+          bankName: "",
+          bankReference: "",
+          notes: "",
+        });
+        await fetchPayments();
+        await fetchInitialData();
+        alert("Payment saved offline! It will automatically sync once the server is reachable.");
       }
     } catch (e) {
-      console.error("Error submitting supplier payment:", e);
-      alert("Error recording payment");
+      console.warn("Network error during payment submission, recording offline:", e);
+      try {
+        const refText = [
+          formData.bankName ? `Bank: ${formData.bankName}` : null,
+          formData.bankReference ? `Ref: ${formData.bankReference}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+
+        await recordOfflineSupplierPayment({
+          supplierId: formData.supplierId,
+          purchaseId: formData.purchaseId || undefined,
+          amount: amountNum,
+          paymentMethod: formData.paymentMethod,
+          bankReference: refText || undefined,
+          notes: formData.notes,
+        });
+        setIsModalOpen(false);
+        setFormData({
+          supplierId: "",
+          purchaseId: "",
+          amount: "",
+          paymentMethod: "CASH",
+          bankName: "",
+          bankReference: "",
+          notes: "",
+        });
+        await fetchPayments();
+        await fetchInitialData();
+        alert("Payment recorded offline! It will sync automatically when online.");
+      } catch (offlineErr) {
+        console.error("Failed to record offline:", offlineErr);
+        alert("Error recording payment");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -279,9 +377,16 @@ export default function SupplierPaymentsPage() {
                       {p.purchase?.invoiceNumber ? `#${p.purchase.invoiceNumber}` : t("generalAccount")}
                     </td>
                     <td className="p-4">
-                      <Badge variant="outline" className="text-[11px] font-bold">
-                        {p.paymentMethod}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[11px] font-bold">
+                          {p.paymentMethod}
+                        </Badge>
+                        {p.isOfflinePending && (
+                          <Badge variant="warning" className="text-[10px] font-bold bg-amber-100 text-amber-800 border-amber-300">
+                            ⏳ Offline Pending
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-slate-600 font-mono text-xs">{p.bankReference || "-"}</td>
                     <td className="p-4 text-right font-extrabold font-mono text-rose-600 text-sm">

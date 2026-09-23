@@ -12,6 +12,7 @@ import { CreditCard, RefreshCw, DollarSign, User, Download, Calendar, X, FileTex
 import { Loader } from "@/components/ui/loader";
 import { useTranslations } from "next-intl";
 import { generateLedgerPDF } from "@/lib/pdfExport";
+import { getCombinedBuyerLedger, recordOfflineBuyerPayment } from "@/lib/offline/cacheService";
 
 interface BuyerLedgerModalProps {
   isOpen: boolean;
@@ -52,17 +53,34 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
   const fetchLedger = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/buyers/${buyerId}/ledger`);
-      if (res.ok) {
-        const data = await res.json();
-        setLedger(Array.isArray(data) ? data : []);
-        if (data.length > 0) {
-          const lastEntry = data[data.length - 1];
-          setSettleForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(lastEntry.balance))) }));
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/buyers/${buyerId}/ledger`);
+        if (res.ok) {
+          const data = await res.json();
+          const combined = await getCombinedBuyerLedger(buyerId!, Array.isArray(data) ? data : []);
+          setLedger(combined);
+          if (combined.length > 0) {
+            const lastEntry = combined[combined.length - 1];
+            setSettleForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(lastEntry.calculatedBalance || lastEntry.balance || 0))) }));
+          }
+          setIsLoading(false);
+          return;
         }
       }
     } catch (error) {
-      console.error("Failed to fetch buyer ledger", error);
+      console.warn("Online fetch ledger failed, falling back to offline combined ledger:", error);
+    }
+
+    // Offline fallback: load cached ledger combined with pending offline sales/payments
+    try {
+      const combined = await getCombinedBuyerLedger(buyerId!, []);
+      setLedger(combined);
+      if (combined.length > 0) {
+        const lastEntry = combined[combined.length - 1];
+        setSettleForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(lastEntry.calculatedBalance || lastEntry.balance || 0))) }));
+      }
+    } catch (err) {
+      console.error("Failed to load offline ledger:", err);
     } finally {
       setIsLoading(false);
     }
@@ -196,6 +214,8 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
     }
 
     setIsSubmitting(true);
+    let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+
     try {
       const refText = [
         settleForm.bankName ? `Bank: ${settleForm.bankName}` : null,
@@ -212,13 +232,39 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
         notes: settleForm.notes || "Bill settlement payment",
       };
 
-      const res = await fetch("/api/buyer-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (!isOffline) {
+        try {
+          const res = await fetch("/api/buyer-payments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-      if (res.ok) {
+          if (res.ok) {
+            setIsSettleOpen(false);
+            setSettleForm({
+              amount: "",
+              paymentMethod: "CASH",
+              bankName: "",
+              bankReference: "",
+              notes: "",
+            });
+            fetchLedger();
+            if (onSuccess) onSuccess();
+            return;
+          } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Error: ${err.error || "Failed to record payment"}`);
+            return;
+          }
+        } catch (netErr) {
+          console.warn("Online settlement failed, switching to offline save:", netErr);
+          isOffline = true;
+        }
+      }
+
+      if (isOffline) {
+        await recordOfflineBuyerPayment(payload);
         setIsSettleOpen(false);
         setSettleForm({
           amount: "",
@@ -227,10 +273,8 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
           bankReference: "",
           notes: "",
         });
-        fetchLedger();
+        await fetchLedger();
         if (onSuccess) onSuccess();
-      } else {
-        alert("Failed to record settlement payment.");
       }
     } catch (error) {
       console.error("Error submitting settlement", error);
