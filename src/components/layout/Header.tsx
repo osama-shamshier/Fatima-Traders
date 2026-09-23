@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { OfflineGlobalBanner } from "@/components/offline/OfflineGlobalBanner";
 
 interface Breadcrumb {
   label: string;
@@ -89,8 +90,11 @@ export function Header({
         </div>
       </div>
 
-      {/* Right Area: Branch Badge, Language Switcher, Profile with Dropdown */}
+      {/* Right Area: Offline Status, Branch Badge, Language Switcher, Profile with Dropdown */}
       <div className="flex items-center gap-3">
+        {/* Offline Sync & Connection Status */}
+        <OfflineGlobalBanner />
+
         {/* Branch Badge */}
         <div className="flex items-center">
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 border border-blue-200/60 shadow-2xs">

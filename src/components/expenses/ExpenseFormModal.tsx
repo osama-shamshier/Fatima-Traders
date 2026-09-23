@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { translateExpenseCategory } from "@/lib/utils";
 import { useTranslations, useLocale } from "next-intl";
+import { recordOfflineExpense } from "@/lib/offline/cacheService";
+import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 
 interface Props {
   isOpen: boolean;
@@ -40,20 +42,38 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/expense-categories")
-        .then((r) => r.json())
-        .then(setCategories)
-        .catch(console.error);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        fetch("/api/expense-categories")
+          .then((r) => r.json())
+          .then((cats) => {
+            setCategories(cats);
+            putManyInStore("expense_categories", cats).catch(() => {});
+          })
+          .catch(console.error);
 
-      fetch("/api/branches")
-        .then((r) => r.json())
-        .then((bList) => {
-          setBranches(bList);
-          if (bList.length > 0) {
-            setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
-          }
-        })
-        .catch(console.error);
+        fetch("/api/branches")
+          .then((r) => r.json())
+          .then((bList) => {
+            setBranches(bList);
+            if (bList.length > 0) {
+              setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+            }
+          })
+          .catch(console.error);
+      } else {
+        // Offline fallback
+        getAllFromStore("expense_categories")
+          .then(setCategories)
+          .catch(console.error);
+        getAllFromStore("branches")
+          .then((bList) => {
+            setBranches(bList);
+            if (bList.length > 0) {
+              setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+            }
+          })
+          .catch(console.error);
+      }
     }
   }, [isOpen]);
 
@@ -70,17 +90,55 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
     }
 
     setLoading(true);
+    let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+
     try {
-      const response = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      if (!isOffline) {
+        try {
+          const response = await fetch("/api/expenses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...formData,
+              amount: amountNum,
+            }),
+          });
+
+          if (response.ok) {
+            setFormData({
+              branchId: branches[0]?.id || "",
+              categoryId: "",
+              amount: "",
+              paymentMethod: "CASH",
+              bankName: "",
+              bankReference: "",
+              expenseDate: new Date().toISOString().split("T")[0],
+              referenceNumber: "",
+              notes: "",
+            });
+            onSuccess();
+            onClose();
+            return;
+          } else {
+            const err = await response.json().catch(() => ({}));
+            alert(`Failed to record expense: ${err.error || "Server error"}`);
+            return;
+          }
+        } catch (netErr) {
+          console.warn("Online expense creation failed, saving offline:", netErr);
+          isOffline = true;
+        }
+      }
+
+      if (isOffline) {
+        const catObj = categories.find((c) => c.id === formData.categoryId);
+        await recordOfflineExpense({
           ...formData,
           amount: amountNum,
-        }),
-      });
+          categoryName: catObj?.name,
+          date: formData.expenseDate,
+        });
 
-      if (response.ok) {
         setFormData({
           branchId: branches[0]?.id || "",
           categoryId: "",
@@ -94,9 +152,6 @@ export function ExpenseFormModal({ isOpen, onClose, onSuccess }: Props) {
         });
         onSuccess();
         onClose();
-      } else {
-        const err = await response.json();
-        alert(`Failed to record expense: ${err.error || "Server error"}`);
       }
     } catch (error) {
       console.error(error);

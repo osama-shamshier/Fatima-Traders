@@ -8,6 +8,8 @@ import { TableLoader } from "@/components/ui/loader";
 import { formatCurrency } from "@/lib/utils";
 import { ProductFormModal } from "@/components/products/ProductFormModal";
 import { useTranslations } from "next-intl";
+import { cacheCatalogData, getOfflineProducts } from "@/lib/offline/cacheService";
+import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 
 export default function ProductsPage() {
   const t = useTranslations("products");
@@ -32,22 +34,48 @@ export default function ProductsPage() {
       if (categoryId) params.append("categoryId", categoryId);
       if (isActive) params.append("isActive", isActive);
 
-      const res = await fetch(`/api/products?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/products?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data);
+          cacheCatalogData({ products: data });
+          setLoading(false);
+          return;
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch products", error);
+      console.warn("Online fetch products failed, falling back to offline cache:", error);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const offlineProds = await getOfflineProducts({
+        categoryId,
+        search,
+      });
+      setProducts(offlineProds);
+    } catch (err) {
+      console.error("Failed to load offline products:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => setCategories(data));
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      fetch("/api/categories")
+        .then((res) => res.json())
+        .then((data) => {
+          setCategories(data);
+          putManyInStore("categories", data).catch(() => {});
+        })
+        .catch(console.error);
+    } else {
+      getAllFromStore("categories")
+        .then(setCategories)
+        .catch(console.error);
+    }
   }, []);
 
   useEffect(() => {

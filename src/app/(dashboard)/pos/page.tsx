@@ -11,6 +11,13 @@ import { POSCheckoutModal } from "./components/POSCheckoutModal";
 import { ReceiptModal } from "./components/ReceiptModal";
 import { CustomerSearchSelect } from "@/components/pos/CustomerSearchSelect";
 import { useTranslations } from "next-intl";
+import {
+  cacheCatalogData,
+  getOfflineProducts,
+  recordOfflineSale,
+} from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 interface Product {
   id: string;
@@ -64,23 +71,74 @@ export default function POSPage() {
     fetchProducts();
   }, [selectedBranchId, selectedCategoryId, search]);
 
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchProducts();
+      }
+    });
+    return unsub;
+  }, [selectedBranchId, selectedCategoryId]);
+
   const fetchInitialData = async () => {
     try {
-      const [branchesRes, categoriesRes, buyersRes] = await Promise.all([
-        fetch("/api/branches"),
-        fetch("/api/categories"),
-        fetch("/api/buyers"),
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const [branchesRes, categoriesRes, buyersRes] = await Promise.all([
+          fetch("/api/branches"),
+          fetch("/api/categories"),
+          fetch("/api/buyers"),
+        ]);
+
+        let bData = [];
+        let cData = [];
+        let byData = [];
+
+        if (branchesRes.ok) {
+          bData = await branchesRes.json();
+          setBranches(bData);
+          if (bData.length > 0 && !selectedBranchId) setSelectedBranchId(bData[0].id);
+        }
+        if (categoriesRes.ok) {
+          cData = await categoriesRes.json();
+          setCategories(cData);
+        }
+        if (buyersRes.ok) {
+          byData = await buyersRes.json();
+          setBuyers(byData);
+        }
+
+        // Cache live data in background
+        cacheCatalogData({
+          branches: bData,
+          categories: cData,
+          buyers: byData,
+        });
+        return;
+      }
+    } catch (error) {
+      console.warn("Online fetch initial data failed, falling back to offline cache:", error);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const [cachedBranches, cachedCategories, cachedBuyers] = await Promise.all([
+        getAllFromStore("branches"),
+        getAllFromStore("categories"),
+        getAllFromStore("buyers"),
       ]);
 
-      if (branchesRes.ok) {
-        const bData = await branchesRes.json();
-        setBranches(bData);
-        if (bData.length > 0) setSelectedBranchId(bData[0].id);
+      if (cachedBranches && cachedBranches.length > 0) {
+        setBranches(cachedBranches);
+        if (!selectedBranchId) setSelectedBranchId(cachedBranches[0].id);
       }
-      if (categoriesRes.ok) setCategories(await categoriesRes.json());
-      if (buyersRes.ok) setBuyers(await buyersRes.json());
-    } catch (error) {
-      console.error("Failed to fetch POS initial data", error);
+      if (cachedCategories && cachedCategories.length > 0) {
+        setCategories(cachedCategories);
+      }
+      if (cachedBuyers && cachedBuyers.length > 0) {
+        setBuyers(cachedBuyers);
+      }
+    } catch (err) {
+      console.error("Failed to read offline initial data:", err);
     }
   };
 
@@ -91,13 +149,28 @@ export default function POSPage() {
       if (selectedCategoryId) params.append("categoryId", selectedCategoryId);
       if (search) params.append("search", search);
 
-      const res = await fetch(`/api/pos/products?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/pos/products?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data);
+          cacheCatalogData({ products: data });
+          return;
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch POS products", error);
+      console.warn("Online fetch POS products failed, falling back to offline cache:", error);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const offlineData = await getOfflineProducts({
+        categoryId: selectedCategoryId,
+        search,
+      });
+      setProducts(offlineData);
+    } catch (err) {
+      console.error("Failed to read offline products:", err);
     }
   };
 
@@ -237,28 +310,57 @@ export default function POSPage() {
         dueDate,
       };
 
-      const res = await fetch("/api/sales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let sale: any = null;
+      let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
-      if (res.ok) {
-        const sale = await res.json();
+      if (!isOffline) {
+        try {
+          const res = await fetch("/api/sales", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (res.ok) {
+            sale = await res.json();
+          } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Checkout failed: ${err.error || "Server error"}`);
+            return;
+          }
+        } catch (netErr) {
+          console.warn("Online checkout failed, switching to offline save:", netErr);
+          isOffline = true;
+        }
+      }
+
+      if (isOffline) {
+        // Record offline sale with optimistic stock decrement
+        sale = await recordOfflineSale({
+          ...payload,
+          items: cart.map((item) => ({
+            productId: item.id,
+            quantity: item.cartQuantity,
+            sellingPrice: item.sellingPrice,
+            discount: item.itemDiscount || 0,
+            name: item.name,
+            sku: item.sku,
+          })),
+        });
+      }
+
+      if (sale) {
         setCompletedSale(sale);
         setIsCheckoutOpen(false);
         setIsReceiptOpen(true);
         setCart([]);
         setGlobalDiscount(0);
         setRoundOff(0);
-        fetchProducts(); // Instant stock refresh!
-      } else {
-        const err = await res.json();
-        alert(`Checkout failed: ${err.error || "Server error"}`);
+        fetchProducts(); // Instant stock refresh from server or IndexedDB!
       }
     } catch (error) {
       console.error("Error during checkout:", error);
-      alert("Checkout failed");
+      alert("Checkout failed. Please try again.");
     }
   };
 

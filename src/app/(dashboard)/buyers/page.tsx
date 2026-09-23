@@ -12,6 +12,9 @@ import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import { cacheCatalogData } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function BuyersPage() {
   const t = useTranslations("buyers");
@@ -36,11 +39,28 @@ export default function BuyersPage() {
   const fetchBuyers = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/buyers");
-      const data = await res.json();
-      setBuyers(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch("/api/buyers");
+        if (res.ok) {
+          const data = await res.json();
+          setBuyers(data);
+          cacheCatalogData({ buyers: data });
+          setIsLoading(false);
+          return;
+        }
+      }
     } catch (error) {
-      console.error("Failed to fetch buyers", error);
+      console.warn("Online fetchBuyers failed, falling back to offline cache:", error);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const cached = await getAllFromStore("buyers");
+      if (cached && cached.length > 0) {
+        setBuyers(cached);
+      }
+    } catch (err) {
+      console.error("Failed to load cached buyers:", err);
     } finally {
       setIsLoading(false);
     }
@@ -48,6 +68,15 @@ export default function BuyersPage() {
 
   useEffect(() => {
     fetchBuyers();
+  }, []);
+
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchBuyers();
+      }
+    });
+    return unsub;
   }, []);
 
   const handleAdd = () => {

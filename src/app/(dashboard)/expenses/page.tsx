@@ -11,6 +11,9 @@ import { ExpenseFormModal } from "@/components/expenses/ExpenseFormModal";
 import { ExpenseCategoryModal } from "@/components/expenses/ExpenseCategoryModal";
 import { PlusCircle, Tags, Trash2, Filter, Receipt } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
+import { cacheCatalogData } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function ExpensesPage() {
   const t = useTranslations("expenses");
@@ -38,11 +41,28 @@ export default function ExpensesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/expenses?${params.toString()}`);
-      const data = await res.json();
-      setExpenses(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/expenses?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setExpenses(data);
+          cacheCatalogData({ expenses: data });
+          setLoading(false);
+          return;
+        }
+      }
     } catch (error) {
-      console.error(error);
+      console.warn("Online fetchExpenses failed, falling back to offline cache:", error);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const cached = await getAllFromStore("expenses");
+      if (cached && cached.length > 0) {
+        setExpenses(cached);
+      }
+    } catch (err) {
+      console.error("Failed to load cached expenses:", err);
     } finally {
       setLoading(false);
     }
@@ -51,6 +71,15 @@ export default function ExpensesPage() {
   useEffect(() => {
     fetchExpenses();
   }, [period]);
+
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchExpenses();
+      }
+    });
+    return unsub;
+  }, []);
 
   const handleCustomApply = (e: React.FormEvent) => {
     e.preventDefault();

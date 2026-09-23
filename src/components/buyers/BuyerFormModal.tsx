@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "next-intl";
+import { recordOfflineBuyer } from "@/lib/offline/cacheService";
 
 interface BuyerFormModalProps {
   isOpen: boolean;
@@ -56,20 +57,40 @@ export function BuyerFormModal({ isOpen, onClose, onSuccess, buyer }: BuyerFormM
   const onSubmit = async (data: any) => {
     try {
       setIsLoading(true);
-      const url = buyer ? `/api/buyers/${buyer.id}` : "/api/buyers";
-      const method = buyer ? "PUT" : "POST";
-      
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
-      if (!res.ok) throw new Error("Failed to save buyer");
-      
-      reset();
-      onSuccess();
-      onClose();
+      if (!isOffline) {
+        try {
+          const url = buyer ? `/api/buyers/${buyer.id}` : "/api/buyers";
+          const method = buyer ? "PUT" : "POST";
+          
+          const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          if (res.ok) {
+            reset();
+            onSuccess();
+            onClose();
+            return;
+          }
+        } catch (netErr) {
+          console.warn("Online buyer save failed, falling back to offline:", netErr);
+          isOffline = true;
+        }
+      }
+
+      if (isOffline && !buyer) {
+        await recordOfflineBuyer(data);
+        reset();
+        onSuccess();
+        onClose();
+        return;
+      }
+
+      throw new Error("Failed to save buyer");
     } catch (error) {
       console.error(error);
       alert("Error saving buyer");
