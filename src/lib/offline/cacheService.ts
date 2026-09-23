@@ -68,13 +68,88 @@ export async function cacheCatalogData(data: {
   }
 }
 
-// Retrieve offline products with filtering
+// Calculate total quantities of products sold in pending offline sales
+export async function getPendingOfflineDeductions(): Promise<Record<string, number>> {
+  try {
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const deductions: Record<string, number> = {};
+    for (const item of outbox) {
+      if ((item.status === "PENDING" || item.status === "FAILED") && item.actionType === "SALE" && item.payload?.items) {
+        for (const saleItem of item.payload.items) {
+          const pid = saleItem.productId;
+          deductions[pid] = (deductions[pid] || 0) + Number(saleItem.quantity || 0);
+        }
+      }
+    }
+    return deductions;
+  } catch (err) {
+    console.error("Error calculating pending offline deductions:", err);
+    return {};
+  }
+}
+
+// Calculate total offline credit (outstanding balance) accumulated per buyer
+export async function getPendingOfflineBuyerCredits(): Promise<Record<string, number>> {
+  try {
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const credits: Record<string, number> = {};
+    for (const item of outbox) {
+      if ((item.status === "PENDING" || item.status === "FAILED") && item.actionType === "SALE" && item.payload?.buyerId) {
+        const buyerId = item.payload.buyerId;
+        const grandTotal = Number(item.payload.grandTotal || 0);
+        const amountPaid = Number(item.payload.amountPaid || 0);
+        const outstanding = Math.max(0, grandTotal - amountPaid);
+        if (outstanding > 0) {
+          credits[buyerId] = (credits[buyerId] || 0) + outstanding;
+        }
+      }
+    }
+    return credits;
+  } catch (err) {
+    console.error("Error calculating pending offline buyer credits:", err);
+    return {};
+  }
+}
+
+// Apply offline deductions to any product list
+export async function applyOfflineDeductionsToProducts<T extends { id: string; availableStock?: number; stock?: number }>(
+  products: T[]
+): Promise<T[]> {
+  const deductions = await getPendingOfflineDeductions();
+  return products.map((p) => {
+    const deduct = deductions[p.id] || 0;
+    const baseStock = Number(p.availableStock !== undefined ? p.availableStock : p.stock !== undefined ? p.stock : 0);
+    const effectiveStock = Math.max(0, baseStock - deduct);
+    return {
+      ...p,
+      availableStock: effectiveStock,
+      stock: effectiveStock,
+    } as unknown as T;
+  });
+}
+
+// Apply offline credits to any buyer list
+export async function applyOfflineCreditsToBuyers<T extends { id: string; totalOutstanding?: number }>(
+  buyers: T[]
+): Promise<T[]> {
+  const credits = await getPendingOfflineBuyerCredits();
+  return buyers.map((b) => {
+    const addDebt = credits[b.id] || 0;
+    return {
+      ...b,
+      totalOutstanding: Number(b.totalOutstanding || 0) + addDebt,
+    } as unknown as T;
+  });
+}
+
+// Retrieve offline products with filtering and active deductions applied
 export async function getOfflineProducts(filters?: {
   categoryId?: string;
   search?: string;
 }): Promise<CachedProduct[]> {
   try {
-    const products = await getAllFromStore<CachedProduct>("products");
+    const rawProducts = await getAllFromStore<CachedProduct>("products");
+    const products = await applyOfflineDeductionsToProducts(rawProducts);
     let result = products;
 
     if (filters?.categoryId) {
@@ -95,6 +170,17 @@ export async function getOfflineProducts(filters?: {
     return result;
   } catch (error) {
     console.error("Error getting offline products:", error);
+    return [];
+  }
+}
+
+// Retrieve offline buyers with active credits applied
+export async function getOfflineBuyers(): Promise<CachedBuyer[]> {
+  try {
+    const rawBuyers = await getAllFromStore<CachedBuyer>("buyers");
+    return applyOfflineCreditsToBuyers(rawBuyers);
+  } catch (error) {
+    console.error("Error getting offline buyers:", error);
     return [];
   }
 }
@@ -153,6 +239,15 @@ export async function recordOfflineSale(payload: {
   const outstandingAmount = Math.max(0, grandTotal - amountPaidNum);
   const paymentStatus =
     amountPaidNum >= grandTotal ? "PAID" : amountPaidNum > 0 ? "PARTIAL" : "PENDING";
+
+  // If credit sale to a buyer, immediately update buyer's totalOutstanding in IndexedDB
+  if (payload.buyerId && outstandingAmount > 0) {
+    const buyer = await getFromStore<CachedBuyer>("buyers", payload.buyerId);
+    if (buyer) {
+      buyer.totalOutstanding = Number(buyer.totalOutstanding || 0) + outstandingAmount;
+      await putInStore("buyers", buyer);
+    }
+  }
 
   // Create simulated sale object matching Prisma Sale structure for ReceiptModal
   const completedSale = {
@@ -271,4 +366,33 @@ export async function recordOfflineBuyer(payload: {
   });
 
   return buyerRecord;
+}
+
+// Get combined sales list (Cached + Pending Offline) for Sales History Page
+export async function getCombinedSales(liveSales: any[] = []): Promise<any[]> {
+  try {
+    const cachedSales = await getAllFromStore<any>("sales");
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+
+    const pendingSaleIds = new Set(
+      outbox.filter((o) => o.status === "PENDING" || o.status === "FAILED").map((o) => o.id)
+    );
+
+    // Identify pending offline sales
+    const pendingSales = cachedSales
+      .filter((s) => pendingSaleIds.has(s.id) || pendingSaleIds.has(s.clientSaleId))
+      .map((s) => ({
+        ...s,
+        isOfflinePending: true,
+      }));
+
+    // Merge: Put pending offline sales at the top
+    const liveIds = new Set(liveSales.map((ls) => ls.id));
+    const unSyncedPending = pendingSales.filter((ps) => !liveIds.has(ps.id));
+
+    return [...unSyncedPending, ...liveSales];
+  } catch (err) {
+    console.error("Error combining sales:", err);
+    return liveSales;
+  }
 }

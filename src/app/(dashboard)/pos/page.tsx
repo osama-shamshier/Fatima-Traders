@@ -15,6 +15,9 @@ import {
   cacheCatalogData,
   getOfflineProducts,
   recordOfflineSale,
+  applyOfflineDeductionsToProducts,
+  applyOfflineCreditsToBuyers,
+  getOfflineBuyers,
 } from "@/lib/offline/cacheService";
 import { getAllFromStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
@@ -104,14 +107,16 @@ export default function POSPage() {
         }
         if (buyersRes.ok) {
           byData = await buyersRes.json();
-          setBuyers(byData);
+          cacheCatalogData({ buyers: byData });
+          // Add pending offline debt to buyers so balance is immediately accurate
+          const effectiveBuyers = await applyOfflineCreditsToBuyers(byData);
+          setBuyers(effectiveBuyers);
         }
 
         // Cache live data in background
         cacheCatalogData({
           branches: bData,
           categories: cData,
-          buyers: byData,
         });
         return;
       }
@@ -124,7 +129,7 @@ export default function POSPage() {
       const [cachedBranches, cachedCategories, cachedBuyers] = await Promise.all([
         getAllFromStore("branches"),
         getAllFromStore("categories"),
-        getAllFromStore("buyers"),
+        getOfflineBuyers(),
       ]);
 
       if (cachedBranches && cachedBranches.length > 0) {
@@ -153,8 +158,10 @@ export default function POSPage() {
         const res = await fetch(`/api/pos/products?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
-          setProducts(data);
           cacheCatalogData({ products: data });
+          // Deduct pending offline sales so stock on screen remains accurate
+          const effectiveData = await applyOfflineDeductionsToProducts<Product>(data);
+          setProducts(effectiveData);
           return;
         }
       }
@@ -162,7 +169,7 @@ export default function POSPage() {
       console.warn("Online fetch POS products failed, falling back to offline cache:", error);
     }
 
-    // Offline fallback from IndexedDB
+    // Offline fallback from IndexedDB with pending deductions
     try {
       const offlineData = await getOfflineProducts({
         categoryId: selectedCategoryId,
@@ -291,6 +298,18 @@ export default function POSPage() {
   ) => {
     if (cart.length === 0) return;
 
+    // Strict validation: Verify available stock for all items before completing checkout
+    for (const item of cart) {
+      const prod = products.find((p) => p.id === item.id);
+      const avail = prod ? Number(prod.availableStock || 0) : item.availableStock;
+      if (item.cartQuantity > avail) {
+        setErrorMessage(
+          `❌ Cannot checkout: "${item.name}" only has ${avail} units available in stock.`
+        );
+        return;
+      }
+    }
+
     try {
       const payload = {
         buyerId: selectedBuyerId || undefined,
@@ -356,7 +375,8 @@ export default function POSPage() {
         setCart([]);
         setGlobalDiscount(0);
         setRoundOff(0);
-        fetchProducts(); // Instant stock refresh from server or IndexedDB!
+        fetchProducts(); // Instant stock refresh with pending offline deductions
+        fetchInitialData(); // Instant buyer outstanding balance refresh
       }
     } catch (error) {
       console.error("Error during checkout:", error);

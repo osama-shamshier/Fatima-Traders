@@ -12,6 +12,8 @@ import { formatDate } from "@/lib/utils";
 import { StockAdjustmentModal } from "@/components/inventory/StockAdjustmentModal";
 import { Search, AlertTriangle, RefreshCw, Warehouse, ArrowLeftRight, ClipboardEdit } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { applyOfflineDeductionsToProducts, getOfflineProducts } from "@/lib/offline/cacheService";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function InventoryPage() {
   const t = useTranslations("inventory");
@@ -48,6 +50,15 @@ export default function InventoryPage() {
     }
   }, [activeTab, searchQuery, branchFilter, lowStockOnly]);
 
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing && activeTab === "current") {
+        fetchInventory();
+      }
+    });
+    return unsub;
+  }, [activeTab, branchFilter]);
+
   const fetchBranches = async () => {
     try {
       const res = await fetch("/api/branches");
@@ -65,12 +76,41 @@ export default function InventoryPage() {
       if (branchFilter) params.append("branchId", branchFilter);
       if (lowStockOnly) params.append("lowStock", "true");
 
-      const res = await fetch(`/api/inventory?${params.toString()}`);
-      if (res.ok) {
-        setInventory(await res.json());
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/inventory?${params.toString()}`);
+        if (res.ok) {
+          const raw = await res.json();
+          const mapped = raw.map((item: any) => ({
+            ...item,
+            id: item.productId || item.id,
+            availableStock: Number(item.quantity || 0),
+          }));
+          const effective = await applyOfflineDeductionsToProducts(mapped);
+          setInventory(effective.map((item: any) => ({
+            ...item,
+            quantity: item.availableStock,
+          })) as any);
+          setLoading(false);
+          return;
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Online fetch inventory failed, falling back to offline cache:", e);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const offlineProds = await getOfflineProducts({ search: searchQuery });
+      const formatted = offlineProds.map((p: any) => ({
+        id: p.id,
+        productId: p.id,
+        product: p,
+        quantity: p.availableStock,
+        branch: branches[0] || { name: "Current Branch" },
+      }));
+      setInventory(formatted as any);
+    } catch (err) {
+      console.error("Failed to load offline inventory:", err);
     } finally {
       setLoading(false);
     }

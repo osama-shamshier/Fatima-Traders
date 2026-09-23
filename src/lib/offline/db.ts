@@ -38,6 +38,7 @@ export interface CachedBuyer {
   address?: string | null;
   companyName?: string | null;
   notes?: string | null;
+  totalOutstanding?: number;
   isOfflineCreated?: boolean;
 }
 

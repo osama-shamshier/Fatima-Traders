@@ -12,7 +12,11 @@ import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
-import { cacheCatalogData } from "@/lib/offline/cacheService";
+import {
+  cacheCatalogData,
+  applyOfflineCreditsToBuyers,
+  getOfflineBuyers,
+} from "@/lib/offline/cacheService";
 import { getAllFromStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
 
@@ -43,8 +47,10 @@ export default function BuyersPage() {
         const res = await fetch("/api/buyers");
         if (res.ok) {
           const data = await res.json();
-          setBuyers(data);
           cacheCatalogData({ buyers: data });
+          // Add pending offline credit to buyers list
+          const effectiveBuyers = await applyOfflineCreditsToBuyers(data);
+          setBuyers(effectiveBuyers);
           setIsLoading(false);
           return;
         }
@@ -53,9 +59,9 @@ export default function BuyersPage() {
       console.warn("Online fetchBuyers failed, falling back to offline cache:", error);
     }
 
-    // Offline fallback from IndexedDB
+    // Offline fallback from IndexedDB with pending credits
     try {
-      const cached = await getAllFromStore("buyers");
+      const cached = await getOfflineBuyers();
       if (cached && cached.length > 0) {
         setBuyers(cached);
       }

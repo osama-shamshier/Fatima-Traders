@@ -27,6 +27,9 @@ import {
   exportSalesSummaryCSV,
   SalesSummaryItem,
 } from "@/lib/pdfExport";
+import { getCombinedSales } from "@/lib/offline/cacheService";
+import { putManyInStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function SalesPage() {
   const t = useTranslations("sales");
@@ -44,6 +47,15 @@ export default function SalesPage() {
     fetchSales();
   }, [period]);
 
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchSales();
+      }
+    });
+    return unsub;
+  }, []);
+
   const fetchSales = async () => {
     setLoading(true);
     try {
@@ -54,12 +66,27 @@ export default function SalesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/sales?${params.toString()}`);
-      if (res.ok) {
-        setSales(await res.json());
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/sales?${params.toString()}`);
+        if (res.ok) {
+          const liveData = await res.json();
+          putManyInStore("sales", liveData).catch(() => {});
+          const combined = await getCombinedSales(liveData);
+          setSales(combined);
+          setLoading(false);
+          return;
+        }
       }
     } catch (e) {
-      console.error("Failed to fetch sales", e);
+      console.warn("Online fetchSales failed, falling back to offline cache:", e);
+    }
+
+    // Offline fallback: load cached + pending offline sales
+    try {
+      const combined = await getCombinedSales([]);
+      setSales(combined);
+    } catch (err) {
+      console.error("Failed to load offline sales:", err);
     } finally {
       setLoading(false);
     }
@@ -378,18 +405,24 @@ export default function SalesPage() {
                       {Number(sale.outstandingAmount) > 0 ? formatCurrency(sale.outstandingAmount) : "-"}
                     </td>
                     <td className="p-3.5 text-center">
-                      <Badge
-                        variant={
-                          sale.paymentStatus === "PAID"
-                            ? "success"
-                            : sale.paymentStatus === "PARTIAL"
-                            ? "warning"
-                            : "danger"
-                        }
-                        className="text-[10px] px-2 py-0.5"
-                      >
-                        {sale.paymentStatus}
-                      </Badge>
+                      {sale.isOfflinePending ? (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-[10px] px-2 py-0.5">
+                          ⏳ Offline Pending
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant={
+                            sale.paymentStatus === "PAID"
+                              ? "success"
+                              : sale.paymentStatus === "PARTIAL"
+                              ? "warning"
+                              : "danger"
+                          }
+                          className="text-[10px] px-2 py-0.5"
+                        >
+                          {sale.paymentStatus}
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-3.5 text-right">
                       <InvoiceModalWrapper sale={sale} saleId={sale.id} />
