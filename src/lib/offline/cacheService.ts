@@ -179,6 +179,15 @@ export async function getPendingOfflineSupplierDisbursements(): Promise<Record<s
           disbursements[suppId] = (disbursements[suppId] || 0) + amount;
         }
       }
+
+      if ((item.status === "PENDING" || item.status === "FAILED") && item.actionType === "PURCHASE" && item.payload?.supplierId) {
+        const suppId = item.payload.supplierId;
+        const outstanding = Number(item.payload.outstandingAmount || 0);
+        if (outstanding > 0) {
+          // Unpaid credit on purchase increases supplier payable debt
+          disbursements[suppId] = (disbursements[suppId] || 0) - outstanding;
+        }
+      }
     }
     return disbursements;
   } catch (err) {
@@ -987,6 +996,193 @@ export async function getCombinedPurchases(livePurchases: any[] = []): Promise<a
     console.error("Error combining purchases:", err);
     return livePurchases;
   }
+}
+
+// Record an offline Purchase
+export async function recordOfflinePurchase(payload: {
+  supplierId: string;
+  branchId: string;
+  invoiceNumber?: string;
+  purchaseDate?: string;
+  amountPaid: number;
+  paymentMethod: string;
+  bankName?: string;
+  bankReference?: string;
+  notes?: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    purchaseRate: number;
+    newSellingPrice?: number;
+  }>;
+}): Promise<any> {
+  const clientPurchaseId = generateClientUUID("pur");
+  const invoiceNumber = payload.invoiceNumber || `OFF-PUR-${Date.now().toString().slice(-6)}`;
+  const now = new Date().toISOString();
+
+  let totalAmount = 0;
+  for (const it of payload.items) {
+    totalAmount += Number(it.quantity || 0) * Number(it.purchaseRate || 0);
+  }
+  const amountPaid = Math.min(totalAmount, Math.max(0, Number(payload.amountPaid || 0)));
+  const outstandingAmount = Math.max(0, totalAmount - amountPaid);
+  const paymentStatus = amountPaid >= totalAmount ? "PAID" : amountPaid > 0 ? "PARTIAL" : "PENDING";
+
+  const supplier = await getFromStore<CachedSupplier>("suppliers", payload.supplierId);
+  const branch = await getFromStore<CachedBranch>("branches", payload.branchId);
+
+  const purchaseRecord = {
+    id: clientPurchaseId,
+    clientPurchaseId,
+    invoiceNumber,
+    purchaseDate: payload.purchaseDate || now,
+    createdAt: now,
+    supplierId: payload.supplierId,
+    supplier: supplier || { id: payload.supplierId, name: "Supplier" },
+    branchId: payload.branchId,
+    branch: branch || { id: payload.branchId, name: "Branch" },
+    totalAmount,
+    amountPaid,
+    outstandingAmount,
+    paymentStatus,
+    paymentMethod: payload.paymentMethod || "CASH",
+    notes: payload.notes || "Offline Purchase",
+    items: payload.items,
+    isOffline: true,
+  };
+
+  // 1. Put in purchases store
+  await putInStore("purchases", purchaseRecord);
+
+  // 2. Increment stock in products store & update cost/selling price if new rate provided
+  for (const it of payload.items) {
+    await incrementLocalStock(it.productId, Number(it.quantity || 0));
+    const prod = await getFromStore<CachedProduct>("products", it.productId);
+    if (prod) {
+      if (it.newSellingPrice && Number(it.newSellingPrice) > 0) {
+        prod.sellingPrice = Number(it.newSellingPrice);
+      }
+      if (it.purchaseRate && Number(it.purchaseRate) > 0) {
+        prod.costPrice = Number(it.purchaseRate);
+      }
+      await putInStore("products", prod);
+    }
+  }
+
+  // 3. Queue in Outbox for syncing when online
+  await enqueueOutbox({
+    id: generateClientUUID("outbox"),
+    actionType: "PURCHASE",
+    endpoint: "/api/purchases",
+    method: "POST",
+    payload: {
+      ...payload,
+      invoiceNumber,
+      totalAmount,
+      amountPaid,
+      outstandingAmount,
+      paymentStatus,
+      clientPurchaseId,
+    },
+  });
+
+  return purchaseRecord;
+}
+
+// Record an offline Product creation or update
+export async function recordOfflineProduct(payload: {
+  id?: string;
+  name: string;
+  sku: string;
+  categoryId: string;
+  unitId: string;
+  description?: string;
+  sellingPrice: number;
+  costPrice?: number;
+  minStockLevel: number;
+  isActive: boolean;
+}): Promise<any> {
+  const isEdit = !!payload.id;
+  const productId = payload.id || generateClientUUID("prod");
+  const now = new Date().toISOString();
+
+  const category = await getFromStore<CachedCategory>("categories", payload.categoryId);
+  const unit = await getFromStore<any>("units", payload.unitId);
+  const existingProd = isEdit ? await getFromStore<CachedProduct>("products", productId) : null;
+
+  const productRecord: CachedProduct = {
+    id: productId,
+    name: payload.name,
+    sku: payload.sku,
+    categoryId: payload.categoryId,
+    unitId: payload.unitId,
+    description: payload.description || "",
+    sellingPrice: Number(payload.sellingPrice || 0),
+    costPrice: payload.costPrice ?? existingProd?.costPrice ?? Number(payload.sellingPrice || 0) * 0.7,
+    minStockLevel: Number(payload.minStockLevel || 0),
+    availableStock: existingProd?.availableStock || 0,
+    isActive: payload.isActive ?? true,
+    category: category || existingProd?.category || { id: payload.categoryId, name: "General" },
+    unit: unit || existingProd?.unit || { id: payload.unitId, abbreviation: "pcs" },
+    createdAt: existingProd?.createdAt || now,
+    updatedAt: now,
+  };
+
+  await putInStore("products", productRecord);
+
+  await enqueueOutbox({
+    id: generateClientUUID("outbox"),
+    actionType: "PRODUCT",
+    endpoint: isEdit ? `/api/products/${productId}` : "/api/products",
+    method: isEdit ? "PUT" : "POST",
+    payload: {
+      ...payload,
+      id: productId,
+    },
+  });
+
+  return productRecord;
+}
+
+// Record an offline Branch creation or update
+export async function recordOfflineBranch(payload: {
+  id?: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive?: boolean;
+}): Promise<any> {
+  const isEdit = !!payload.id;
+  const branchId = payload.id || generateClientUUID("branch");
+  const now = new Date().toISOString();
+
+  const existingBranch = isEdit ? await getFromStore<CachedBranch>("branches", branchId) : null;
+
+  const branchRecord: CachedBranch = {
+    id: branchId,
+    name: payload.name,
+    address: payload.address || "",
+    phone: payload.phone || "",
+    isActive: payload.isActive ?? true,
+    createdAt: existingBranch?.createdAt || now,
+    updatedAt: now,
+  };
+
+  await putInStore("branches", branchRecord);
+
+  await enqueueOutbox({
+    id: generateClientUUID("outbox"),
+    actionType: "BRANCH",
+    endpoint: isEdit ? `/api/branches/${branchId}` : "/api/branches",
+    method: isEdit ? "PUT" : "POST",
+    payload: {
+      ...payload,
+      id: branchId,
+    },
+  });
+
+  return branchRecord;
 }
 
 // Calculate Cash Flow in Offline Mode

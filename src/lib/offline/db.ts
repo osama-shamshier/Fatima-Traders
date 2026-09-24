@@ -6,7 +6,7 @@ const DB_VERSION = 4;
 
 export interface OutboxItem {
   id: string; // client UUID (e.g. outbox_1727...)
-  actionType: "SALE" | "EXPENSE" | "STOCK_ADJUSTMENT" | "PURCHASE" | "BUYER" | "SUPPLIER" | "BUYER_PAYMENT" | "SUPPLIER_PAYMENT";
+  actionType: "SALE" | "EXPENSE" | "STOCK_ADJUSTMENT" | "PURCHASE" | "BUYER" | "SUPPLIER" | "BUYER_PAYMENT" | "SUPPLIER_PAYMENT" | "PRODUCT" | "BRANCH";
   endpoint: string;
   method: "POST" | "PUT" | "DELETE";
   payload: any;
@@ -22,12 +22,16 @@ export interface CachedProduct {
   name: string;
   sku: string;
   sellingPrice: number;
+  costPrice?: number;
   availableStock: number;
   categoryId?: string;
   category?: { id?: string; name: string };
   unitId?: string;
   unit?: { id?: string; abbreviation: string; name?: string };
   minStockLevel?: number;
+  description?: string;
+  isActive?: boolean;
+  createdAt?: string;
   updatedAt?: string;
 }
 
@@ -67,7 +71,12 @@ export interface CachedBranch {
   id: string;
   name: string;
   address?: string | null;
+  phone?: string | null;
+  email?: string | null;
   isMain?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CachedCategory {

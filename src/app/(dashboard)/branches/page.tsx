@@ -7,6 +7,7 @@ import { Plus, Edit, Trash2, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
 import { useTranslations } from "next-intl";
+import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 
 export default function BranchesPage() {
   const t = useTranslations("branches");
@@ -20,19 +21,41 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     setIsLoading(true);
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const localBranches = await getAllFromStore<any>("branches");
+        setBranches(Array.isArray(localBranches) ? localBranches : []);
+        setIsLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/branches");
       if (res.ok) {
         const data = await res.json();
-        setBranches(data);
+        const list = Array.isArray(data) ? data : [];
+        setBranches(list);
+        putManyInStore("branches", list).catch(() => {});
+      } else {
+        const localBranches = await getAllFromStore<any>("branches");
+        setBranches(Array.isArray(localBranches) ? localBranches : []);
       }
     } catch (error) {
-      console.error("Failed to fetch branches", error);
+      console.warn("Failed to fetch branches, loading from offline cache:", error);
+      const localBranches = await getAllFromStore<any>("branches").catch(() => []);
+      setBranches(Array.isArray(localBranches) ? localBranches : []);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
     fetchBranches();
+    const handleNetworkChange = () => fetchBranches();
+    window.addEventListener("online", handleNetworkChange);
+    window.addEventListener("offline", handleNetworkChange);
+    return () => {
+      window.removeEventListener("online", handleNetworkChange);
+      window.removeEventListener("offline", handleNetworkChange);
+    };
   }, []);
 
   const handleDelete = async (id: string) => {

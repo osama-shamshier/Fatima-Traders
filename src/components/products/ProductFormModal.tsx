@@ -7,6 +7,8 @@ import * as z from "zod";
 import { X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
+import { recordOfflineProduct } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -58,12 +60,48 @@ export function ProductFormModal({ isOpen, onClose, product, onSuccess }: Produc
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/categories")
-        .then((res) => res.json())
-        .then((data) => setCategories(data));
-      fetch("/api/units")
-        .then((res) => res.json())
-        .then((data) => setUnits(data));
+      const loadModalData = async () => {
+        try {
+          if (typeof navigator !== "undefined" && !navigator.onLine) {
+            const [localCats, localUnits] = await Promise.all([
+              getAllFromStore<any>("categories"),
+              getAllFromStore<any>("units"),
+            ]);
+            setCategories(Array.isArray(localCats) ? localCats : []);
+            setUnits(Array.isArray(localUnits) ? localUnits : []);
+            return;
+          }
+
+          const [catRes, unitRes] = await Promise.all([
+            fetch("/api/categories"),
+            fetch("/api/units"),
+          ]);
+
+          if (catRes.ok) {
+            const cData = await catRes.json();
+            setCategories(Array.isArray(cData) ? cData : []);
+          } else {
+            const localCats = await getAllFromStore<any>("categories");
+            setCategories(Array.isArray(localCats) ? localCats : []);
+          }
+
+          if (unitRes.ok) {
+            const uData = await unitRes.json();
+            setUnits(Array.isArray(uData) ? uData : []);
+          } else {
+            const localUnits = await getAllFromStore<any>("units");
+            setUnits(Array.isArray(localUnits) ? localUnits : []);
+          }
+        } catch {
+          const [localCats, localUnits] = await Promise.all([
+            getAllFromStore<any>("categories").catch(() => []),
+            getAllFromStore<any>("units").catch(() => []),
+          ]);
+          setCategories(Array.isArray(localCats) ? localCats : []);
+          setUnits(Array.isArray(localUnits) ? localUnits : []);
+        }
+      };
+      loadModalData();
     }
   }, [isOpen]);
 
@@ -72,6 +110,13 @@ export function ProductFormModal({ isOpen, onClose, product, onSuccess }: Produc
   const onSubmit = async (data: ProductFormValues) => {
     setSubmitError("");
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await recordOfflineProduct({ ...data, id: product?.id });
+        onSuccess();
+        onClose();
+        return;
+      }
+
       const url = product ? `/api/products/${product.id}` : "/api/products";
       const method = product ? "PUT" : "POST";
 
@@ -82,13 +127,29 @@ export function ProductFormModal({ isOpen, onClose, product, onSuccess }: Produc
       });
 
       if (!res.ok) {
-        const result = await res.json();
+        if (res.status === 503) {
+          await recordOfflineProduct({ ...data, id: product?.id });
+          onSuccess();
+          onClose();
+          return;
+        }
+        const result = await res.json().catch(() => ({}));
         throw new Error(result.error || "Something went wrong");
       }
 
       onSuccess();
       onClose();
     } catch (err: any) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await recordOfflineProduct({ ...data, id: product?.id });
+          onSuccess();
+          onClose();
+          return;
+        } catch (innerErr) {
+          console.error(innerErr);
+        }
+      }
       setSubmitError(err.message);
     }
   };

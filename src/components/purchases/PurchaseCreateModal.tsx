@@ -10,6 +10,8 @@ import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Trash2, Tag, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { getOfflineSuppliers, getOfflineProducts, recordOfflinePurchase } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
 
 interface PurchaseCreateModalProps {
   isOpen: boolean;
@@ -50,11 +52,34 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
 
   const fetchData = async () => {
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const [suppList, branchList, prodList] = await Promise.all([
+          getOfflineSuppliers(),
+          getAllFromStore<any>("branches"),
+          getOfflineProducts(),
+        ]);
+        const sList = Array.isArray(suppList) ? suppList : [];
+        const bList = Array.isArray(branchList) ? branchList : [];
+        const pList = Array.isArray(prodList) ? prodList : [];
+
+        setSuppliers(sList);
+        if (sList.length > 0 && !formData.supplierId) {
+          setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
+        }
+        setBranches(bList);
+        if (bList.length > 0 && !formData.branchId) {
+          setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+        }
+        setProducts(pList);
+        return;
+      }
+
       const [suppRes, branchRes, prodRes] = await Promise.all([
         fetch("/api/suppliers"),
         fetch("/api/branches"),
         fetch("/api/products"),
       ]);
+
       if (suppRes.ok) {
         const sData = await suppRes.json();
         const sList = Array.isArray(sData) ? sData : [];
@@ -62,7 +87,14 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
         if (sList.length > 0 && !formData.supplierId) {
           setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
         }
+      } else {
+        const sList = await getOfflineSuppliers();
+        setSuppliers(Array.isArray(sList) ? sList : []);
+        if (sList.length > 0 && !formData.supplierId) {
+          setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
+        }
       }
+
       if (branchRes.ok) {
         const bData = await branchRes.json();
         const bList = Array.isArray(bData) ? bData : [];
@@ -70,13 +102,31 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
         if (bList.length > 0 && !formData.branchId) {
           setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
         }
+      } else {
+        const bList = await getAllFromStore<any>("branches");
+        setBranches(Array.isArray(bList) ? bList : []);
+        if (bList.length > 0 && !formData.branchId) {
+          setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+        }
       }
+
       if (prodRes.ok) {
         const pData = await prodRes.json();
         setProducts(Array.isArray(pData) ? pData : []);
+      } else {
+        const pList = await getOfflineProducts();
+        setProducts(Array.isArray(pList) ? pList : []);
       }
     } catch (error) {
-      console.error("Error loading purchase modal dropdown data:", error);
+      console.warn("Error loading purchase modal dropdown data, falling back to cache:", error);
+      const [suppList, branchList, prodList] = await Promise.all([
+        getOfflineSuppliers(),
+        getAllFromStore<any>("branches").catch(() => []),
+        getOfflineProducts(),
+      ]);
+      setSuppliers(Array.isArray(suppList) ? suppList : []);
+      setBranches(Array.isArray(branchList) ? branchList : []);
+      setProducts(Array.isArray(prodList) ? prodList : []);
     }
   };
 
@@ -128,25 +178,32 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
 
     setLoading(true);
 
-    try {
-      const refText = [
-        formData.bankName ? `Bank: ${formData.bankName}` : null,
-        formData.bankReference ? `Ref: ${formData.bankReference}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | ");
+    const refText = [
+      formData.bankName ? `Bank: ${formData.bankName}` : null,
+      formData.bankReference ? `Ref: ${formData.bankReference}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
 
-      const payload = {
-        ...formData,
-        amountPaid: Number(formData.amountPaid) || 0,
-        bankReference: refText || undefined,
-        items: items.map((i) => ({
-          productId: i.productId,
-          quantity: Number(i.quantity),
-          purchaseRate: Number(i.purchaseRate),
-          newSellingPrice: Number(i.newSellingPrice) > 0 ? Number(i.newSellingPrice) : undefined,
-        })),
-      };
+    const payload = {
+      ...formData,
+      amountPaid: Number(formData.amountPaid) || 0,
+      bankReference: refText || undefined,
+      items: items.map((i) => ({
+        productId: i.productId,
+        quantity: Number(i.quantity),
+        purchaseRate: Number(i.purchaseRate),
+        newSellingPrice: Number(i.newSellingPrice) > 0 ? Number(i.newSellingPrice) : undefined,
+      })),
+    };
+
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await recordOfflinePurchase(payload);
+        onSuccess();
+        onClose();
+        return;
+      }
 
       const res = await fetch("/api/purchases", {
         method: "POST",
@@ -155,6 +212,12 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       });
 
       if (!res.ok) {
+        if (res.status === 503) {
+          await recordOfflinePurchase(payload);
+          onSuccess();
+          onClose();
+          return;
+        }
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to create purchase");
       }
@@ -162,6 +225,16 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       onSuccess();
       onClose();
     } catch (error: any) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await recordOfflinePurchase(payload);
+          onSuccess();
+          onClose();
+          return;
+        } catch (innerErr) {
+          console.error(innerErr);
+        }
+      }
       console.error(error);
       alert(error.message || "Error creating purchase bill");
     } finally {

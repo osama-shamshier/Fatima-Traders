@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTranslations } from "next-intl";
+import { recordOfflineBranch } from "@/lib/offline/cacheService";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -48,6 +49,13 @@ export function BranchFormModal({ isOpen, onClose, branch, onSuccess }: { isOpen
 
   const onSubmit = async (data: FormData) => {
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await recordOfflineBranch({ ...data, id: branch?.id });
+        onSuccess();
+        onClose();
+        return;
+      }
+
       const url = branch ? `/api/branches/${branch.id}` : "/api/branches";
       const method = branch ? "PUT" : "POST";
       
@@ -61,9 +69,23 @@ export function BranchFormModal({ isOpen, onClose, branch, onSuccess }: { isOpen
         onSuccess();
         onClose();
       } else {
+        if (res.status === 503) {
+          await recordOfflineBranch({ ...data, id: branch?.id });
+          onSuccess();
+          onClose();
+          return;
+        }
         console.error("Error saving branch");
       }
     } catch (error) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await recordOfflineBranch({ ...data, id: branch?.id });
+          onSuccess();
+          onClose();
+          return;
+        } catch {}
+      }
       console.error("Failed to save branch", error);
     }
   };

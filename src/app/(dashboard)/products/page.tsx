@@ -38,8 +38,9 @@ export default function ProductsPage() {
         const res = await fetch(`/api/products?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
-          setProducts(data);
-          cacheCatalogData({ products: data });
+          const list = Array.isArray(data) ? data : [];
+          setProducts(list);
+          cacheCatalogData({ products: list });
           setLoading(false);
           return;
         }
@@ -54,28 +55,51 @@ export default function ProductsPage() {
         categoryId,
         search,
       });
-      setProducts(offlineProds);
+      setProducts(Array.isArray(offlineProds) ? offlineProds : []);
     } catch (err) {
       console.error("Failed to load offline products:", err);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (typeof navigator !== "undefined" && navigator.onLine) {
-      fetch("/api/categories")
-        .then((res) => res.json())
-        .then((data) => {
-          setCategories(data);
-          putManyInStore("categories", data).catch(() => {});
-        })
-        .catch(console.error);
-    } else {
-      getAllFromStore("categories")
-        .then(setCategories)
-        .catch(console.error);
-    }
+    const loadCategories = async () => {
+      try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const localCats = await getAllFromStore<any>("categories");
+          setCategories(Array.isArray(localCats) ? localCats : []);
+          return;
+        }
+        const res = await fetch("/api/categories");
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : [];
+          setCategories(list);
+          putManyInStore("categories", list).catch(() => {});
+        } else {
+          const localCats = await getAllFromStore<any>("categories");
+          setCategories(Array.isArray(localCats) ? localCats : []);
+        }
+      } catch {
+        const localCats = await getAllFromStore<any>("categories").catch(() => []);
+        setCategories(Array.isArray(localCats) ? localCats : []);
+      }
+    };
+
+    loadCategories();
+
+    const handleNetworkChange = () => {
+      loadCategories();
+      fetchProducts();
+    };
+    window.addEventListener("online", handleNetworkChange);
+    window.addEventListener("offline", handleNetworkChange);
+    return () => {
+      window.removeEventListener("online", handleNetworkChange);
+      window.removeEventListener("offline", handleNetworkChange);
+    };
   }, []);
 
   useEffect(() => {
