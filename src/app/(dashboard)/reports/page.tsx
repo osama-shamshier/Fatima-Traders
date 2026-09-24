@@ -10,6 +10,15 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import {
+  getOfflineProducts,
+  getCombinedSales,
+  calculateOfflineShiftProfitLoss,
+  getOfflineBuyers,
+  getOfflineSuppliers,
+  applyOfflineCreditsToBuyers,
+  applyOfflineDisbursementsToSuppliers,
+} from "@/lib/offline/cacheService";
 
 export default function ReportsPage() {
   const t = useTranslations("reports");
@@ -33,17 +42,58 @@ export default function ReportsPage() {
     else if (activeTab === "area-balances") fetchPartyList();
   }, [activeTab, partyType]);
 
+  useEffect(() => {
+    const handleNetworkChange = () => {
+      if (activeTab === "valuation") fetchValuation();
+      else if (activeTab === "sales") fetchSalesReport();
+      else if (activeTab === "profit-loss") fetchProfitLoss();
+      else if (activeTab === "area-balances") fetchPartyList();
+    };
+
+    window.addEventListener("online", handleNetworkChange);
+    window.addEventListener("offline", handleNetworkChange);
+    return () => {
+      window.removeEventListener("online", handleNetworkChange);
+      window.removeEventListener("offline", handleNetworkChange);
+    };
+  }, [activeTab, partyType]);
+
   const fetchPartyList = async () => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        if (partyType === "Customers") {
+          const buyers = await getOfflineBuyers();
+          setPartyList(buyers);
+        } else {
+          const suppliers = await getOfflineSuppliers();
+          setPartyList(suppliers);
+        }
+        return;
+      }
       const endpoint = partyType === "Customers" ? "/api/buyers" : "/api/suppliers";
       const res = await fetch(endpoint);
       if (res.ok) {
         const data = await res.json();
-        setPartyList(Array.isArray(data) ? data : []);
+        if (partyType === "Customers") {
+          const adjusted = await applyOfflineCreditsToBuyers(Array.isArray(data) ? data : []);
+          setPartyList(adjusted);
+        } else {
+          const adjusted = await applyOfflineDisbursementsToSuppliers(Array.isArray(data) ? data : []);
+          setPartyList(adjusted);
+        }
+      } else {
+        throw new Error("Failed to fetch party list");
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Failed to fetch online party list, falling back to offline cache:", e);
+      if (partyType === "Customers") {
+        const buyers = await getOfflineBuyers();
+        setPartyList(buyers);
+      } else {
+        const suppliers = await getOfflineSuppliers();
+        setPartyList(suppliers);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -52,10 +102,31 @@ export default function ReportsPage() {
   const fetchValuation = async () => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        const prods = await getOfflineProducts();
+        const totalValuation = prods.reduce((sum, p) => {
+          const stock = Number(p.availableStock !== undefined ? p.availableStock : (p as any).currentStock || 0);
+          const cost = Number((p as any).costPrice || ((p as any).sellingPrice ? (p as any).sellingPrice * 0.7 : 0));
+          return sum + (stock > 0 ? stock * cost : 0);
+        }, 0);
+        setValuationData({ totalValuation });
+        return;
+      }
       const res = await fetch("/api/reports/inventory-valuation");
-      if (res.ok) setValuationData(await res.json());
+      if (res.ok) {
+        setValuationData(await res.json());
+      } else {
+        throw new Error("Valuation fetch failed");
+      }
     } catch (e) {
-      console.error(e);
+      console.warn("Valuation fetch error, using offline products:", e);
+      const prods = await getOfflineProducts();
+      const totalValuation = prods.reduce((sum, p) => {
+        const stock = Number(p.availableStock !== undefined ? p.availableStock : (p as any).currentStock || 0);
+        const cost = Number((p as any).costPrice || ((p as any).sellingPrice ? (p as any).sellingPrice * 0.7 : 0));
+        return sum + (stock > 0 ? stock * cost : 0);
+      }, 0);
+      setValuationData({ totalValuation });
     } finally {
       setIsLoading(false);
     }
@@ -64,10 +135,24 @@ export default function ReportsPage() {
   const fetchSalesReport = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/reports/sales");
-      if (res.ok) setSalesData(await res.json());
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        const combined = await getCombinedSales([]);
+        setSalesData(combined);
+        return;
+      }
+      const res = await fetch("/api/sales");
+      if (res.ok) {
+        const data = await res.json();
+        const combined = await getCombinedSales(Array.isArray(data) ? data : []);
+        setSalesData(combined);
+      } else {
+        const combined = await getCombinedSales([]);
+        setSalesData(combined);
+      }
     } catch (e) {
-      console.error(e);
+      console.warn("Sales report fetch error, using offline sales:", e);
+      const combined = await getCombinedSales([]);
+      setSalesData(combined);
     } finally {
       setIsLoading(false);
     }
@@ -76,10 +161,22 @@ export default function ReportsPage() {
   const fetchProfitLoss = async () => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        const pl = await calculateOfflineShiftProfitLoss();
+        setPlData(pl);
+        return;
+      }
       const res = await fetch("/api/reports/profit-loss");
-      if (res.ok) setPlData(await res.json());
+      if (res.ok) {
+        setPlData(await res.json());
+      } else {
+        const pl = await calculateOfflineShiftProfitLoss();
+        setPlData(pl);
+      }
     } catch (e) {
-      console.error(e);
+      console.warn("Profit/loss fetch error, using offline calculations:", e);
+      const pl = await calculateOfflineShiftProfitLoss();
+      setPlData(pl);
     } finally {
       setIsLoading(false);
     }

@@ -1,7 +1,7 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v4";
+const CACHE_NAME = "fatima-retail-pwa-v5";
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -155,10 +155,7 @@ self.addEventListener("fetch", (event) => {
           const genericPayload = await caches.match(url.pathname + "_rsc_payload");
           if (genericPayload) return genericPayload;
 
-          // 4. Match pathname directly
-          const pathCached = await caches.match(url.pathname);
-          if (pathCached) return pathCached;
-
+          // Never return HTML for RSC requests! Return 503 so Next.js falls back to document navigation.
           return new Response("Offline RSC Unavailable", {
             status: 503,
             statusText: "Offline RSC Unavailable",

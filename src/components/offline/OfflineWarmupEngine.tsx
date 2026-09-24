@@ -56,7 +56,26 @@ export function OfflineWarmupEngine() {
 
         // 2. Fetch HTML shells and RSC payloads in background so Service Worker caches them
         for (const route of CORE_ROUTES) {
-          fetch(route, { headers: { Accept: "text/html" } }).catch(() => {});
+          fetch(route, { headers: { Accept: "text/html" } })
+            .then((r) => (r.ok ? r.text() : ""))
+            .then((html) => {
+              if (!html) return;
+              // Eagerly pre-cache all page JS scripts and CSS stylesheets extracted from the HTML shell
+              const scriptMatches = html.matchAll(/<script[^>]+src="([^">]+)"/g);
+              for (const m of scriptMatches) {
+                if (m[1] && m[1].startsWith("/_next/")) {
+                  fetch(m[1]).catch(() => {});
+                }
+              }
+              const linkMatches = html.matchAll(/<link[^>]+href="([^">]+)"/g);
+              for (const m of linkMatches) {
+                if (m[1] && m[1].startsWith("/_next/")) {
+                  fetch(m[1]).catch(() => {});
+                }
+              }
+            })
+            .catch(() => {});
+
           fetch(route, { headers: { RSC: "1" } }).catch(() => {});
         }
 

@@ -586,12 +586,8 @@ export async function recordOfflineBuyerPayment(payload: {
   const now = new Date().toISOString();
   const paymentAmount = Number(payload.amount);
 
-  // 1. Immediately reduce buyer's totalOutstanding in local storage
-  const buyer = await getFromStore<CachedBuyer>("buyers", payload.buyerId);
-  if (buyer) {
-    buyer.totalOutstanding = Math.max(0, Number(buyer.totalOutstanding || 0) - paymentAmount);
-    await putInStore("buyers", buyer);
-  }
+  // Customer outstanding balance is adjusted via outbox pending credits (getPendingOfflineBuyerCredits)
+  // to avoid double-deducting against the baseline buyers store.
 
   // 2. Save payment record in local store
   const paymentRecord = {
@@ -1313,15 +1309,45 @@ export async function calculateOfflineDashboardStats() {
     // Apply pending disbursements to suppliers
     const adjustedSuppliers = await applyOfflineDisbursementsToSuppliers(suppliers);
 
-    // Filter today's sales
-    const todayStr = new Date().toISOString().split("T")[0];
+    // Filter today's sales (using local calendar day)
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+
     const todaySales = sales.filter((s) => {
-      const saleDate = s.saleDate || s.createdAt;
-      return saleDate && saleDate.startsWith(todayStr);
+      const d = new Date(s.saleDate || s.createdAt);
+      return (
+        d.getFullYear() === todayYear &&
+        d.getMonth() === todayMonth &&
+        d.getDate() === todayDate
+      );
     });
 
     const salesTodayRevenue = todaySales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
     const salesTodayCount = todaySales.length;
+
+    // Today's Payment Method breakdown
+    const todayCashSales = todaySales
+      .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
+      .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
+
+    const bankDetailsList = todaySales
+      .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
+      .map((s) => ({
+        id: s.id,
+        type: "POS_SALE" as const,
+        invoiceNumber: s.invoiceNumber,
+        customerName: s.buyer?.name || "Walk-in Customer",
+        branchName: s.branch?.name || "Main Branch",
+        amount: Number(s.amountPaid || 0),
+        bankName: s.bankName || "Bank Transfer",
+        referenceNumber: s.bankReference || "-",
+        createdAt: s.createdAt || s.saleDate,
+      }));
+
+    const todayBankSales = bankDetailsList.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const todayPendingCredit = todaySales.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
 
     // Low stock & out of stock products
     const lowStockProductsList = adjustedProducts.filter((p) => {
@@ -1334,29 +1360,61 @@ export async function calculateOfflineDashboardStats() {
       return stock <= 0;
     }).length;
 
-    // Customer Debt & Supplier Payables
-    const totalCustomerDebt = adjustedBuyers.reduce((sum, b) => sum + Number(b.totalOutstanding || 0), 0);
-    const totalSupplierPayable = adjustedSuppliers.reduce(
-      (sum, s: any) => sum + Number(s.totalOutstanding || s.outstandingBalance || 0),
+    // Customer Debt (Receivables) & Supplier Payables
+    const totalBuyerReceivables = adjustedBuyers.reduce(
+      (sum, b) => sum + Number(b.totalOutstanding || 0),
+      0
+    );
+    const totalSupplierPayables = adjustedSuppliers.reduce(
+      (sum, s: any) => sum + Number(s.totalOutstanding !== undefined ? s.totalOutstanding : s.outstandingBalance || 0),
       0
     );
 
+    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
+
+    const recentSales = sales.slice(0, 5).map((s) => ({
+      id: s.id,
+      invoiceNumber: s.invoiceNumber,
+      grandTotal: s.grandTotal,
+      createdAt: s.createdAt || s.saleDate,
+      buyer: s.buyer || { name: "Walk-in Customer" },
+      branch: s.branch || { name: "Main Branch" },
+    }));
+
+    const outstandingDebtors = adjustedBuyers
+      .filter((b) => Number(b.totalOutstanding || 0) > 0)
+      .sort((a, b) => Number(b.totalOutstanding || 0) - Number(a.totalOutstanding || 0))
+      .slice(0, 10);
+
     return {
       totalProducts: adjustedProducts.length,
+      activeBranches: branches.length > 0 ? branches.length : 1,
       salesTodayRevenue,
       salesTodayCount,
-      activeBranches: branches.length > 0 ? branches.length : 1,
+      todayCashSales,
+      todayBankSales,
+      todayPendingCredit,
+      bankDetailsList,
+      totalRevenue,
+      totalSupplierPayables,
+      totalBuyerReceivables,
+      totalCustomerDebt: totalBuyerReceivables,
+      totalSupplierPayable: totalSupplierPayables,
       lowStockProducts: lowStockProductsList.length,
       outOfStockCount,
-      totalCustomerDebt,
-      totalSupplierPayable,
-      lowStockItems: lowStockProductsList.map((p) => ({
+      recentSales,
+      outstandingDebtors,
+      lowStockList: lowStockProductsList.map((p) => ({
         id: p.id,
         name: p.name,
         sku: p.sku,
-        availableStock: p.availableStock,
-        minStockLevel: p.minStockLevel || 5,
-        sellingPrice: p.sellingPrice,
+        categoryName: p.category?.name || "General",
+        unitAbbr: p.unit?.abbreviation || "",
+        currentStock: Number(p.availableStock || 0),
+        minStockLevel: Number(p.minStockLevel || 5),
+        sellingPrice: Number(p.sellingPrice || 0),
+        status: Number(p.availableStock || 0) <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK",
+        branches: [{ branchName: "Main Branch", quantity: Number(p.availableStock || 0) }],
       })),
       isOfflineCalculated: true,
     };

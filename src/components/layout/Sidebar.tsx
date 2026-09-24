@@ -208,6 +208,7 @@ function CollapsibleSection({
               <li key={item.labelKey}>
                 <Link
                   href={item.href}
+                  prefetch={true}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                     isActive
