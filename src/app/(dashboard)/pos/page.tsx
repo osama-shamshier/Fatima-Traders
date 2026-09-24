@@ -311,18 +311,35 @@ export default function POSPage() {
     }
 
     try {
+      const subtotal = cart.reduce(
+        (sum, item) => sum + (item.sellingPrice - (item.itemDiscount || 0)) * item.cartQuantity,
+        0
+      );
+      const effRoundOff = appliedRoundOff !== undefined ? appliedRoundOff : roundOff;
+      const effGrandTotal = Math.max(0, subtotal - (globalDiscount || 0) + effRoundOff);
+      const effAmountPaid = Math.min(effGrandTotal, Math.max(0, Number(amountPaid || 0)));
+      const effOutstanding = Math.max(0, effGrandTotal - effAmountPaid);
+
+      const foundBuyer = buyers.find((b) => b.id === selectedBuyerId);
+
       const payload = {
         buyerId: selectedBuyerId || undefined,
+        buyer: foundBuyer ? { id: foundBuyer.id, name: foundBuyer.name, companyName: foundBuyer.companyName } : undefined,
         branchId: selectedBranchId,
+        subtotal,
         discount: globalDiscount,
-        roundOff: appliedRoundOff || roundOff,
+        roundOff: effRoundOff,
+        grandTotal: effGrandTotal,
+        amountPaid: effAmountPaid,
+        outstandingAmount: effOutstanding,
         items: cart.map((item) => ({
           productId: item.id,
           quantity: item.cartQuantity,
           sellingPrice: item.sellingPrice,
           discount: item.itemDiscount || 0,
+          name: item.name,
+          sku: item.sku,
         })),
-        amountPaid,
         paymentMethod,
         bankName,
         bankReference,

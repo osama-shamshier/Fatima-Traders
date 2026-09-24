@@ -1,7 +1,7 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v2";
+const CACHE_NAME = "fatima-retail-pwa-v4";
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -17,10 +17,19 @@ const STATIC_ASSETS = [
   "/buyer-due-dates",
   "/suppliers",
   "/supplier-payments",
+  "/financials",
   "/profit-loss",
   "/categories",
   "/units",
   "/counters",
+  "/branches",
+  "/reports",
+  "/stock-transfers",
+  "/settings",
+  "/users",
+  "/roles",
+  "/audit-logs",
+  "/backups",
   "/favicon.ico",
   "/manifest.json",
 ];
@@ -33,7 +42,6 @@ self.addEventListener("install", (event) => {
         try {
           await cache.add(asset);
         } catch (err) {
-          // Non-blocking: will be cached on first online navigation/pre-warm
           console.warn("Pre-caching asset skipped/failed:", asset);
         }
       }
@@ -85,7 +93,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Fetch fresh in background
           fetch(event.request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -130,6 +137,7 @@ self.addEventListener("fetch", (event) => {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
+              cache.put(url.pathname + "_rsc_payload", responseToCache.clone());
             });
           }
           return networkResponse;
@@ -143,18 +151,31 @@ self.addEventListener("fetch", (event) => {
           const matchedWithoutQuery = await caches.match(event.request, { ignoreSearch: true });
           if (matchedWithoutQuery) return matchedWithoutQuery;
 
-          // 3. Match pathname directly
+          // 3. Fallback to generic stored payload for this route
+          const genericPayload = await caches.match(url.pathname + "_rsc_payload");
+          if (genericPayload) return genericPayload;
+
+          // 4. Match pathname directly
           const pathCached = await caches.match(url.pathname);
           if (pathCached) return pathCached;
 
-          return new Response("", { status: 408, statusText: "Offline RSC" });
+          return new Response("Offline RSC Unavailable", {
+            status: 503,
+            statusText: "Offline RSC Unavailable",
+            headers: { "Content-Type": "text/plain" },
+          });
         })
     );
     return;
   }
 
-  // 3. Page Navigations (HTML): Network first with fallback to cached page shell
-  if (event.request.mode === "navigate") {
+  // 3. Page Navigations and HTML Shells: Network first with fallback to cached page shell
+  const isPageRequest =
+    event.request.mode === "navigate" ||
+    (event.request.headers.get("Accept") && event.request.headers.get("Accept").includes("text/html")) ||
+    STATIC_ASSETS.includes(url.pathname);
+
+  if (isPageRequest) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
@@ -162,12 +183,12 @@ self.addEventListener("fetch", (event) => {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
+              cache.put(url.pathname, responseToCache.clone());
             });
           }
           return networkResponse;
         })
         .catch(async () => {
-          // Fallback to cache for this specific route, or fallback to pathname
           const cached = await caches.match(event.request);
           if (cached) return cached;
 

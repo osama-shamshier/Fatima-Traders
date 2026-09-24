@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { precacheAllPartyLedgers } from "@/lib/offline/cacheService";
+import { precacheFullApplicationData } from "@/lib/offline/cacheService";
 
 const CORE_ROUTES = [
+  "/dashboard",
   "/pos",
   "/sales",
   "/sales-returns",
@@ -17,11 +18,19 @@ const CORE_ROUTES = [
   "/buyer-due-dates",
   "/suppliers",
   "/supplier-payments",
+  "/financials",
   "/profit-loss",
   "/categories",
   "/units",
   "/counters",
-  "/dashboard",
+  "/branches",
+  "/reports",
+  "/stock-transfers",
+  "/settings",
+  "/users",
+  "/roles",
+  "/audit-logs",
+  "/backups",
 ];
 
 export function OfflineWarmupEngine() {
@@ -45,23 +54,24 @@ export function OfflineWarmupEngine() {
           }
         }
 
-        // 2. Fetch HTML shells in background so Service Worker caches them
+        // 2. Fetch HTML shells and RSC payloads in background so Service Worker caches them
         for (const route of CORE_ROUTES) {
           fetch(route, { headers: { Accept: "text/html" } }).catch(() => {});
+          fetch(route, { headers: { RSC: "1" } }).catch(() => {});
         }
 
-        // 3. Pre-cache all active party ledgers and recent records into IndexedDB
-        await precacheAllPartyLedgers();
+        // 3. Pre-cache all active catalog entities, ledgers, and reports into IndexedDB
+        await precacheFullApplicationData();
         hasWarmedUpRef.current = true;
       } catch (err) {
         console.warn("Offline Warmup Engine encountered non-critical error:", err);
       }
     };
 
-    // Delay warmup slightly (2.5 seconds) after initial page render to prioritize active UI
+    // Trigger warmup immediately after initial mount
     const timer = setTimeout(() => {
       runWarmup();
-    }, 2500);
+    }, 100);
 
     // Periodic refresh every 5 minutes when online
     const interval = setInterval(() => {

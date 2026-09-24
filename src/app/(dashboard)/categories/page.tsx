@@ -8,6 +8,7 @@ import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { CategoryFormModal } from "@/components/categories/CategoryFormModal";
 import { useTranslations } from "next-intl";
+import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 
 export default function CategoriesPage() {
   const t = useTranslations("categories");
@@ -21,13 +22,27 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/categories");
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch("/api/categories");
+        if (res.ok) {
+          const data = await res.json();
+          setCategories(data);
+          putManyInStore("categories", data).catch(() => {});
+          setLoading(false);
+          return;
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch categories", error);
+      console.warn("Online fetch categories failed, falling back to offline cache:", error);
+    }
+
+    try {
+      const cached = await getAllFromStore<any>("categories");
+      if (cached && cached.length > 0) {
+        setCategories(cached);
+      }
+    } catch (err) {
+      console.error("Failed to load offline categories:", err);
     } finally {
       setLoading(false);
     }
@@ -35,6 +50,9 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
+    const handleOnline = () => fetchCategories();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const handleDelete = async (id: string) => {

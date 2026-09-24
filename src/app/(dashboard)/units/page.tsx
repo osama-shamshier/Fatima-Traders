@@ -8,6 +8,7 @@ import { TableLoader } from "@/components/ui/loader";
 import { formatDate } from "@/lib/utils";
 import { UnitFormModal } from "@/components/units/UnitFormModal";
 import { useTranslations } from "next-intl";
+import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 
 export default function UnitsPage() {
   const t = useTranslations("units");
@@ -21,13 +22,27 @@ export default function UnitsPage() {
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/units");
-      if (res.ok) {
-        const data = await res.json();
-        setUnits(data);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch("/api/units");
+        if (res.ok) {
+          const data = await res.json();
+          setUnits(data);
+          putManyInStore("units", data).catch(() => {});
+          setLoading(false);
+          return;
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch units", error);
+      console.warn("Online fetch units failed, falling back to offline cache:", error);
+    }
+
+    try {
+      const cached = await getAllFromStore<any>("units");
+      if (cached && cached.length > 0) {
+        setUnits(cached);
+      }
+    } catch (err) {
+      console.error("Failed to load offline units:", err);
     } finally {
       setLoading(false);
     }
@@ -35,6 +50,9 @@ export default function UnitsPage() {
 
   useEffect(() => {
     fetchUnits();
+    const handleOnline = () => fetchUnits();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const handleDelete = async (id: string) => {

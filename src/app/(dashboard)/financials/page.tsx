@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
 import { ArrowDownRight, ArrowUpRight, DollarSign, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { calculateOfflineCashFlow, calculateOfflineGeneralLedger } from "@/lib/offline/cacheService";
 
 export default function FinancialsPage() {
   const t = useTranslations("financials");
@@ -18,16 +19,62 @@ export default function FinancialsPage() {
   const [loadingLedger, setLoadingLedger] = useState(true);
   const [loadingCashFlow, setLoadingCashFlow] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/financials/ledger")
-      .then((r) => r.json())
-      .then(setLedger)
-      .finally(() => setLoadingLedger(false));
+  const loadFinancials = async () => {
+    setLoadingLedger(true);
+    setLoadingCashFlow(true);
 
-    fetch("/api/financials/cash-flow")
-      .then((r) => r.json())
-      .then(setCashFlow)
-      .finally(() => setLoadingCashFlow(false));
+    try {
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const [lRes, cfRes] = await Promise.all([
+          fetch("/api/financials/ledger").catch(() => null),
+          fetch("/api/financials/cash-flow").catch(() => null),
+        ]);
+
+        if (lRes && lRes.ok) {
+          const lData = await lRes.json();
+          setLedger(lData);
+        } else {
+          const offlineLedger = await calculateOfflineGeneralLedger();
+          setLedger(offlineLedger);
+        }
+
+        if (cfRes && cfRes.ok) {
+          const cfData = await cfRes.json();
+          setCashFlow(cfData);
+        } else {
+          const offlineCF = await calculateOfflineCashFlow();
+          setCashFlow(offlineCF);
+        }
+
+        setLoadingLedger(false);
+        setLoadingCashFlow(false);
+        return;
+      }
+    } catch (e) {
+      console.warn("Online fetch financials failed, falling back to offline calculations:", e);
+    }
+
+    // Offline calculations fallback
+    try {
+      const [offlineLedger, offlineCF] = await Promise.all([
+        calculateOfflineGeneralLedger(),
+        calculateOfflineCashFlow(),
+      ]);
+      setLedger(offlineLedger);
+      setCashFlow(offlineCF);
+    } catch (err) {
+      console.error("Failed to calculate offline financials:", err);
+    } finally {
+      setLoadingLedger(false);
+      setLoadingCashFlow(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFinancials();
+    const handleOnline = () => loadFinancials();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   return (

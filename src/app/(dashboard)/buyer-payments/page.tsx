@@ -9,6 +9,8 @@ import { Plus, Search, X, CreditCard, DollarSign } from "lucide-react";
 import { BuyerPaymentFormModal } from "@/components/buyer-payments/BuyerPaymentFormModal";
 import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "next-intl";
+import { getCombinedBuyerPayments } from "@/lib/offline/cacheService";
+import { putManyInStore } from "@/lib/offline/db";
 
 export default function BuyerPaymentsPage() {
   const t = useTranslations("buyerPayments");
@@ -23,11 +25,27 @@ export default function BuyerPaymentsPage() {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/buyer-payments");
-      const data = await res.json();
-      setPayments(Array.isArray(data) ? data : []);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch("/api/buyer-payments");
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : [];
+          putManyInStore("buyer_payments", list).catch(() => {});
+          const combined = await getCombinedBuyerPayments(list);
+          setPayments(combined);
+          setIsLoading(false);
+          return;
+        }
+      }
     } catch (error) {
-      console.error("Failed to fetch payments", error);
+      console.warn("Online fetch buyer payments failed, falling back to offline cache:", error);
+    }
+
+    try {
+      const combined = await getCombinedBuyerPayments([]);
+      setPayments(combined);
+    } catch (err) {
+      console.error("Failed to load offline buyer payments:", err);
     } finally {
       setIsLoading(false);
     }
@@ -35,6 +53,9 @@ export default function BuyerPaymentsPage() {
 
   useEffect(() => {
     fetchPayments();
+    const handleOnline = () => fetchPayments();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const filteredPayments = payments.filter((p) => {

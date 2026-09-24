@@ -10,6 +10,7 @@ import { TableLoader } from "@/components/ui/loader";
 import { Calendar, Filter, RefreshCw, FileText, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { useTranslations } from "next-intl";
+import { getCombinedSales } from "@/lib/offline/cacheService";
 
 export default function BuyerDueDatesPage() {
   const t = useTranslations("buyerDueDates");
@@ -43,16 +44,77 @@ export default function BuyerDueDatesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/buyers/due-dates?${params.toString()}`);
-      if (res.ok) {
-        setItems(await res.json());
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch(`/api/buyers/due-dates?${params.toString()}`);
+        if (res.ok) {
+          setItems(await res.json());
+          setLoading(false);
+          return;
+        }
       }
     } catch (e) {
-      console.error("Failed to fetch due dates", e);
+      console.warn("Online fetch due dates failed, falling back to offline cache:", e);
+    }
+
+    // Offline calculation fallback
+    try {
+      const sales = await getCombinedSales([]);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+      const mapped = sales
+        .filter((s) => s.dueDate && Number(s.outstandingAmount || 0) > 0 && (s.buyerId || s.buyer))
+        .map((s) => {
+          const dueTime = new Date(s.dueDate).getTime();
+          const diffDays = Math.ceil((dueTime - today) / (1000 * 60 * 60 * 24));
+          const status = diffDays < 0 ? "OVERDUE" : diffDays === 0 ? "DUE_TODAY" : "UPCOMING";
+          return {
+            id: s.id,
+            saleId: s.id,
+            invoiceNumber: s.invoiceNumber,
+            buyerId: s.buyerId || s.buyer?.id,
+            buyerName: s.buyer?.name || "Customer",
+            companyName: s.buyer?.companyName || null,
+            contactNumber: s.buyer?.contactNumber || null,
+            dueDate: s.dueDate,
+            outstandingAmount: Number(s.outstandingAmount || 0),
+            status,
+            daysRemaining: diffDays,
+          };
+        });
+
+      let filtered = mapped;
+      if (period === "overdue") {
+        filtered = filtered.filter((i) => i.daysRemaining < 0);
+      } else if (period === "due_today") {
+        filtered = filtered.filter((i) => i.daysRemaining === 0);
+      } else if (period === "upcoming_7") {
+        filtered = filtered.filter((i) => i.daysRemaining > 0 && i.daysRemaining <= 7);
+      }
+
+      if (search) {
+        const q = search.toLowerCase().trim();
+        filtered = filtered.filter(
+          (i) =>
+            i.buyerName.toLowerCase().includes(q) ||
+            (i.companyName && i.companyName.toLowerCase().includes(q)) ||
+            i.invoiceNumber.toLowerCase().includes(q)
+        );
+      }
+
+      setItems(filtered);
+    } catch (err) {
+      console.error("Failed to calculate offline due dates:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handleOnline = () => fetchDueDates();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [period, search, startDate, endDate]);
 
   const handleCustomApply = (e: React.FormEvent) => {
     e.preventDefault();

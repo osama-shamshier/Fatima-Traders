@@ -53,7 +53,12 @@ export default function SalesPage() {
         fetchSales();
       }
     });
-    return unsub;
+    const handleOnline = () => fetchSales();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const fetchSales = async () => {

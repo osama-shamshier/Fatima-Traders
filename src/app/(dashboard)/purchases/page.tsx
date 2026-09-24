@@ -10,6 +10,8 @@ import { PurchaseCreateModal } from "@/components/purchases/PurchaseCreateModal"
 import { PurchaseViewModal } from "@/components/purchases/PurchaseViewModal";
 import { Search, Plus, ShoppingBag, X, Eye } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { getCombinedPurchases } from "@/lib/offline/cacheService";
+import { putManyInStore } from "@/lib/offline/db";
 
 export default function PurchasesPage() {
   const t = useTranslations("purchases");
@@ -26,13 +28,28 @@ export default function PurchasesPage() {
 
   const fetchPurchases = async () => {
     try {
-      const res = await fetch("/api/purchases");
-      if (res.ok) {
-        const data = await res.json();
-        setPurchases(Array.isArray(data) ? data : []);
+      setLoading(true);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        const res = await fetch("/api/purchases");
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : [];
+          putManyInStore("purchases", list).catch(() => {});
+          const combined = await getCombinedPurchases(list);
+          setPurchases(combined);
+          setLoading(false);
+          return;
+        }
       }
     } catch (error) {
-      console.error(error);
+      console.warn("Online fetch purchases failed, falling back to offline cache:", error);
+    }
+
+    try {
+      const combined = await getCombinedPurchases([]);
+      setPurchases(combined);
+    } catch (err) {
+      console.error("Failed to load offline purchases:", err);
     } finally {
       setLoading(false);
     }
@@ -40,6 +57,9 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     fetchPurchases();
+    const handleOnline = () => fetchPurchases();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const handleAdd = () => {
