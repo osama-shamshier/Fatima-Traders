@@ -44,6 +44,7 @@ export async function cacheCatalogData(data: {
   buyers?: CachedBuyer[];
   expenses?: CachedExpense[];
   suppliers?: CachedSupplier[];
+  purchases?: any[];
 }): Promise<void> {
   try {
     await openOfflineDB();
@@ -65,6 +66,9 @@ export async function cacheCatalogData(data: {
     }
     if (data.suppliers && data.suppliers.length > 0) {
       await putManyInStore("suppliers", data.suppliers);
+    }
+    if (data.purchases && data.purchases.length > 0) {
+      await putManyInStore("purchases", data.purchases);
     }
 
     await setMeta("lastCachedAt", new Date().toISOString());
@@ -428,6 +432,41 @@ export async function recordOfflineBuyer(payload: {
   });
 
   return buyerRecord;
+}
+
+// Record an offline Supplier
+export async function recordOfflineSupplier(payload: {
+  name: string;
+  contactNumber?: string;
+  address?: string;
+  companyName?: string;
+}): Promise<CachedSupplier> {
+  const clientSupplierId = generateClientUUID("supp");
+
+  const supplierRecord: CachedSupplier = {
+    id: clientSupplierId,
+    name: payload.name,
+    contactNumber: payload.contactNumber || null,
+    address: payload.address || null,
+    companyName: payload.companyName || null,
+    isOfflineCreated: true,
+  };
+
+  await putInStore("suppliers", supplierRecord);
+
+  await enqueueOutbox({
+    id: clientSupplierId,
+    actionType: "SUPPLIER",
+    endpoint: "/api/suppliers",
+    method: "POST",
+    payload: {
+      ...payload,
+      clientSupplierId,
+      isOffline: true,
+    },
+  });
+
+  return supplierRecord;
 }
 
 // Get combined sales list (Cached + Pending Offline) for Sales History Page
@@ -861,5 +900,147 @@ export async function calculateOfflineShiftProfitLoss(startDate?: string, endDat
   } catch (err) {
     console.error("Error calculating offline profit/loss:", err);
     return null;
+  }
+}
+
+// Calculate live dashboard stats in offline mode
+export async function calculateOfflineDashboardStats() {
+  try {
+    const [products, buyers, suppliers, branches, sales] = await Promise.all([
+      getAllFromStore<CachedProduct>("products"),
+      getAllFromStore<CachedBuyer>("buyers"),
+      getAllFromStore<CachedSupplier>("suppliers"),
+      getAllFromStore<CachedBranch>("branches"),
+      getAllFromStore<any>("sales"),
+    ]);
+
+    // Apply pending deductions to products
+    const adjustedProducts = await applyOfflineDeductionsToProducts(products);
+
+    // Apply pending credits to buyers
+    const adjustedBuyers = await applyOfflineCreditsToBuyers(buyers);
+
+    // Apply pending disbursements to suppliers
+    const adjustedSuppliers = await applyOfflineDisbursementsToSuppliers(suppliers);
+
+    // Filter today's sales
+    const todayStr = new Date().toISOString().split("T")[0];
+    const todaySales = sales.filter((s) => {
+      const saleDate = s.saleDate || s.createdAt;
+      return saleDate && saleDate.startsWith(todayStr);
+    });
+
+    const salesTodayRevenue = todaySales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
+    const salesTodayCount = todaySales.length;
+
+    // Low stock & out of stock products
+    const lowStockProductsList = adjustedProducts.filter((p) => {
+      const stock = Number(p.availableStock ?? 0);
+      const minLevel = Number(p.minStockLevel || 5);
+      return stock <= minLevel;
+    });
+    const outOfStockCount = adjustedProducts.filter((p) => {
+      const stock = Number(p.availableStock ?? 0);
+      return stock <= 0;
+    }).length;
+
+    // Customer Debt & Supplier Payables
+    const totalCustomerDebt = adjustedBuyers.reduce((sum, b) => sum + Number(b.totalOutstanding || 0), 0);
+    const totalSupplierPayable = adjustedSuppliers.reduce(
+      (sum, s: any) => sum + Number(s.totalOutstanding || s.outstandingBalance || 0),
+      0
+    );
+
+    return {
+      totalProducts: adjustedProducts.length,
+      salesTodayRevenue,
+      salesTodayCount,
+      activeBranches: branches.length > 0 ? branches.length : 1,
+      lowStockProducts: lowStockProductsList.length,
+      outOfStockCount,
+      totalCustomerDebt,
+      totalSupplierPayable,
+      lowStockItems: lowStockProductsList.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        availableStock: p.availableStock,
+        minStockLevel: p.minStockLevel || 5,
+        sellingPrice: p.sellingPrice,
+      })),
+      isOfflineCalculated: true,
+    };
+  } catch (err) {
+    console.error("Error calculating offline dashboard stats:", err);
+    return null;
+  }
+}
+
+// Batch pre-cache all party ledgers and application data for full offline availability
+export async function precacheAllPartyLedgers(): Promise<void> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return;
+  }
+
+  try {
+    // 1. Fetch buyers and batch-cache their ledgers
+    const buyersRes = await fetch("/api/buyers").catch(() => null);
+    if (buyersRes && buyersRes.ok) {
+      const buyers = await buyersRes.json();
+      if (Array.isArray(buyers)) {
+        await cacheCatalogData({ buyers });
+        // Batch fetch ledgers for active buyers (top 50)
+        for (const buyer of buyers.slice(0, 50)) {
+          fetch(`/api/buyers/${buyer.id}/ledger`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((ledger) => {
+              if (Array.isArray(ledger)) {
+                cachePartyLedger(buyer.id, ledger);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
+    // 2. Fetch suppliers and batch-cache their ledgers
+    const suppRes = await fetch("/api/suppliers").catch(() => null);
+    if (suppRes && suppRes.ok) {
+      const suppliers = await suppRes.json();
+      if (Array.isArray(suppliers)) {
+        await cacheCatalogData({ suppliers });
+        for (const supplier of suppliers.slice(0, 50)) {
+          fetch(`/api/suppliers/${supplier.id}/ledger`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((ledger) => {
+              if (Array.isArray(ledger)) {
+                cachePartyLedger(`supplier_${supplier.id}`, ledger);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
+    // 3. Fetch and cache purchases
+    const purRes = await fetch("/api/purchases").catch(() => null);
+    if (purRes && purRes.ok) {
+      const purchases = await purRes.json();
+      if (Array.isArray(purchases)) {
+        await putManyInStore("purchases", purchases);
+      }
+    }
+
+    // 4. Fetch and cache recent sales for offline invoice reviews
+    const salesRes = await fetch("/api/sales").catch(() => null);
+    if (salesRes && salesRes.ok) {
+      const salesData = await salesRes.json();
+      const salesList = Array.isArray(salesData) ? salesData : salesData?.sales || [];
+      if (Array.isArray(salesList)) {
+        await putManyInStore("sales", salesList.slice(0, 100));
+      }
+    }
+  } catch (err) {
+    console.warn("Background pre-caching party ledgers error:", err);
   }
 }

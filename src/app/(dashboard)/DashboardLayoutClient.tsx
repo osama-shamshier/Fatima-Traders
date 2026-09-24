@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { cn } from "@/lib/utils";
 import { canAccessRoute, getDefaultUserRoute, isOwner } from "@/lib/rbac";
+import { OfflineWarmupEngine } from "@/components/offline/OfflineWarmupEngine";
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
@@ -48,6 +49,7 @@ export function DashboardLayoutClient({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
+      <OfflineWarmupEngine />
       <Sidebar 
         isMobileOpen={isMobileSidebarOpen} 
         setIsMobileOpen={setIsMobileSidebarOpen}

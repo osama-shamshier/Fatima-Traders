@@ -1,28 +1,42 @@
 // Service Worker for Fatima Traders Retail Management System
-// Full-app offline shell and static asset caching
+// Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v1";
+const CACHE_NAME = "fatima-retail-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
   "/pos",
+  "/sales",
+  "/sales-returns",
   "/products",
   "/inventory",
   "/expenses",
   "/purchases",
   "/buyers",
+  "/buyer-payments",
+  "/buyer-due-dates",
   "/suppliers",
+  "/supplier-payments",
+  "/profit-loss",
+  "/categories",
+  "/units",
+  "/counters",
   "/favicon.ico",
   "/manifest.json",
 ];
 
-// Install: Pre-cache core shell pages
+// Install: Pre-cache core shell pages resiliently
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("Pre-caching some assets failed:", err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of STATIC_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          // Non-blocking: will be cached on first online navigation/pre-warm
+          console.warn("Pre-caching asset skipped/failed:", asset);
+        }
+      }
     })
   );
   self.skipWaiting();
@@ -102,7 +116,44 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Page Navigations (HTML): Network first with fallback to cached page shell
+  // 2. Next.js React Server Component (RSC) requests and client navigation payloads
+  const isRSC =
+    url.searchParams.has("_rsc") ||
+    event.request.headers.get("RSC") === "1" ||
+    event.request.headers.get("Next-Router-State-Tree");
+
+  if (isRSC) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          // 1. Exact match
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+
+          // 2. Match ignoring search parameters (e.g. if _rsc hash changed)
+          const matchedWithoutQuery = await caches.match(event.request, { ignoreSearch: true });
+          if (matchedWithoutQuery) return matchedWithoutQuery;
+
+          // 3. Match pathname directly
+          const pathCached = await caches.match(url.pathname);
+          if (pathCached) return pathCached;
+
+          return new Response("", { status: 408, statusText: "Offline RSC" });
+        })
+    );
+    return;
+  }
+
+  // 3. Page Navigations (HTML): Network first with fallback to cached page shell
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
@@ -116,9 +167,12 @@ self.addEventListener("fetch", (event) => {
           return networkResponse;
         })
         .catch(async () => {
-          // Fallback to cache for this specific route, or fallback to /pos or /dashboard
+          // Fallback to cache for this specific route, or fallback to pathname
           const cached = await caches.match(event.request);
           if (cached) return cached;
+
+          const pathCached = await caches.match(url.pathname);
+          if (pathCached) return pathCached;
 
           const posCached = await caches.match("/pos");
           if (posCached) return posCached;
@@ -142,7 +196,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. API GET requests: Network first, cache fallback
+  // 4. API GET requests: Network first, cache fallback
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(event.request)

@@ -2,7 +2,7 @@
 // Fatima Traders Retail Management System
 
 const DB_NAME = "fatima_retail_offline_v2";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface OutboxItem {
   id: string; // client UUID (e.g. outbox_1727...)
@@ -171,6 +171,14 @@ export function openOfflineDB(): Promise<IDBDatabase> {
       // Cached Ledgers per Party
       if (!db.objectStoreNames.contains("ledgers")) {
         db.createObjectStore("ledgers", { keyPath: "partyId" });
+      }
+
+      // Purchases (cached for offline viewing and invoice references)
+      if (!db.objectStoreNames.contains("purchases")) {
+        const purStore = db.createObjectStore("purchases", { keyPath: "id" });
+        purStore.createIndex("supplierId", "supplierId", { unique: false });
+        purStore.createIndex("invoiceNumber", "invoiceNumber", { unique: false });
+        purStore.createIndex("createdAt", "createdAt", { unique: false });
       }
     };
 

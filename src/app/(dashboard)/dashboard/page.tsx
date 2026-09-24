@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { LowStockModal } from "@/components/dashboard/LowStockModal";
 import { useTranslations } from "next-intl";
+import { calculateOfflineDashboardStats } from "@/lib/offline/cacheService";
 
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
@@ -43,17 +44,32 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
+    const handleOnline = () => fetchStats();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   const fetchStats = async () => {
     setIsLoading(true);
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const localStats = await calculateOfflineDashboardStats();
+        if (localStats) setStats(localStats);
+        setIsLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/dashboard/stats");
       if (res.ok) {
         setStats(await res.json());
+      } else {
+        const localStats = await calculateOfflineDashboardStats();
+        if (localStats) setStats(localStats);
       }
     } catch (e) {
-      console.error("Failed to fetch dashboard stats", e);
+      console.warn("Server stats fetch failed, calculating offline dashboard stats:", e);
+      const localStats = await calculateOfflineDashboardStats();
+      if (localStats) setStats(localStats);
     } finally {
       setIsLoading(false);
     }
@@ -147,6 +163,28 @@ export default function DashboardPage() {
           <RefreshCw className="w-4 h-4 mr-2" /> {t("refresh")}
         </Button>
       </div>
+
+      {/* Offline Mode Banner */}
+      {stats?.isOfflineCalculated && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                ⚡ Offline Mode Local Dashboard
+              </h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Displaying real-time local sales, inventory, and customer debt calculated directly from your terminal. Full multi-branch cloud stats reconcile when online.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-lg shrink-0">
+            Local Shift Mode
+          </span>
+        </div>
+      )}
 
       {/* KPI Metric Cards (4 Cards) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

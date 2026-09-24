@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTranslations } from "next-intl";
+import { recordOfflineSupplier } from "@/lib/offline/cacheService";
 
 interface SupplierFormModalProps {
   isOpen: boolean;
@@ -69,28 +70,44 @@ export function SupplierFormModal({ isOpen, onClose, onSuccess, supplier }: Supp
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const url = isEdit ? `/api/suppliers/${supplier.id}` : "/api/suppliers";
-      const method = isEdit ? "PUT" : "POST";
+    let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+    if (!isOffline) {
+      try {
+        const url = isEdit ? `/api/suppliers/${supplier.id}` : "/api/suppliers";
+        const method = isEdit ? "PUT" : "POST";
 
-      if (!res.ok) {
-        throw new Error("Failed to save supplier");
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        if (res.ok) {
+          onSuccess();
+          onClose();
+          return;
+        }
+      } catch (netErr) {
+        console.warn("Online supplier save failed, falling back to offline:", netErr);
+        isOffline = true;
       }
-
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error(error);
-      alert("Error saving supplier");
-    } finally {
-      setLoading(false);
     }
+
+    if (isOffline && !isEdit) {
+      try {
+        await recordOfflineSupplier(formData);
+        onSuccess();
+        onClose();
+        alert("Supplier saved offline! It will automatically sync to the server when connected.");
+        return;
+      } catch (offlineErr) {
+        console.error("Offline supplier creation failed:", offlineErr);
+      }
+    }
+
+    setLoading(false);
+    alert("Error saving supplier");
   };
 
   return (
