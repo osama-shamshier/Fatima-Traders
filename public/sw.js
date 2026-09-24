@@ -1,9 +1,10 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v7";
+const CACHE_NAME = "fatima-retail-pwa-v8";
 const STATIC_ASSETS = [
   "/",
+  "/login",
   "/dashboard",
   "/pos",
   "/sales",

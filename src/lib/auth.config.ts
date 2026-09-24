@@ -56,9 +56,19 @@ export const authConfig = {
 
       return false; // Redirect to login
     },
+    async redirect({ url, baseUrl }: any) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {
+        // Ignore invalid URL parse errors
+      }
+      return `${baseUrl}/login`;
+    },
   },
   pages: {
     signIn: "/login",
+    signOut: "/login",
   },
   session: {
     strategy: "jwt" as const,

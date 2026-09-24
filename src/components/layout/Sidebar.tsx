@@ -362,7 +362,14 @@ export function Sidebar({
               <span className="text-[10px] text-slate-400 font-medium">{userRole}</span>
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={async () => {
+                try {
+                  await signOut({ redirect: false });
+                } catch (error) {
+                  console.error("SignOut error:", error);
+                }
+                window.location.href = "/login";
+              }}
               className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               title={t("signOut")}
             >

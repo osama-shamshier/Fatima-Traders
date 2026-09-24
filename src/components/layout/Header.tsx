@@ -129,9 +129,14 @@ export function Header({
 
               <div className="p-1">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDropdownOpen(false);
-                    signOut({ callbackUrl: "/login" });
+                    try {
+                      await signOut({ redirect: false });
+                    } catch (error) {
+                      console.error("SignOut error:", error);
+                    }
+                    window.location.href = "/login";
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                 >

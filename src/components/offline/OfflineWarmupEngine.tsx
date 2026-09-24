@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { precacheFullApplicationData } from "@/lib/offline/cacheService";
 
 const CORE_ROUTES = [
+  "/login",
   "/dashboard",
   "/pos",
   "/sales",
