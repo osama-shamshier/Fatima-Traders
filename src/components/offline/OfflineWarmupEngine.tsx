@@ -75,8 +75,6 @@ export function OfflineWarmupEngine() {
               }
             })
             .catch(() => {});
-
-          fetch(route, { headers: { RSC: "1" } }).catch(() => {});
         }
 
         // 3. Pre-cache all active catalog entities, ledgers, and reports into IndexedDB

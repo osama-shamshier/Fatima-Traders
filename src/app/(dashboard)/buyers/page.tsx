@@ -47,10 +47,11 @@ export default function BuyersPage() {
         const res = await fetch("/api/buyers");
         if (res.ok) {
           const data = await res.json();
-          cacheCatalogData({ buyers: data });
+          const list = Array.isArray(data) ? data : [];
+          cacheCatalogData({ buyers: list });
           // Add pending offline credit to buyers list
-          const effectiveBuyers = await applyOfflineCreditsToBuyers(data);
-          setBuyers(effectiveBuyers);
+          const effectiveBuyers = await applyOfflineCreditsToBuyers(list);
+          setBuyers(Array.isArray(effectiveBuyers) ? effectiveBuyers : []);
           setIsLoading(false);
           return;
         }
@@ -62,11 +63,10 @@ export default function BuyersPage() {
     // Offline fallback from IndexedDB with pending credits
     try {
       const cached = await getOfflineBuyers();
-      if (cached && cached.length > 0) {
-        setBuyers(cached);
-      }
+      setBuyers(Array.isArray(cached) ? cached : []);
     } catch (err) {
       console.error("Failed to load cached buyers:", err);
+      setBuyers([]);
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +74,13 @@ export default function BuyersPage() {
 
   useEffect(() => {
     fetchBuyers();
+    const handleNetworkChange = () => fetchBuyers();
+    window.addEventListener("online", handleNetworkChange);
+    window.addEventListener("offline", handleNetworkChange);
+    return () => {
+      window.removeEventListener("online", handleNetworkChange);
+      window.removeEventListener("offline", handleNetworkChange);
+    };
   }, []);
 
   useEffect(() => {

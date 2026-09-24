@@ -1,7 +1,7 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v6";
+const CACHE_NAME = "fatima-retail-pwa-v7";
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -137,8 +137,6 @@ self.addEventListener("fetch", (event) => {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
-              cache.put(url.pathname + "_rsc_payload", responseToCache.clone());
-              cache.put(url.origin + url.pathname + "_rsc_payload", responseToCache.clone());
             });
           }
           return networkResponse;
@@ -150,30 +148,15 @@ self.addEventListener("fetch", (event) => {
           const cached = await cache.match(event.request);
           if (cached) return cached;
 
-          // 2. Match ignoring search parameters (e.g. if _rsc hash changed)
+          // 2. Match ignoring search parameters (if _rsc hash changed)
           const matchedWithoutQuery = await cache.match(event.request, { ignoreSearch: true });
-          if (matchedWithoutQuery) return matchedWithoutQuery;
-
-          // 3. Fallback to generic stored payload for this route
-          const genericPayload = await cache.match(url.pathname + "_rsc_payload");
-          if (genericPayload) return genericPayload;
-
-          const genericPayloadFull = await cache.match(url.origin + url.pathname + "_rsc_payload");
-          if (genericPayloadFull) return genericPayloadFull;
-
-          // 4. Search cache keys for any RSC payload matching this pathname
-          const keys = await cache.keys();
-          const rscKey = keys.find(
-            (k) =>
-              k.url.includes(url.pathname) &&
-              (k.url.includes("_rsc") || k.url.includes("_rsc_payload"))
-          );
-          if (rscKey) {
-            const match = await cache.match(rscKey);
-            if (match) return match;
+          if (matchedWithoutQuery) {
+            const ct = matchedWithoutQuery.headers.get("Content-Type") || "";
+            // Never return HTML for RSC requests!
+            if (!ct.includes("text/html")) return matchedWithoutQuery;
           }
 
-          // Never return HTML for RSC requests! Return 503 so Next.js falls back to document navigation.
+          // Return 503 so Next.js falls back cleanly to document navigation
           return new Response("Offline RSC Unavailable", {
             status: 503,
             statusText: "Offline RSC Unavailable",
@@ -199,7 +182,6 @@ self.addEventListener("fetch", (event) => {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
               cache.put(url.pathname, responseToCache.clone());
-              cache.put(url.origin + url.pathname, responseToCache.clone());
             });
           }
           return networkResponse;
@@ -211,51 +193,37 @@ self.addEventListener("fetch", (event) => {
           const cached = await cache.match(event.request);
           if (cached) return cached;
 
-          // 2. Pathname match
+          // 2. Pathname match (e.g. /buyers, /pos, /dashboard)
           const pathCached = await cache.match(url.pathname);
           if (pathCached) return pathCached;
 
           const fullUrlCached = await cache.match(url.origin + url.pathname);
           if (fullUrlCached) return fullUrlCached;
 
-          // 3. Search keys for any preferred App Shell (pos, dashboard, products, root)
-          const keys = await cache.keys();
-          const preferredRoutes = ["/pos", "/dashboard", "/products", "/sales", "/purchases", "/"];
-          for (const pref of preferredRoutes) {
-            const foundKey = keys.find((k) => k.url.endsWith(pref) || k.url === url.origin + pref);
-            if (foundKey) {
-              const res = await cache.match(foundKey);
-              if (res && res.status === 200) return res;
-            }
+          // 3. Fallback for root path
+          if (url.pathname === "/") {
+            const dashCached = await cache.match("/dashboard");
+            if (dashCached) return dashCached;
+            const posCached = await cache.match("/pos");
+            if (posCached) return posCached;
           }
 
-          // 4. Any cached HTML page at all in cache
-          for (const key of keys) {
-            if (!key.url.includes("/api/") && !key.url.includes("/_next/")) {
-              const res = await cache.match(key);
-              const ct = res?.headers.get("Content-Type") || "";
-              if (res && res.status === 200 && ct.includes("text/html")) {
-                return res;
-              }
-            }
-          }
-
-          // 5. Client redirect shell to /pos if no page shell could be matched
+          // 4. Clean offline notice for routes not yet cached
           return new Response(
             `<!DOCTYPE html>
             <html>
               <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>Fatima Retail - Offline Terminal</title>
-                <script>
-                  window.location.replace("/pos");
-                </script>
+                <title>Fatima Retail - Offline</title>
               </head>
               <body style="font-family:system-ui,sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;">
-                <h2 style="font-size:20px;font-weight:700;">Offline Terminal</h2>
-                <p style="font-size:14px;color:#64748b;">Redirecting to POS...</p>
-                <p><a href="/pos" style="display:inline-block;margin-top:12px;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;">Go to POS</a></p>
+                <h2 style="font-size:20px;font-weight:700;">Page Offline</h2>
+                <p style="font-size:14px;color:#64748b;margin-top:8px;">Please connect to the internet to load this page.</p>
+                <div style="margin-top:20px;">
+                  <a href="/dashboard" style="display:inline-block;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;margin:4px;">Dashboard</a>
+                  <a href="/pos" style="display:inline-block;padding:8px 16px;background:#059669;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;margin:4px;">POS Terminal</a>
+                </div>
               </body>
             </html>`,
             { headers: { "Content-Type": "text/html" } }
