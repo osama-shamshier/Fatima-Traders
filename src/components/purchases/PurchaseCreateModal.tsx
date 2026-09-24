@@ -197,6 +197,19 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       })),
     };
 
+    const isNetworkError = (err: any) => {
+      if (!err) return false;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+      const msg = (err.message || "").toLowerCase();
+      return (
+        err.name === "TypeError" ||
+        msg.includes("failed to fetch") ||
+        msg.includes("network") ||
+        msg.includes("load failed") ||
+        msg.includes("offline")
+      );
+    };
+
     try {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         await recordOfflinePurchase(payload);
@@ -205,27 +218,40 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
         return;
       }
 
-      const res = await fetch("/api/purchases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const res = await fetch("/api/purchases", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok) {
-        if (res.status === 503) {
+        if (res.ok) {
+          onSuccess();
+          onClose();
+          return;
+        }
+
+        if (res.status === 503 || res.status === 504 || res.status === 502) {
           await recordOfflinePurchase(payload);
           onSuccess();
           onClose();
           return;
         }
+
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to create purchase");
+      } catch (fetchErr: any) {
+        if (isNetworkError(fetchErr)) {
+          console.warn("Network failure during purchase, recording offline:", fetchErr);
+          await recordOfflinePurchase(payload);
+          onSuccess();
+          onClose();
+          return;
+        }
+        throw fetchErr;
       }
-
-      onSuccess();
-      onClose();
     } catch (error: any) {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (isNetworkError(error)) {
         try {
           await recordOfflinePurchase(payload);
           onSuccess();

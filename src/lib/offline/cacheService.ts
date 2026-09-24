@@ -89,6 +89,14 @@ export async function getPendingOfflineDeductions(): Promise<Record<string, numb
           deductions[pid] = (deductions[pid] || 0) + Number(saleItem.quantity || 0);
         }
       }
+
+      if ((item.status === "PENDING" || item.status === "FAILED") && item.actionType === "PURCHASE" && item.payload?.items) {
+        for (const purchaseItem of item.payload.items) {
+          const pid = purchaseItem.productId;
+          // Negative deduction increases effective stock in applyOfflineDeductionsToProducts
+          deductions[pid] = (deductions[pid] || 0) - Number(purchaseItem.quantity || 0);
+        }
+      }
     }
     return deductions;
   } catch (err) {
@@ -1054,9 +1062,8 @@ export async function recordOfflinePurchase(payload: {
   // 1. Put in purchases store
   await putInStore("purchases", purchaseRecord);
 
-  // 2. Increment stock in products store & update cost/selling price if new rate provided
+  // 2. Update product selling price & cost price if new rates provided (stock increment is applied via getPendingOfflineDeductions)
   for (const it of payload.items) {
-    await incrementLocalStock(it.productId, Number(it.quantity || 0));
     const prod = await getFromStore<CachedProduct>("products", it.productId);
     if (prod) {
       if (it.newSellingPrice && Number(it.newSellingPrice) > 0) {
