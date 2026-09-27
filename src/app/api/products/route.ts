@@ -33,15 +33,30 @@ export async function GET(request: NextRequest) {
       include: {
         category: true,
         unit: true,
+        inventory: {
+          select: { quantity: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(products);
+    const formatted = products.map((p) => {
+      const stock = p.inventory.reduce((sum, inv) => sum + Number(inv.quantity || 0), 0);
+      return {
+        ...p,
+        availableStock: stock,
+        stock,
+        sellingPrice: Number(p.sellingPrice || 0),
+      };
+    });
+
+
+    return NextResponse.json(formatted);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
   }
 }
+
 
 export async function POST(request: NextRequest) {
   try {

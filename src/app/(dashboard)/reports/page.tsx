@@ -19,6 +19,7 @@ import {
   applyOfflineCreditsToBuyers,
   applyOfflineDisbursementsToSuppliers,
 } from "@/lib/offline/cacheService";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function ReportsPage() {
   const t = useTranslations("reports");
@@ -35,28 +36,35 @@ export default function ReportsPage() {
   const [filterType, setFilterType] = useState<"ALL" | "OUTSTANDING">("ALL");
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const refreshCurrentTab = () => {
     if (activeTab === "valuation") fetchValuation();
     else if (activeTab === "sales") fetchSalesReport();
     else if (activeTab === "profit-loss") fetchProfitLoss();
     else if (activeTab === "area-balances") fetchPartyList();
+  };
+
+  useEffect(() => {
+    refreshCurrentTab();
   }, [activeTab, partyType]);
 
   useEffect(() => {
-    const handleNetworkChange = () => {
-      if (activeTab === "valuation") fetchValuation();
-      else if (activeTab === "sales") fetchSalesReport();
-      else if (activeTab === "profit-loss") fetchProfitLoss();
-      else if (activeTab === "area-balances") fetchPartyList();
-    };
+    const unsub = syncEngine.subscribe(() => {
+      refreshCurrentTab();
+    });
 
+    const handleNetworkChange = () => refreshCurrentTab();
     window.addEventListener("online", handleNetworkChange);
     window.addEventListener("offline", handleNetworkChange);
+    window.addEventListener("focus", handleNetworkChange);
+
     return () => {
+      unsub();
       window.removeEventListener("online", handleNetworkChange);
       window.removeEventListener("offline", handleNetworkChange);
+      window.removeEventListener("focus", handleNetworkChange);
     };
   }, [activeTab, partyType]);
+
 
   const fetchPartyList = async () => {
     setIsLoading(true);
@@ -308,7 +316,7 @@ export default function ReportsPage() {
                     salesData.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50">
                         <td className="p-3.5 font-mono font-bold text-blue-600">{s.invoiceNumber}</td>
-                        <td className="p-3.5 text-slate-500 font-mono">{formatDate(s.saleDate)}</td>
+                        <td className="p-3.5 text-slate-500 font-mono">{formatDate(s.saleDate || s.createdAt)}</td>
                         <td className="p-3.5 font-bold text-slate-900">{s.buyer?.name || "Walk-in"}</td>
                         <td className="p-3.5 text-slate-600">{s.branch?.name}</td>
                         <td className="p-3.5 text-right font-mono font-bold text-slate-900">{formatCurrency(s.grandTotal)}</td>

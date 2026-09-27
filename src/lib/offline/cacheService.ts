@@ -50,23 +50,95 @@ export async function cacheCatalogData(data: {
     await openOfflineDB();
 
     if (data.products && data.products.length > 0) {
-      await putManyInStore("products", data.products);
+      const existing = await getAllFromStore<any>("products");
+      const existingMap = new Map<string, any>();
+      existing.forEach((p) => existingMap.set(p.id, p));
+
+      const mergedProducts = data.products.map((p) => {
+        const old = existingMap.get(p.id);
+        const avail =
+          p.availableStock !== undefined
+            ? Number(p.availableStock)
+            : old?.availableStock !== undefined
+            ? Number(old.availableStock)
+            : (p as any).stock !== undefined
+            ? Number((p as any).stock)
+            : old?.stock !== undefined
+            ? Number(old.stock)
+            : 0;
+
+        return {
+          ...old,
+          ...p,
+          availableStock: avail,
+          stock: avail,
+          sellingPrice: Number(p.sellingPrice !== undefined ? p.sellingPrice : old?.sellingPrice || 0),
+          costPrice: Number(p.costPrice !== undefined ? p.costPrice : old?.costPrice || (Number(p.sellingPrice || old?.sellingPrice || 0) * 0.7)),
+        };
+      });
+      await putManyInStore("products", mergedProducts);
     }
+
     if (data.categories && data.categories.length > 0) {
       await putManyInStore("categories", data.categories);
     }
     if (data.branches && data.branches.length > 0) {
       await putManyInStore("branches", data.branches);
     }
+
     if (data.buyers && data.buyers.length > 0) {
-      await putManyInStore("buyers", data.buyers);
+      const existing = await getAllFromStore<any>("buyers");
+      const existingMap = new Map<string, any>();
+      existing.forEach((b) => existingMap.set(b.id, b));
+      const mergedBuyers = data.buyers.map((b) => {
+        const old = existingMap.get(b.id);
+        return {
+          ...old,
+          ...b,
+          totalOutstanding:
+            b.totalOutstanding !== undefined
+              ? Number(b.totalOutstanding)
+              : old?.totalOutstanding !== undefined
+              ? Number(old.totalOutstanding)
+              : 0,
+        };
+      });
+      await putManyInStore("buyers", mergedBuyers);
     }
+
     if (data.expenses && data.expenses.length > 0) {
       await putManyInStore("expenses", data.expenses);
     }
+
     if (data.suppliers && data.suppliers.length > 0) {
-      await putManyInStore("suppliers", data.suppliers);
+      const existing = await getAllFromStore<any>("suppliers");
+      const existingMap = new Map<string, any>();
+      existing.forEach((s) => existingMap.set(s.id, s));
+      const mergedSuppliers = data.suppliers.map((s) => {
+        const old = existingMap.get(s.id);
+        const sAny = s as any;
+        const oldAny = old as any;
+
+        const out =
+          sAny.totalOutstanding !== undefined
+            ? Number(sAny.totalOutstanding)
+            : sAny.outstandingBalance !== undefined
+            ? Number(sAny.outstandingBalance)
+            : oldAny?.totalOutstanding !== undefined
+            ? Number(oldAny.totalOutstanding)
+            : oldAny?.outstandingBalance !== undefined
+            ? Number(oldAny.outstandingBalance)
+            : 0;
+        return {
+          ...old,
+          ...s,
+          outstandingBalance: out,
+        };
+      });
+      await putManyInStore("suppliers", mergedSuppliers);
+
     }
+
     if (data.purchases && data.purchases.length > 0) {
       await putManyInStore("purchases", data.purchases);
     }
@@ -76,6 +148,7 @@ export async function cacheCatalogData(data: {
     console.warn("Failed to cache catalog data offline:", error);
   }
 }
+
 
 // Calculate total quantities of products sold in pending offline sales
 export async function getPendingOfflineDeductions(): Promise<Record<string, number>> {
@@ -1492,15 +1565,145 @@ export async function calculateOfflineShiftProfitLoss(startDate?: string, endDat
   }
 }
 
+// Merge pending outbox transactions into server dashboard stats (so offline changes reflect even when connected to server)
+export async function mergePendingOutboxIntoDashboardStats(serverStats: any) {
+  try {
+    const outbox = await getAllFromStore<OutboxItem>("outbox");
+    const pendingItems = outbox.filter((o) => o.status === "PENDING" || o.status === "FAILED");
+    if (pendingItems.length === 0) return serverStats;
+
+    const stats = { ...serverStats };
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+
+    let pendingCashSales = 0;
+    let pendingBankSales = 0;
+    let pendingCreditSales = 0;
+    let pendingSalesCount = 0;
+    let pendingSalesRevenue = 0;
+    let pendingReceivablesChange = 0;
+    let pendingPayablesChange = 0;
+    const additionalBankDetails: any[] = [];
+
+    for (const item of pendingItems) {
+      if (item.actionType === "SALE") {
+        const p = item.payload || {};
+        const d = new Date(p.offlineCreatedAt || item.createdAt);
+        const isToday =
+          d.getFullYear() === todayYear &&
+          d.getMonth() === todayMonth &&
+          d.getDate() === todayDate;
+
+        const grandTotal = Number(p.grandTotal || 0);
+        const amountPaid = Number(p.amountPaid || 0);
+        const outstanding = Number(p.outstandingAmount !== undefined ? p.outstandingAmount : Math.max(0, grandTotal - amountPaid));
+
+        if (isToday) {
+          pendingSalesCount += 1;
+          pendingSalesRevenue += grandTotal;
+
+          if (p.paymentMethod === "BANK_TRANSFER") {
+            pendingBankSales += amountPaid;
+            if (amountPaid > 0) {
+              additionalBankDetails.push({
+                id: item.id,
+                type: "POS_SALE" as const,
+                invoiceNumber: p.offlineInvoiceNumber || `OFF-${item.id.slice(-6)}`,
+                customerName: p.buyer?.name || "Walk-in Customer",
+                branchName: "Main Branch",
+                amount: amountPaid,
+                bankName: p.bankName || "Bank Transfer",
+                referenceNumber: p.bankReference || "-",
+                createdAt: p.offlineCreatedAt || item.createdAt,
+              });
+            }
+          } else {
+            pendingCashSales += amountPaid;
+          }
+
+          pendingCreditSales += outstanding;
+        }
+
+        if (outstanding > 0 && p.buyerId) {
+          pendingReceivablesChange += outstanding;
+        }
+      }
+
+      if (item.actionType === "BUYER_PAYMENT") {
+        const p = item.payload || {};
+        const amount = Number(p.amount || 0);
+        pendingReceivablesChange -= amount;
+
+        const d = new Date(p.paymentDate || item.createdAt);
+        const isToday =
+          d.getFullYear() === todayYear &&
+          d.getMonth() === todayMonth &&
+          d.getDate() === todayDate;
+
+        if (isToday) {
+          if (p.paymentMethod === "BANK_TRANSFER") {
+            pendingBankSales += amount;
+            additionalBankDetails.push({
+              id: item.id,
+              type: "BUYER_PAYMENT" as const,
+              invoiceNumber: `PAY-${item.id.slice(-6)}`,
+              customerName: p.buyer?.name || "Customer",
+              branchName: "Main Branch",
+              amount,
+              bankName: p.bankName || "Bank Transfer",
+              referenceNumber: p.bankReference || "-",
+              createdAt: p.paymentDate || item.createdAt,
+            });
+          } else {
+            pendingCashSales += amount;
+          }
+        }
+      }
+
+      if (item.actionType === "PURCHASE") {
+        const p = item.payload || {};
+        const outstanding = Number(p.outstandingAmount || 0);
+        if (outstanding > 0) {
+          pendingPayablesChange += outstanding;
+        }
+      }
+
+      if (item.actionType === "SUPPLIER_PAYMENT") {
+        const p = item.payload || {};
+        const amount = Number(p.amount || 0);
+        pendingPayablesChange -= amount;
+      }
+    }
+
+    return {
+      ...stats,
+      salesTodayCount: Number(stats.salesTodayCount || 0) + pendingSalesCount,
+      salesTodayRevenue: Number(stats.salesTodayRevenue || 0) + pendingSalesRevenue,
+      todayCashSales: Number(stats.todayCashSales || 0) + pendingCashSales,
+      todayBankSales: Number(stats.todayBankSales || 0) + pendingBankSales,
+      todayPendingCredit: Number(stats.todayPendingCredit || 0) + pendingCreditSales,
+      bankDetailsList: [...additionalBankDetails, ...(stats.bankDetailsList || [])],
+      totalBuyerReceivables: Math.max(0, Number(stats.totalBuyerReceivables || 0) + pendingReceivablesChange),
+      totalSupplierPayables: Math.max(0, Number(stats.totalSupplierPayables || 0) + pendingPayablesChange),
+    };
+  } catch (err) {
+    console.error("Error merging pending outbox into dashboard stats:", err);
+    return serverStats;
+  }
+}
+
 // Calculate live dashboard stats in offline mode
 export async function calculateOfflineDashboardStats() {
   try {
-    const [products, buyers, suppliers, branches, sales] = await Promise.all([
+    const [products, buyers, suppliers, branches, sales, buyerPayments] = await Promise.all([
       getAllFromStore<CachedProduct>("products"),
       getAllFromStore<CachedBuyer>("buyers"),
       getAllFromStore<CachedSupplier>("suppliers"),
       getAllFromStore<CachedBranch>("branches"),
       getCombinedSales([]),
+      getCombinedBuyerPayments([]),
     ]);
 
     // Apply pending deductions to products
@@ -1530,24 +1733,55 @@ export async function calculateOfflineDashboardStats() {
     const salesTodayRevenue = todaySales.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
     const salesTodayCount = todaySales.length;
 
-    // Today's Payment Method breakdown
-    const todayCashSales = todaySales
-      .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
-      .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0);
+    // Today's buyer settlement payments
+    const todayBuyerPayments = buyerPayments.filter((bp) => {
+      const d = new Date(bp.paymentDate || bp.createdAt);
+      return (
+        d.getFullYear() === todayYear &&
+        d.getMonth() === todayMonth &&
+        d.getDate() === todayDate
+      );
+    });
 
-    const bankDetailsList = todaySales
-      .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
-      .map((s) => ({
-        id: s.id,
-        type: "POS_SALE" as const,
-        invoiceNumber: s.invoiceNumber,
-        customerName: s.buyer?.name || "Walk-in Customer",
-        branchName: s.branch?.name || "Main Branch",
-        amount: Number(s.amountPaid || 0),
-        bankName: s.bankName || "Bank Transfer",
-        referenceNumber: s.bankReference || "-",
-        createdAt: s.createdAt || s.saleDate,
-      }));
+    const buyerCashPaymentsToday = todayBuyerPayments
+      .filter((bp) => bp.paymentMethod === "CASH" || !bp.paymentMethod)
+      .reduce((sum, bp) => sum + Number(bp.amount || 0), 0);
+
+    const buyerBankPaymentsToday = todayBuyerPayments
+      .filter((bp) => bp.paymentMethod === "BANK_TRANSFER" && Number(bp.amount || 0) > 0);
+
+    // Today's Payment Method breakdown
+    const todayCashSales =
+      todaySales
+        .filter((s) => s.paymentMethod === "CASH" || !s.paymentMethod)
+        .reduce((sum, s) => sum + Number(s.amountPaid || 0), 0) + buyerCashPaymentsToday;
+
+    const bankDetailsList = [
+      ...todaySales
+        .filter((s) => s.paymentMethod === "BANK_TRANSFER" && Number(s.amountPaid || 0) > 0)
+        .map((s) => ({
+          id: s.id,
+          type: "POS_SALE" as const,
+          invoiceNumber: s.invoiceNumber,
+          customerName: s.buyer?.name || "Walk-in Customer",
+          branchName: s.branch?.name || "Main Branch",
+          amount: Number(s.amountPaid || 0),
+          bankName: s.bankName || "Bank Transfer",
+          referenceNumber: s.bankReference || "-",
+          createdAt: s.createdAt || s.saleDate,
+        })),
+      ...buyerBankPaymentsToday.map((bp) => ({
+        id: bp.id,
+        type: "BUYER_PAYMENT" as const,
+        invoiceNumber: `PAY-${bp.id.slice(-6)}`,
+        customerName: bp.buyer?.name || "Customer",
+        branchName: "Main Branch",
+        amount: Number(bp.amount || 0),
+        bankName: bp.bankName || "Bank Transfer",
+        referenceNumber: bp.bankReference || "-",
+        createdAt: bp.paymentDate || bp.createdAt,
+      })),
+    ];
 
     const todayBankSales = bankDetailsList.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const todayPendingCredit = todaySales.reduce((sum, s) => sum + Number(s.outstandingAmount || 0), 0);
@@ -1634,103 +1868,90 @@ export async function precacheFullApplicationData(): Promise<void> {
   }
 
   try {
-    // 1. Fetch & cache POS products
-    fetch("/api/pos/products")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((products) => {
-        if (Array.isArray(products)) {
-          putManyInStore("products", products);
-        }
-      })
-      .catch(() => {});
+    // 1. Fetch & cache POS products with inventory / stocks, categories, branches, units in parallel
+    const [posProdsRes, catsRes, branchesRes, unitsRes] = await Promise.all([
+      fetch("/api/pos/products", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/categories", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/branches", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/units", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+    ]);
 
-    // 2. Fetch & cache products catalog
-    fetch("/api/products")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((products) => {
-        if (Array.isArray(products)) {
-          putManyInStore("products", products);
-        }
-      })
-      .catch(() => {});
+    if (posProdsRes && posProdsRes.ok) {
+      const products = await posProdsRes.json();
+      if (Array.isArray(products)) {
+        await cacheCatalogData({ products });
+      }
+    }
 
-    // 3. Fetch & cache categories, branches, units
-    fetch("/api/categories")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((categories) => {
-        if (Array.isArray(categories)) {
-          putManyInStore("categories", categories);
-        }
-      })
-      .catch(() => {});
+    if (catsRes && catsRes.ok) {
+      const categories = await catsRes.json();
+      if (Array.isArray(categories)) {
+        await cacheCatalogData({ categories });
+      }
+    }
 
-    fetch("/api/branches")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((branches) => {
-        if (Array.isArray(branches)) {
-          putManyInStore("branches", branches);
-        }
-      })
-      .catch(() => {});
+    if (branchesRes && branchesRes.ok) {
+      const branches = await branchesRes.json();
+      if (Array.isArray(branches)) {
+        await cacheCatalogData({ branches });
+      }
+    }
 
-    fetch("/api/units")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((units) => {
-        if (Array.isArray(units)) {
-          putManyInStore("units", units);
-        }
-      })
-      .catch(() => {});
+    if (unitsRes && unitsRes.ok) {
+      const units = await unitsRes.json();
+      if (Array.isArray(units)) {
+        await putManyInStore("units", units);
+      }
+    }
 
-    // 4. Fetch buyers and batch-cache their ledgers
-    const buyersRes = await fetch("/api/buyers").catch(() => null);
+    // 2. Fetch buyers & suppliers and cache them
+    const [buyersRes, suppRes, purRes, salesRes, expRes, expCatRes] = await Promise.all([
+      fetch("/api/buyers", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/suppliers", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/purchases", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/sales", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/expenses", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+      fetch("/api/expense-categories", { signal: AbortSignal.timeout(8000) }).catch(() => null),
+    ]);
+
     if (buyersRes && buyersRes.ok) {
       const buyers = await buyersRes.json();
       if (Array.isArray(buyers)) {
-        await putManyInStore("buyers", buyers);
-        for (const buyer of buyers.slice(0, 100)) {
-          fetch(`/api/buyers/${buyer.id}/ledger`)
+        await cacheCatalogData({ buyers });
+        // Cache top buyer ledgers in background
+        buyers.slice(0, 100).forEach((b: any) => {
+          fetch(`/api/buyers/${b.id}/ledger`, { signal: AbortSignal.timeout(5000) })
             .then((r) => (r.ok ? r.json() : null))
             .then((ledger) => {
-              if (Array.isArray(ledger)) {
-                cachePartyLedger(buyer.id, ledger);
-              }
+              if (Array.isArray(ledger)) cachePartyLedger(b.id, ledger);
             })
             .catch(() => {});
-        }
+        });
       }
     }
 
-    // 5. Fetch suppliers and batch-cache their ledgers
-    const suppRes = await fetch("/api/suppliers").catch(() => null);
     if (suppRes && suppRes.ok) {
       const suppliers = await suppRes.json();
       if (Array.isArray(suppliers)) {
-        await putManyInStore("suppliers", suppliers);
-        for (const supplier of suppliers.slice(0, 100)) {
-          fetch(`/api/suppliers/${supplier.id}/ledger`)
+        await cacheCatalogData({ suppliers });
+        suppliers.slice(0, 100).forEach((s: any) => {
+          fetch(`/api/suppliers/${s.id}/ledger`, { signal: AbortSignal.timeout(5000) })
             .then((r) => (r.ok ? r.json() : null))
             .then((ledger) => {
-              if (Array.isArray(ledger)) {
-                cachePartyLedger(`supplier_${supplier.id}`, ledger);
-              }
+              if (Array.isArray(ledger)) cachePartyLedger(`supplier_${s.id}`, ledger);
             })
             .catch(() => {});
-        }
+        });
       }
     }
 
-    // 6. Fetch and cache purchases
-    const purRes = await fetch("/api/purchases").catch(() => null);
     if (purRes && purRes.ok) {
       const purchases = await purRes.json();
       if (Array.isArray(purchases)) {
-        await putManyInStore("purchases", purchases);
+        await cacheCatalogData({ purchases });
       }
     }
 
-    // 7. Fetch and cache recent sales for offline invoice reviews
-    const salesRes = await fetch("/api/sales").catch(() => null);
     if (salesRes && salesRes.ok) {
       const salesData = await salesRes.json();
       const salesList = Array.isArray(salesData) ? salesData : salesData?.sales || [];
@@ -1739,32 +1960,29 @@ export async function precacheFullApplicationData(): Promise<void> {
       }
     }
 
-    // 8. Fetch expenses and expense categories
-    fetch("/api/expenses")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((expenses) => {
-        if (Array.isArray(expenses)) {
-          putManyInStore("expenses", expenses);
-        }
-      })
-      .catch(() => {});
+    if (expRes && expRes.ok) {
+      const expenses = await expRes.json();
+      if (Array.isArray(expenses)) {
+        await cacheCatalogData({ expenses });
+      }
+    }
 
-    fetch("/api/expense-categories")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((cats) => {
-        if (Array.isArray(cats)) {
-          putManyInStore("expense_categories", cats);
-        }
-      })
-      .catch(() => {});
+    if (expCatRes && expCatRes.ok) {
+      const cats = await expCatRes.json();
+      if (Array.isArray(cats)) {
+        await putManyInStore("expense_categories", cats);
+      }
+    }
 
-    // 9. Pre-fetch financial reports so Service Worker caches their HTTP responses
-    fetch("/api/financials/ledger").catch(() => {});
-    fetch("/api/financials/cash-flow").catch(() => {});
-    fetch("/api/reports/profit-loss").catch(() => {});
-    fetch("/api/buyers/due-dates").catch(() => {});
-    fetch("/api/buyer-payments").catch(() => {});
-    fetch("/api/supplier-payments").catch(() => {});
+    // 3. Pre-fetch financial reports so Service Worker caches their HTTP responses
+    fetch("/api/dashboard/stats", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/reports/inventory-valuation", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/financials/ledger", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/financials/cash-flow", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/reports/profit-loss", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/buyers/due-dates", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/buyer-payments", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    fetch("/api/supplier-payments", { signal: AbortSignal.timeout(5000) }).catch(() => {});
   } catch (err) {
     console.warn("Background pre-caching application data error:", err);
   }
@@ -1772,3 +1990,4 @@ export async function precacheFullApplicationData(): Promise<void> {
 
 // Backward-compatible alias
 export const precacheAllPartyLedgers = precacheFullApplicationData;
+

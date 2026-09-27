@@ -13,6 +13,7 @@ import { StockAdjustmentModal } from "@/components/inventory/StockAdjustmentModa
 import { Search, AlertTriangle, RefreshCw, Warehouse, ArrowLeftRight, ClipboardEdit } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { applyOfflineDeductionsToProducts, getOfflineProducts } from "@/lib/offline/cacheService";
+import { getAllFromStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function InventoryPage() {
@@ -34,7 +35,7 @@ export default function InventoryPage() {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
-  const [branches, setBranches] = useState([]);
+  const [branches, setBranches] = useState<any[]>([]);
 
   useEffect(() => {
     fetchBranches();
@@ -61,11 +62,17 @@ export default function InventoryPage() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch("/api/branches");
+      const res = await fetch("/api/branches", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         setBranches(await res.json());
+        return;
       }
     } catch (e) {}
+
+    try {
+      const cached = await getAllFromStore<any>("branches");
+      if (cached && cached.length > 0) setBranches(cached);
+    } catch {}
   };
 
   const fetchInventory = async () => {
@@ -76,23 +83,21 @@ export default function InventoryPage() {
       if (branchFilter) params.append("branchId", branchFilter);
       if (lowStockOnly) params.append("lowStock", "true");
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch(`/api/inventory?${params.toString()}`);
-        if (res.ok) {
-          const raw = await res.json();
-          const mapped = raw.map((item: any) => ({
-            ...item,
-            id: item.productId || item.id,
-            availableStock: Number(item.quantity || 0),
-          }));
-          const effective = await applyOfflineDeductionsToProducts(mapped);
-          setInventory(effective.map((item: any) => ({
-            ...item,
-            quantity: item.availableStock,
-          })) as any);
-          setLoading(false);
-          return;
-        }
+      const res = await fetch(`/api/inventory?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const raw = await res.json();
+        const mapped = raw.map((item: any) => ({
+          ...item,
+          id: item.productId || item.id,
+          availableStock: Number(item.quantity || 0),
+        }));
+        const effective = await applyOfflineDeductionsToProducts(mapped);
+        setInventory(effective.map((item: any) => ({
+          ...item,
+          quantity: item.availableStock,
+        })) as any);
+        setLoading(false);
+        return;
       }
     } catch (e) {
       console.warn("Online fetch inventory failed, falling back to offline cache:", e);
@@ -115,6 +120,7 @@ export default function InventoryPage() {
       setLoading(false);
     }
   };
+
 
   const fetchMovements = async () => {
     setLoading(true);

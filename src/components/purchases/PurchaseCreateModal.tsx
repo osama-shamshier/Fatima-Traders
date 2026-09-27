@@ -52,32 +52,10 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
 
   const fetchData = async () => {
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const [suppList, branchList, prodList] = await Promise.all([
-          getOfflineSuppliers(),
-          getAllFromStore<any>("branches"),
-          getOfflineProducts(),
-        ]);
-        const sList = Array.isArray(suppList) ? suppList : [];
-        const bList = Array.isArray(branchList) ? branchList : [];
-        const pList = Array.isArray(prodList) ? prodList : [];
-
-        setSuppliers(sList);
-        if (sList.length > 0 && !formData.supplierId) {
-          setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
-        }
-        setBranches(bList);
-        if (bList.length > 0 && !formData.branchId) {
-          setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
-        }
-        setProducts(pList);
-        return;
-      }
-
       const [suppRes, branchRes, prodRes] = await Promise.all([
-        fetch("/api/suppliers"),
-        fetch("/api/branches"),
-        fetch("/api/products"),
+        fetch("/api/suppliers", { signal: AbortSignal.timeout(5000) }),
+        fetch("/api/branches", { signal: AbortSignal.timeout(5000) }),
+        fetch("/api/products", { signal: AbortSignal.timeout(5000) }),
       ]);
 
       if (suppRes.ok) {
@@ -98,6 +76,7 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       if (branchRes.ok) {
         const bData = await branchRes.json();
         const bList = Array.isArray(bData) ? bData : [];
+
         setBranches(bList);
         if (bList.length > 0 && !formData.branchId) {
           setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
@@ -124,11 +103,22 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
         getAllFromStore<any>("branches").catch(() => []),
         getOfflineProducts(),
       ]);
-      setSuppliers(Array.isArray(suppList) ? suppList : []);
-      setBranches(Array.isArray(branchList) ? branchList : []);
-      setProducts(Array.isArray(prodList) ? prodList : []);
+      const sList = Array.isArray(suppList) ? suppList : [];
+      const bList = Array.isArray(branchList) ? branchList : [];
+      const pList = Array.isArray(prodList) ? prodList : [];
+
+      setSuppliers(sList);
+      if (sList.length > 0 && !formData.supplierId) {
+        setFormData((prev) => ({ ...prev, supplierId: sList[0].id }));
+      }
+      setBranches(bList);
+      if (bList.length > 0 && !formData.branchId) {
+        setFormData((prev) => ({ ...prev, branchId: bList[0].id }));
+      }
+      setProducts(pList);
     }
   };
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -199,30 +189,26 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
 
     const isNetworkError = (err: any) => {
       if (!err) return false;
-      if (typeof navigator !== "undefined" && !navigator.onLine) return true;
       const msg = (err.message || "").toLowerCase();
       return (
         err.name === "TypeError" ||
+        err.name === "AbortError" ||
         msg.includes("failed to fetch") ||
         msg.includes("network") ||
         msg.includes("load failed") ||
-        msg.includes("offline")
+        msg.includes("offline") ||
+        msg.includes("timeout")
       );
     };
 
-    try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        await recordOfflinePurchase(payload);
-        onSuccess();
-        onClose();
-        return;
-      }
 
+    try {
       try {
         const res = await fetch("/api/purchases", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(8000),
         });
 
         if (res.ok) {
@@ -267,6 +253,7 @@ export function PurchaseCreateModal({ isOpen, onClose, onSuccess }: PurchaseCrea
       setLoading(false);
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

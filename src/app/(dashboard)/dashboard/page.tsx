@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/dialog";
 import { LowStockModal } from "@/components/dashboard/LowStockModal";
 import { useTranslations } from "next-intl";
-import { calculateOfflineDashboardStats } from "@/lib/offline/cacheService";
+import { calculateOfflineDashboardStats, mergePendingOutboxIntoDashboardStats } from "@/lib/offline/cacheService";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
@@ -44,17 +45,38 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
-    const handleOnline = () => fetchStats();
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+
+    const unsub = syncEngine.subscribe(() => {
+      fetchStats();
+    });
+
+    const handleNetworkChange = () => fetchStats();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchStats();
+    };
+
+    window.addEventListener("online", handleNetworkChange);
+    window.addEventListener("offline", handleNetworkChange);
+    window.addEventListener("focus", handleNetworkChange);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleNetworkChange);
+      window.removeEventListener("offline", handleNetworkChange);
+      window.removeEventListener("focus", handleNetworkChange);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   const fetchStats = async () => {
-    setIsLoading(true);
     try {
       const res = await fetch("/api/dashboard/stats", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
-        setStats(await res.json());
+        const serverData = await res.json();
+        // Merge pending offline outbox items into server response
+        const mergedStats = await mergePendingOutboxIntoDashboardStats(serverData);
+        setStats(mergedStats);
       } else {
         const localStats = await calculateOfflineDashboardStats();
         if (localStats) setStats(localStats);
@@ -67,6 +89,7 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   };
+
 
 
   const statCards = [

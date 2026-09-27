@@ -22,15 +22,14 @@ export default function UnitsPage() {
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch("/api/units");
-        if (res.ok) {
-          const data = await res.json();
-          setUnits(data);
-          putManyInStore("units", data).catch(() => {});
-          setLoading(false);
-          return;
-        }
+      const res = await fetch("/api/units", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setUnits(list);
+        putManyInStore("units", list).catch(() => {});
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch units failed, falling back to offline cache:", error);
@@ -38,15 +37,15 @@ export default function UnitsPage() {
 
     try {
       const cached = await getAllFromStore<any>("units");
-      if (cached && cached.length > 0) {
-        setUnits(cached);
-      }
+      setUnits(Array.isArray(cached) ? cached : []);
     } catch (err) {
       console.error("Failed to load offline units:", err);
+      setUnits([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchUnits();

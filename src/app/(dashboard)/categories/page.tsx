@@ -22,15 +22,14 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch("/api/categories");
-        if (res.ok) {
-          const data = await res.json();
-          setCategories(data);
-          putManyInStore("categories", data).catch(() => {});
-          setLoading(false);
-          return;
-        }
+      const res = await fetch("/api/categories", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setCategories(list);
+        putManyInStore("categories", list).catch(() => {});
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch categories failed, falling back to offline cache:", error);
@@ -38,15 +37,15 @@ export default function CategoriesPage() {
 
     try {
       const cached = await getAllFromStore<any>("categories");
-      if (cached && cached.length > 0) {
-        setCategories(cached);
-      }
+      setCategories(Array.isArray(cached) ? cached : []);
     } catch (err) {
       console.error("Failed to load offline categories:", err);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchCategories();

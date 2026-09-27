@@ -352,20 +352,25 @@ export default function POSPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(6000),
           });
 
           if (res.ok) {
             sale = await res.json();
+          } else if (res.status >= 500 || res.status === 408) {
+            console.warn(`Server responded with ${res.status}, saving sale offline.`);
+            isOffline = true;
           } else {
             const err = await res.json().catch(() => ({}));
             alert(`Checkout failed: ${err.error || "Server error"}`);
             return;
           }
         } catch (netErr) {
-          console.warn("Online checkout failed, switching to offline save:", netErr);
+          console.warn("Online checkout failed or timed out, switching to offline save:", netErr);
           isOffline = true;
         }
       }
+
 
       if (isOffline) {
         // Record offline sale with optimistic stock decrement

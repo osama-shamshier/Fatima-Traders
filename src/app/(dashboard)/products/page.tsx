@@ -34,16 +34,14 @@ export default function ProductsPage() {
       if (categoryId) params.append("categoryId", categoryId);
       if (isActive) params.append("isActive", isActive);
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch(`/api/products?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : [];
-          setProducts(list);
-          cacheCatalogData({ products: list });
-          setLoading(false);
-          return;
-        }
+      const res = await fetch(`/api/products?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setProducts(list);
+        cacheCatalogData({ products: list });
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch products failed, falling back to offline cache:", error);
@@ -67,26 +65,26 @@ export default function ProductsPage() {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          const localCats = await getAllFromStore<any>("categories");
-          setCategories(Array.isArray(localCats) ? localCats : []);
-          return;
-        }
-        const res = await fetch("/api/categories");
+        const res = await fetch("/api/categories", { signal: AbortSignal.timeout(5000) });
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : [];
           setCategories(list);
           putManyInStore("categories", list).catch(() => {});
-        } else {
-          const localCats = await getAllFromStore<any>("categories");
-          setCategories(Array.isArray(localCats) ? localCats : []);
+          return;
         }
-      } catch {
-        const localCats = await getAllFromStore<any>("categories").catch(() => []);
+      } catch (err) {
+        console.warn("Failed to fetch online categories, loading cached:", err);
+      }
+
+      try {
+        const localCats = await getAllFromStore<any>("categories");
         setCategories(Array.isArray(localCats) ? localCats : []);
+      } catch {
+        setCategories([]);
       }
     };
+
 
     loadCategories();
 

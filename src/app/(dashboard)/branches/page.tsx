@@ -21,31 +21,29 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     setIsLoading(true);
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const localBranches = await getAllFromStore<any>("branches");
-        setBranches(Array.isArray(localBranches) ? localBranches : []);
-        setIsLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/branches");
+      const res = await fetch("/api/branches", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         setBranches(list);
         putManyInStore("branches", list).catch(() => {});
-      } else {
-        const localBranches = await getAllFromStore<any>("branches");
-        setBranches(Array.isArray(localBranches) ? localBranches : []);
+        setIsLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Failed to fetch branches, loading from offline cache:", error);
-      const localBranches = await getAllFromStore<any>("branches").catch(() => []);
+    }
+
+    try {
+      const localBranches = await getAllFromStore<any>("branches");
       setBranches(Array.isArray(localBranches) ? localBranches : []);
+    } catch {
+      setBranches([]);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchBranches();

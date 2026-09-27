@@ -25,16 +25,17 @@ export default function CountersPage() {
   const fetchCounters = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/counters");
+      const res = await fetch("/api/counters", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
-        setCounters(data);
+        setCounters(Array.isArray(data) ? data : []);
       }
     } catch (error) {
-      console.error("Failed to fetch counters", error);
+      console.warn("Failed to fetch counters:", error);
     }
     setIsLoading(false);
   };
+
 
   useEffect(() => {
     fetchCounters();
