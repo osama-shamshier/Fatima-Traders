@@ -52,14 +52,7 @@ export default function DashboardPage() {
   const fetchStats = async () => {
     setIsLoading(true);
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const localStats = await calculateOfflineDashboardStats();
-        if (localStats) setStats(localStats);
-        setIsLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/dashboard/stats");
+      const res = await fetch("/api/dashboard/stats", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         setStats(await res.json());
       } else {
@@ -74,6 +67,7 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   };
+
 
   const statCards = [
     {

@@ -25,17 +25,15 @@ export default function BuyerPaymentsPage() {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch("/api/buyer-payments");
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : [];
-          putManyInStore("buyer_payments", list).catch(() => {});
-          const combined = await getCombinedBuyerPayments(list);
-          setPayments(combined);
-          setIsLoading(false);
-          return;
-        }
+      const res = await fetch("/api/buyer-payments", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        putManyInStore("buyer_payments", list).catch(() => {});
+        const combined = await getCombinedBuyerPayments(list);
+        setPayments(combined);
+        setIsLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch buyer payments failed, falling back to offline cache:", error);
@@ -50,6 +48,7 @@ export default function BuyerPaymentsPage() {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchPayments();

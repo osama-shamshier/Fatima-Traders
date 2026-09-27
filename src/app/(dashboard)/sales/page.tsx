@@ -71,16 +71,14 @@ export default function SalesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch(`/api/sales?${params.toString()}`);
-        if (res.ok) {
-          const liveData = await res.json();
-          putManyInStore("sales", liveData).catch(() => {});
-          const combined = await getCombinedSales(liveData);
-          setSales(combined);
-          setLoading(false);
-          return;
-        }
+      const res = await fetch(`/api/sales?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const liveData = await res.json();
+        putManyInStore("sales", liveData).catch(() => {});
+        const combined = await getCombinedSales(liveData);
+        setSales(combined);
+        setLoading(false);
+        return;
       }
     } catch (e) {
       console.warn("Online fetchSales failed, falling back to offline cache:", e);
@@ -96,6 +94,7 @@ export default function SalesPage() {
       setLoading(false);
     }
   };
+
 
   const handleCustomApply = (e: React.FormEvent) => {
     e.preventDefault();

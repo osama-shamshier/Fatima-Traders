@@ -29,17 +29,15 @@ export default function PurchasesPage() {
   const fetchPurchases = async () => {
     try {
       setLoading(true);
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch("/api/purchases");
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : [];
-          putManyInStore("purchases", list).catch(() => {});
-          const combined = await getCombinedPurchases(list);
-          setPurchases(combined);
-          setLoading(false);
-          return;
-        }
+      const res = await fetch("/api/purchases", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        putManyInStore("purchases", list).catch(() => {});
+        const combined = await getCombinedPurchases(list);
+        setPurchases(combined);
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch purchases failed, falling back to offline cache:", error);
@@ -54,6 +52,7 @@ export default function PurchasesPage() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchPurchases();

@@ -24,32 +24,30 @@ export default function FinancialsPage() {
     setLoadingCashFlow(true);
 
     try {
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const [lRes, cfRes] = await Promise.all([
-          fetch("/api/financials/ledger").catch(() => null),
-          fetch("/api/financials/cash-flow").catch(() => null),
-        ]);
+      const [lRes, cfRes] = await Promise.all([
+        fetch("/api/financials/ledger", { signal: AbortSignal.timeout(5000) }).catch(() => null),
+        fetch("/api/financials/cash-flow", { signal: AbortSignal.timeout(5000) }).catch(() => null),
+      ]);
 
-        if (lRes && lRes.ok) {
-          const lData = await lRes.json();
-          setLedger(lData);
-        } else {
-          const offlineLedger = await calculateOfflineGeneralLedger();
-          setLedger(offlineLedger);
-        }
-
-        if (cfRes && cfRes.ok) {
-          const cfData = await cfRes.json();
-          setCashFlow(cfData);
-        } else {
-          const offlineCF = await calculateOfflineCashFlow();
-          setCashFlow(offlineCF);
-        }
-
-        setLoadingLedger(false);
-        setLoadingCashFlow(false);
-        return;
+      if (lRes && lRes.ok) {
+        const lData = await lRes.json();
+        setLedger(lData);
+      } else {
+        const offlineLedger = await calculateOfflineGeneralLedger();
+        setLedger(offlineLedger);
       }
+
+      if (cfRes && cfRes.ok) {
+        const cfData = await cfRes.json();
+        setCashFlow(cfData);
+      } else {
+        const offlineCF = await calculateOfflineCashFlow();
+        setCashFlow(offlineCF);
+      }
+
+      setLoadingLedger(false);
+      setLoadingCashFlow(false);
+      return;
     } catch (e) {
       console.warn("Online fetch financials failed, falling back to offline calculations:", e);
     }
@@ -69,6 +67,7 @@ export default function FinancialsPage() {
       setLoadingCashFlow(false);
     }
   };
+
 
   useEffect(() => {
     loadFinancials();

@@ -53,13 +53,7 @@ export default function SupplierPaymentsPage() {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const combined = await getCombinedSupplierPayments([]);
-        setPayments(combined);
-        setIsLoading(false);
-        return;
-      }
-      const res = await fetch("/api/supplier-payments");
+      const res = await fetch("/api/supplier-payments", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         const combined = await getCombinedSupplierPayments(Array.isArray(data) ? data : []);
@@ -77,11 +71,12 @@ export default function SupplierPaymentsPage() {
     }
   };
 
+
   const fetchInitialData = async () => {
     try {
       const [suppRes, purRes] = await Promise.all([
-        fetch("/api/suppliers").catch(() => null),
-        fetch("/api/purchases").catch(() => null),
+        fetch("/api/suppliers", { signal: AbortSignal.timeout(5000) }).catch(() => null),
+        fetch("/api/purchases", { signal: AbortSignal.timeout(5000) }).catch(() => null),
       ]);
       if (suppRes && suppRes.ok) {
         const sData = await suppRes.json();

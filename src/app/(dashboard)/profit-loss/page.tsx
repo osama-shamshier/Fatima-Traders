@@ -64,8 +64,8 @@ export default function ProfitLossPage() {
   const fetchBranchesAndProducts = async () => {
     try {
       const [bRes, pRes] = await Promise.all([
-        fetch("/api/branches").catch(() => null),
-        fetch("/api/products").catch(() => null),
+        fetch("/api/branches", { signal: AbortSignal.timeout(5000) }).catch(() => null),
+        fetch("/api/products", { signal: AbortSignal.timeout(5000) }).catch(() => null),
       ]);
       if (bRes && bRes.ok) {
         setBranches(await bRes.json());
@@ -87,6 +87,7 @@ export default function ProfitLossPage() {
       if (cachedP && cachedP.length > 0) setProducts(cachedP);
     }
   };
+
 
   const getFilterBounds = () => {
     let filterStart: string | undefined = undefined;
@@ -118,13 +119,6 @@ export default function ProfitLossPage() {
   const fetchProfitLoss = async () => {
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined" && !navigator.onLine) {
-        const { filterStart, filterEnd } = getFilterBounds();
-        const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
-        if (offlineReport) setPlData(offlineReport);
-        return;
-      }
-
       const params = new URLSearchParams();
       if (period !== "all") params.append("period", period);
       if (selectedBranchId) params.append("branchId", selectedBranchId);
@@ -134,7 +128,7 @@ export default function ProfitLossPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/reports/profit-loss?${params.toString()}`);
+      const res = await fetch(`/api/reports/profit-loss?${params.toString()}`, { signal: AbortSignal.timeout(8000) });
       if (res.ok) {
         setPlData(await res.json());
       } else {
@@ -151,6 +145,7 @@ export default function ProfitLossPage() {
       setIsLoading(false);
     }
   };
+
 
   const handleApplyFilter = (e: React.FormEvent) => {
     e.preventDefault();

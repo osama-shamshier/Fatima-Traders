@@ -32,13 +32,7 @@ export default function SuppliersPage() {
 
   const fetchSuppliers = async () => {
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const cached = await getOfflineSuppliers();
-        setSuppliers(cached);
-        setLoading(false);
-        return;
-      }
-      const res = await fetch("/api/suppliers");
+      const res = await fetch("/api/suppliers", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -57,6 +51,7 @@ export default function SuppliersPage() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchSuppliers();

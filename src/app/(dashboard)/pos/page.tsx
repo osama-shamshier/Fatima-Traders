@@ -85,41 +85,39 @@ export default function POSPage() {
 
   const fetchInitialData = async () => {
     try {
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const [branchesRes, categoriesRes, buyersRes] = await Promise.all([
-          fetch("/api/branches"),
-          fetch("/api/categories"),
-          fetch("/api/buyers"),
-        ]);
+      const [branchesRes, categoriesRes, buyersRes] = await Promise.all([
+        fetch("/api/branches", { signal: AbortSignal.timeout(5000) }),
+        fetch("/api/categories", { signal: AbortSignal.timeout(5000) }),
+        fetch("/api/buyers", { signal: AbortSignal.timeout(5000) }),
+      ]);
 
-        let bData = [];
-        let cData = [];
-        let byData = [];
+      let bData: any[] = [];
+      let cData: any[] = [];
+      let byData: any[] = [];
 
-        if (branchesRes.ok) {
-          bData = await branchesRes.json();
-          setBranches(bData);
-          if (bData.length > 0 && !selectedBranchId) setSelectedBranchId(bData[0].id);
-        }
-        if (categoriesRes.ok) {
-          cData = await categoriesRes.json();
-          setCategories(cData);
-        }
-        if (buyersRes.ok) {
-          byData = await buyersRes.json();
-          cacheCatalogData({ buyers: byData });
-          // Add pending offline debt to buyers so balance is immediately accurate
-          const effectiveBuyers = await applyOfflineCreditsToBuyers(byData);
-          setBuyers(effectiveBuyers);
-        }
-
-        // Cache live data in background
-        cacheCatalogData({
-          branches: bData,
-          categories: cData,
-        });
-        return;
+      if (branchesRes.ok) {
+        bData = await branchesRes.json();
+        setBranches(Array.isArray(bData) ? bData : []);
+        if (Array.isArray(bData) && bData.length > 0 && !selectedBranchId) setSelectedBranchId(bData[0].id);
       }
+      if (categoriesRes.ok) {
+        cData = await categoriesRes.json();
+        setCategories(Array.isArray(cData) ? cData : []);
+      }
+      if (buyersRes.ok) {
+        byData = await buyersRes.json();
+        const list = Array.isArray(byData) ? byData : [];
+        cacheCatalogData({ buyers: list });
+        const effectiveBuyers = await applyOfflineCreditsToBuyers(list);
+        setBuyers(Array.isArray(effectiveBuyers) ? effectiveBuyers : []);
+      }
+
+      // Cache live data in background
+      cacheCatalogData({
+        branches: Array.isArray(bData) ? bData : [],
+        categories: Array.isArray(cData) ? cData : [],
+      });
+      return;
     } catch (error) {
       console.warn("Online fetch initial data failed, falling back to offline cache:", error);
     }
@@ -132,20 +130,19 @@ export default function POSPage() {
         getOfflineBuyers(),
       ]);
 
-      if (cachedBranches && cachedBranches.length > 0) {
+      if (Array.isArray(cachedBranches) && cachedBranches.length > 0) {
         setBranches(cachedBranches);
         if (!selectedBranchId) setSelectedBranchId(cachedBranches[0].id);
       }
-      if (cachedCategories && cachedCategories.length > 0) {
+      if (Array.isArray(cachedCategories) && cachedCategories.length > 0) {
         setCategories(cachedCategories);
       }
-      if (cachedBuyers && cachedBuyers.length > 0) {
-        setBuyers(cachedBuyers);
-      }
+      setBuyers(Array.isArray(cachedBuyers) ? cachedBuyers : []);
     } catch (err) {
       console.error("Failed to read offline initial data:", err);
     }
   };
+
 
   const fetchProducts = async () => {
     try {
@@ -154,16 +151,15 @@ export default function POSPage() {
       if (selectedCategoryId) params.append("categoryId", selectedCategoryId);
       if (search) params.append("search", search);
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch(`/api/pos/products?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          cacheCatalogData({ products: data });
-          // Deduct pending offline sales so stock on screen remains accurate
-          const effectiveData = await applyOfflineDeductionsToProducts<Product>(data);
-          setProducts(effectiveData);
-          return;
-        }
+      const res = await fetch(`/api/pos/products?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        cacheCatalogData({ products: list });
+        // Deduct pending offline sales so stock on screen remains accurate
+        const effectiveData = await applyOfflineDeductionsToProducts<Product>(list);
+        setProducts(effectiveData);
+        return;
       }
     } catch (error) {
       console.warn("Online fetch POS products failed, falling back to offline cache:", error);
@@ -180,6 +176,7 @@ export default function POSPage() {
       console.error("Failed to read offline products:", err);
     }
   };
+
 
   const openQtyModal = (product: Product) => {
     setErrorMessage(null);

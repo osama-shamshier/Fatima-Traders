@@ -41,15 +41,13 @@ export default function ExpensesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch(`/api/expenses?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setExpenses(data);
-          cacheCatalogData({ expenses: data });
-          setLoading(false);
-          return;
-        }
+      const res = await fetch(`/api/expenses?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        setExpenses(data);
+        cacheCatalogData({ expenses: data });
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetchExpenses failed, falling back to offline cache:", error);
@@ -67,6 +65,7 @@ export default function ExpensesPage() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchExpenses();

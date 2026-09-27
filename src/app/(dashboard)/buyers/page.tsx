@@ -43,18 +43,16 @@ export default function BuyersPage() {
   const fetchBuyers = async () => {
     setIsLoading(true);
     try {
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        const res = await fetch("/api/buyers");
-        if (res.ok) {
-          const data = await res.json();
-          const list = Array.isArray(data) ? data : [];
-          cacheCatalogData({ buyers: list });
-          // Add pending offline credit to buyers list
-          const effectiveBuyers = await applyOfflineCreditsToBuyers(list);
-          setBuyers(Array.isArray(effectiveBuyers) ? effectiveBuyers : []);
-          setIsLoading(false);
-          return;
-        }
+      const res = await fetch("/api/buyers", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        cacheCatalogData({ buyers: list });
+        // Add pending offline credit to buyers list
+        const effectiveBuyers = await applyOfflineCreditsToBuyers(list);
+        setBuyers(Array.isArray(effectiveBuyers) ? effectiveBuyers : []);
+        setIsLoading(false);
+        return;
       }
     } catch (error) {
       console.warn("Online fetchBuyers failed, falling back to offline cache:", error);
@@ -71,6 +69,7 @@ export default function BuyersPage() {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchBuyers();

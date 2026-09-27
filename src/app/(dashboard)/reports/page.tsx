@@ -61,18 +61,8 @@ export default function ReportsPage() {
   const fetchPartyList = async () => {
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined" && !navigator.onLine) {
-        if (partyType === "Customers") {
-          const buyers = await getOfflineBuyers();
-          setPartyList(buyers);
-        } else {
-          const suppliers = await getOfflineSuppliers();
-          setPartyList(suppliers);
-        }
-        return;
-      }
       const endpoint = partyType === "Customers" ? "/api/buyers" : "/api/suppliers";
-      const res = await fetch(endpoint);
+      const res = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         if (partyType === "Customers") {
@@ -99,20 +89,11 @@ export default function ReportsPage() {
     }
   };
 
+
   const fetchValuation = async () => {
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined" && !navigator.onLine) {
-        const prods = await getOfflineProducts();
-        const totalValuation = prods.reduce((sum, p) => {
-          const stock = Number(p.availableStock !== undefined ? p.availableStock : (p as any).currentStock || 0);
-          const cost = Number((p as any).costPrice || ((p as any).sellingPrice ? (p as any).sellingPrice * 0.7 : 0));
-          return sum + (stock > 0 ? stock * cost : 0);
-        }, 0);
-        setValuationData({ totalValuation });
-        return;
-      }
-      const res = await fetch("/api/reports/inventory-valuation");
+      const res = await fetch("/api/reports/inventory-valuation", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         setValuationData(await res.json());
       } else {
@@ -135,12 +116,7 @@ export default function ReportsPage() {
   const fetchSalesReport = async () => {
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined" && !navigator.onLine) {
-        const combined = await getCombinedSales([]);
-        setSalesData(combined);
-        return;
-      }
-      const res = await fetch("/api/sales");
+      const res = await fetch("/api/sales", { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         const combined = await getCombinedSales(Array.isArray(data) ? data : []);
@@ -161,12 +137,7 @@ export default function ReportsPage() {
   const fetchProfitLoss = async () => {
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined" && !navigator.onLine) {
-        const pl = await calculateOfflineShiftProfitLoss();
-        setPlData(pl);
-        return;
-      }
-      const res = await fetch("/api/reports/profit-loss");
+      const res = await fetch("/api/reports/profit-loss", { signal: AbortSignal.timeout(8000) });
       if (res.ok) {
         setPlData(await res.json());
       } else {
