@@ -27,8 +27,14 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
     window.print();
   };
 
-  const branchOrStoreAddress = sale.branch?.address || settings.address;
-  const branchOrStorePhone = sale.branch?.phone || settings.phone;
+  const displayPhone = settings.phone || sale.branch?.phone;
+  const displayAddress = settings.address || sale.branch?.address;
+
+  // Ensure footer uses the updated phone if it references the old default
+  const rawFooter = settings.receiptFooter || "Thank you for shopping with us!\nPlease visit again.";
+  const displayFooter = displayPhone
+    ? rawFooter.replace(/0334-?7776934/g, displayPhone)
+    : rawFooter;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -49,10 +55,10 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
               </p>
             )}
             <p className="text-[11px] text-slate-600">
-              {sale.branch?.name || "Main Branch"}{branchOrStoreAddress ? ` - ${branchOrStoreAddress}` : ""}
+              {sale.branch?.name ? `${sale.branch.name} - ` : ""}{displayAddress}
             </p>
-            {branchOrStorePhone && (
-              <p className="text-[11px] text-slate-800 font-bold">Tel: {branchOrStorePhone}</p>
+            {displayPhone && (
+              <p className="text-[11px] text-slate-800 font-bold">Tel: {displayPhone}</p>
             )}
           </div>
 
@@ -157,14 +163,7 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
           </div>
 
           <div className="text-center pt-3 text-[11px] text-slate-500 whitespace-pre-line">
-            {settings.receiptFooter ? (
-              <p>{settings.receiptFooter}</p>
-            ) : (
-              <>
-                <p>Thank you for your purchase!</p>
-                <p>Please visit again.</p>
-              </>
-            )}
+            <p>{displayFooter}</p>
           </div>
         </div>
 

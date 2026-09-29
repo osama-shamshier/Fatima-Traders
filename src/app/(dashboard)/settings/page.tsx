@@ -58,7 +58,18 @@ export default function SettingsPage() {
                 <Input
                   required
                   value={formSettings.storeName}
-                  onChange={(e) => setFormSettings({ ...formSettings, storeName: e.target.value })}
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setFormSettings((prev) => {
+                      let newHeader = prev.receiptHeader;
+                      if (newHeader && prev.storeName && newHeader.includes(prev.storeName)) {
+                        newHeader = newHeader.replaceAll(prev.storeName, newName);
+                      } else if (newHeader && newHeader.includes("FATIMA TRADERS")) {
+                        newHeader = newHeader.replaceAll("FATIMA TRADERS", newName);
+                      }
+                      return { ...prev, storeName: newName, receiptHeader: newHeader };
+                    });
+                  }}
                   className="text-xs mt-1 bg-white font-medium"
                 />
               </div>
@@ -66,7 +77,18 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold">{t("phone")}</Label>
                 <Input
                   value={formSettings.phone}
-                  onChange={(e) => setFormSettings({ ...formSettings, phone: e.target.value })}
+                  onChange={(e) => {
+                    const newPhone = e.target.value;
+                    setFormSettings((prev) => {
+                      let newFooter = prev.receiptFooter;
+                      if (newFooter && prev.phone && newFooter.includes(prev.phone)) {
+                        newFooter = newFooter.replaceAll(prev.phone, newPhone);
+                      } else if (newFooter && newFooter.includes("0334-7776934")) {
+                        newFooter = newFooter.replace(/0334-?7776934/g, newPhone);
+                      }
+                      return { ...prev, phone: newPhone, receiptFooter: newFooter };
+                    });
+                  }}
                   className="text-xs mt-1 bg-white"
                 />
               </div>

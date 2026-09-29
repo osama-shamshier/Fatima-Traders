@@ -31,9 +31,11 @@ import { LowStockModal } from "@/components/dashboard/LowStockModal";
 import { useTranslations } from "next-intl";
 import { calculateOfflineDashboardStats, mergePendingOutboxIntoDashboardStats } from "@/lib/offline/cacheService";
 import { syncEngine } from "@/lib/offline/syncEngine";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
+  const { settings } = useSettings();
   const [stats, setStats] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -173,7 +175,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            {settings.storeName ? `${settings.storeName} Dashboard` : t("title")}
+          </h1>
           <p className="text-slate-500 text-sm">{t("subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchStats}>

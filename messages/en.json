@@ -57,7 +57,7 @@
     }
   },
   "dashboard": {
-    "title": "Fatima Traders Dashboard",
+    "title": "Store Dashboard",
     "subtitle": "Real-time overview of sales, cash & bank collections, customer debt, and operational status.",
     "refresh": "Refresh Dashboard",
     "totalProducts": "Total Active Products",

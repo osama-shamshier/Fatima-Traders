@@ -57,8 +57,8 @@ export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalPro
                   {settings.storeName || "FATIMA TRADERS"}
                 </h2>
                 <p className="text-slate-500 text-xs font-semibold">{sale.branch?.name}</p>
-                <p className="text-slate-500 text-xs">{sale.branch?.address || settings.address}</p>
-                <p className="text-slate-500 text-xs font-mono">{sale.branch?.phone || settings.phone}</p>
+                <p className="text-slate-500 text-xs">{settings.address || sale.branch?.address}</p>
+                <p className="text-slate-500 text-xs font-mono">{settings.phone || sale.branch?.phone}</p>
               </div>
             </div>
 

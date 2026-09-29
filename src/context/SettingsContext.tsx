@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   phone: "0334-7776934",
   address: "Purani Ghalla Mandi, Ahmad Pur East",
   receiptHeader: "FATIMA TRADERS (Ahmad Pur East)",
-  receiptFooter: "Thank you for shopping with us! برائے رابطہ: 0334-7776934",
+  receiptFooter: "Thank you for shopping with us! Please visit again.",
   tagline: "Chemical & Packing Materials Store",
 };
 
@@ -36,7 +36,11 @@ export function getCachedSettings(): AppSettings {
       const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return { ...DEFAULT_SETTINGS, ...parsed };
+        const merged = { ...DEFAULT_SETTINGS, ...parsed };
+        if (merged.receiptFooter?.includes("0334-7776934") && merged.phone && merged.phone !== "0334-7776934") {
+          merged.receiptFooter = merged.receiptFooter.replace(/0334-?7776934/g, merged.phone);
+        }
+        return merged;
       }
     } catch {
       // ignore JSON parse or access error
