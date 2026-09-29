@@ -43,10 +43,10 @@ class SyncEngine {
     // Initial check
     this.checkHealth();
 
-    // Heartbeat every 20 seconds to detect actual connectivity
+    // Responsive heartbeat every 6 seconds to detect actual connectivity quickly
     this.heartbeatInterval = setInterval(() => {
       this.checkHealth();
-    }, 20000);
+    }, 6000);
   }
 
   public subscribe(listener: SyncListener): () => void {
@@ -57,10 +57,32 @@ class SyncEngine {
     };
   }
 
+  public getIsOnline(): boolean {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return false;
+    }
+    return this.isOnline;
+  }
+
+  public reportNetworkFailure() {
+    if (this.isOnline) {
+      this.isOnline = false;
+      this.notify();
+    }
+  }
+
+  public reportNetworkSuccess() {
+    if (!this.isOnline) {
+      this.isOnline = true;
+      this.notify();
+      this.triggerSync();
+    }
+  }
+
   private async notify() {
     const pending = await this.getPendingCount();
     const state = {
-      isOnline: this.isOnline,
+      isOnline: this.getIsOnline(),
       isSyncing: this.isSyncing,
       pendingCount: pending,
       lastSyncTime: this.lastSyncTime,
@@ -96,17 +118,18 @@ class SyncEngine {
     }
 
     try {
-      // Fast lightweight HEAD request to check real server connectivity
+      // Fast lightweight HEAD request with 1200ms timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
       const res = await fetch("/api/health", {
-        method: "GET",
+        method: "HEAD",
         signal: controller.signal,
+        cache: "no-store",
       });
       clearTimeout(timeoutId);
 
       const wasOffline = !this.isOnline;
-      this.isOnline = res.ok || res.status === 404; // Any response means network is reachable
+      this.isOnline = res.ok || res.status === 404; // Any response means server is reached
 
       if (wasOffline && this.isOnline) {
         this.triggerSync();
@@ -121,7 +144,7 @@ class SyncEngine {
   private handleOnline() {
     this.isOnline = true;
     this.notify();
-    this.triggerSync();
+    this.checkHealth();
   }
 
   private handleOffline() {

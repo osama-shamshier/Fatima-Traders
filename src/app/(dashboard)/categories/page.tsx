@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import { CategoryFormModal } from "@/components/categories/CategoryFormModal";
 import { useTranslations } from "next-intl";
 import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function CategoriesPage() {
   const t = useTranslations("categories");
@@ -20,27 +21,33 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<any>(null);
 
   const fetchCategories = async () => {
+    // 1. Immediately hydrate from offline cache (< 10ms)
     try {
-      setLoading(true);
-      const res = await fetch("/api/categories", { signal: AbortSignal.timeout(5000) });
+      const cached = await getAllFromStore<any>("categories");
+      if (Array.isArray(cached) && cached.length > 0) {
+        setCategories(cached);
+        setLoading(false);
+      }
+    } catch {}
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/categories", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         setCategories(list);
         putManyInStore("categories", list).catch(() => {});
-        setLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Online fetch categories failed, falling back to offline cache:", error);
-    }
-
-    try {
-      const cached = await getAllFromStore<any>("categories");
-      setCategories(Array.isArray(cached) ? cached : []);
-    } catch (err) {
-      console.error("Failed to load offline categories:", err);
-      setCategories([]);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }

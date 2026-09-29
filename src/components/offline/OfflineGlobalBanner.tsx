@@ -7,7 +7,12 @@ import { Wifi, WifiOff, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function OfflineGlobalBanner() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => {
+    if (typeof navigator !== "undefined") {
+      return navigator.onLine && syncEngine.getIsOnline();
+    }
+    return true;
+  });
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,13 +25,23 @@ export function OfflineGlobalBanner() {
       });
     }
 
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     const unsubscribe = syncEngine.subscribe((state) => {
       setIsOnline(state.isOnline);
       setIsSyncing(state.isSyncing);
       setPendingCount(state.pendingCount);
     });
 
-    return unsubscribe;
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      unsubscribe();
+    };
   }, []);
 
   return (

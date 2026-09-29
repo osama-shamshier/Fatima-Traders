@@ -64,7 +64,24 @@ export default function SalesPage() {
   }, []);
 
   const fetchSales = async () => {
-    setLoading(true);
+    // 1. Immediately hydrate from cached + pending offline sales (< 10ms)
+    try {
+      const combined = await getCombinedSales([]);
+      if (Array.isArray(combined) && combined.length > 0) {
+        setSales(combined);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Failed to load initial offline sales:", err);
+    }
+
+    // 2. Skip network if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const params = new URLSearchParams();
       if (period !== "all") params.append("period", period);
@@ -73,25 +90,16 @@ export default function SalesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/sales?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`/api/sales?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const liveData = await res.json();
         putManyInStore("sales", liveData).catch(() => {});
         const combined = await getCombinedSales(liveData);
         setSales(combined);
-        setLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Online fetchSales failed, falling back to offline cache:", e);
-    }
-
-    // Offline fallback: load cached + pending offline sales
-    try {
-      const combined = await getCombinedSales([]);
-      setSales(combined);
-    } catch (err) {
-      console.error("Failed to load offline sales:", err);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }

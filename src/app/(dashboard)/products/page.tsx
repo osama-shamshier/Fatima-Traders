@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import { cacheCatalogData, getOfflineProducts } from "@/lib/offline/cacheService";
 import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
 import { generateProductsPDF, exportProductsCSV } from "@/lib/pdfExport";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function ProductsPage() {
   const t = useTranslations("products");
@@ -30,36 +31,43 @@ export default function ProductsPage() {
   const [isActive, setIsActive] = useState("");
 
   const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (search) params.append("search", search);
-      if (categoryId) params.append("categoryId", categoryId);
-      if (isActive) params.append("isActive", isActive);
-
-      const res = await fetch(`/api/products?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
-        setProducts(list);
-        cacheCatalogData({ products: list });
-        setLoading(false);
-        return;
-      }
-    } catch (error) {
-      console.warn("Online fetch products failed, falling back to offline cache:", error);
-    }
-
-    // Offline fallback from IndexedDB
+    // 1. Immediately hydrate from offline cache (< 10ms)
     try {
       const offlineProds = await getOfflineProducts({
         categoryId,
         search,
       });
-      setProducts(Array.isArray(offlineProds) ? offlineProds : []);
+      if (Array.isArray(offlineProds) && offlineProds.length > 0) {
+        setProducts(offlineProds);
+        setLoading(false);
+      }
     } catch (err) {
       console.error("Failed to load offline products:", err);
-      setProducts([]);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append("search", search);
+      if (categoryId) params.append("categoryId", categoryId);
+      if (isActive) params.append("isActive", isActive);
+
+      const res = await fetch(`/api/products?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setProducts(list);
+        cacheCatalogData({ products: list });
+        syncEngine.reportNetworkSuccess();
+      }
+    } catch (error) {
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }
@@ -67,24 +75,31 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const loadCategories = async () => {
+      // 1. Immediately load cached categories
       try {
-        const res = await fetch("/api/categories", { signal: AbortSignal.timeout(5000) });
+        const localCats = await getAllFromStore<any>("categories");
+        if (Array.isArray(localCats) && localCats.length > 0) {
+          setCategories(localCats);
+        }
+      } catch {}
+
+      // 2. Skip network if offline
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+
+      // 3. Online refresh
+      try {
+        const res = await fetch("/api/categories", { signal: AbortSignal.timeout(2500) });
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : [];
           setCategories(list);
           putManyInStore("categories", list).catch(() => {});
-          return;
+          syncEngine.reportNetworkSuccess();
         }
       } catch (err) {
-        console.warn("Failed to fetch online categories, loading cached:", err);
-      }
-
-      try {
-        const localCats = await getAllFromStore<any>("categories");
-        setCategories(Array.isArray(localCats) ? localCats : []);
-      } catch {
-        setCategories([]);
+        syncEngine.reportNetworkFailure();
       }
     };
 

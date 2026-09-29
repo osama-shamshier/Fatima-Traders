@@ -1,7 +1,7 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v8";
+const CACHE_NAME = "fatima-retail-pwa-v9";
 const STATIC_ASSETS = [
   "/",
   "/login",
@@ -234,8 +234,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 4. API GET requests: Network first, cache fallback
+  // 4. API GET requests: Fast network with immediate offline fallback
   if (url.pathname.startsWith("/api/")) {
+    if (!navigator.onLine) {
+      event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          return new Response(JSON.stringify({ error: "Offline" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        })
+      );
+      return;
+    }
+
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {

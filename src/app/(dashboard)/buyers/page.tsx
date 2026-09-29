@@ -43,9 +43,24 @@ export default function BuyersPage() {
   const [selectedBuyer, setSelectedBuyer] = useState<any>(null);
 
   const fetchBuyers = async () => {
-    setIsLoading(true);
+    // 1. Immediately hydrate from cache (< 10ms)
     try {
-      const res = await fetch("/api/buyers", { signal: AbortSignal.timeout(5000) });
+      const cached = await getOfflineBuyers();
+      if (Array.isArray(cached) && cached.length > 0) {
+        setBuyers(cached);
+        setIsLoading(false);
+      }
+    } catch {}
+
+    // 2. Skip network if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/buyers", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -53,20 +68,10 @@ export default function BuyersPage() {
         // Add pending offline credit to buyers list
         const effectiveBuyers = await applyOfflineCreditsToBuyers(list);
         setBuyers(Array.isArray(effectiveBuyers) ? effectiveBuyers : []);
-        setIsLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Online fetchBuyers failed, falling back to offline cache:", error);
-    }
-
-    // Offline fallback from IndexedDB with pending credits
-    try {
-      const cached = await getOfflineBuyers();
-      setBuyers(Array.isArray(cached) ? cached : []);
-    } catch (err) {
-      console.error("Failed to load cached buyers:", err);
-      setBuyers([]);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }

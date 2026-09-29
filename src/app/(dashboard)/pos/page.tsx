@@ -86,11 +86,39 @@ export default function POSPage() {
   }, [selectedBranchId, selectedCategoryId]);
 
   const fetchInitialData = async () => {
+    // 1. Immediately hydrate from offline cache (< 10ms)
+    try {
+      const [cachedBranches, cachedCategories, cachedBuyers] = await Promise.all([
+        getAllFromStore<any>("branches"),
+        getAllFromStore<any>("categories"),
+        getOfflineBuyers(),
+      ]);
+
+      if (Array.isArray(cachedBranches) && cachedBranches.length > 0) {
+        setBranches(cachedBranches);
+        if (!selectedBranchId) setSelectedBranchId(cachedBranches[0].id);
+      }
+      if (Array.isArray(cachedCategories) && cachedCategories.length > 0) {
+        setCategories(cachedCategories);
+      }
+      if (Array.isArray(cachedBuyers) && cachedBuyers.length > 0) {
+        setBuyers(cachedBuyers);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial cache:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const [branchesRes, categoriesRes, buyersRes] = await Promise.all([
-        fetch("/api/branches", { signal: AbortSignal.timeout(5000) }),
-        fetch("/api/categories", { signal: AbortSignal.timeout(5000) }),
-        fetch("/api/buyers", { signal: AbortSignal.timeout(5000) }),
+        fetch("/api/branches", { signal: AbortSignal.timeout(2500) }),
+        fetch("/api/categories", { signal: AbortSignal.timeout(2500) }),
+        fetch("/api/buyers", { signal: AbortSignal.timeout(2500) }),
       ]);
 
       let bData: any[] = [];
@@ -119,41 +147,40 @@ export default function POSPage() {
         branches: Array.isArray(bData) ? bData : [],
         categories: Array.isArray(cData) ? cData : [],
       });
-      return;
+      syncEngine.reportNetworkSuccess();
     } catch (error) {
-      console.warn("Online fetch initial data failed, falling back to offline cache:", error);
-    }
-
-    // Offline fallback from IndexedDB
-    try {
-      const [cachedBranches, cachedCategories, cachedBuyers] = await Promise.all([
-        getAllFromStore("branches"),
-        getAllFromStore("categories"),
-        getOfflineBuyers(),
-      ]);
-
-      if (Array.isArray(cachedBranches) && cachedBranches.length > 0) {
-        setBranches(cachedBranches);
-        if (!selectedBranchId) setSelectedBranchId(cachedBranches[0].id);
-      }
-      if (Array.isArray(cachedCategories) && cachedCategories.length > 0) {
-        setCategories(cachedCategories);
-      }
-      setBuyers(Array.isArray(cachedBuyers) ? cachedBuyers : []);
-    } catch (err) {
-      console.error("Failed to read offline initial data:", err);
+      syncEngine.reportNetworkFailure();
     }
   };
 
 
   const fetchProducts = async () => {
+    // 1. Instantly display offline cache (< 10ms)
+    try {
+      const offlineData = await getOfflineProducts({
+        categoryId: selectedCategoryId,
+        search,
+      });
+      if (Array.isArray(offlineData) && offlineData.length > 0) {
+        setProducts(offlineData);
+      }
+    } catch (err) {
+      console.error("Failed to read offline products:", err);
+    }
+
+    // 2. If offline, done! Zero network wait
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
+
+    // 3. Background online refresh
     try {
       const params = new URLSearchParams();
       if (selectedBranchId) params.append("branchId", selectedBranchId);
       if (selectedCategoryId) params.append("categoryId", selectedCategoryId);
       if (search) params.append("search", search);
 
-      const res = await fetch(`/api/pos/products?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`/api/pos/products?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -161,21 +188,11 @@ export default function POSPage() {
         // Deduct pending offline sales so stock on screen remains accurate
         const effectiveData = await applyOfflineDeductionsToProducts<Product>(list);
         setProducts(effectiveData);
+        syncEngine.reportNetworkSuccess();
         return;
       }
     } catch (error) {
-      console.warn("Online fetch POS products failed, falling back to offline cache:", error);
-    }
-
-    // Offline fallback from IndexedDB with pending deductions
-    try {
-      const offlineData = await getOfflineProducts({
-        categoryId: selectedCategoryId,
-        search,
-      });
-      setProducts(offlineData);
-    } catch (err) {
-      console.error("Failed to read offline products:", err);
+      syncEngine.reportNetworkFailure();
     }
   };
 
@@ -350,7 +367,7 @@ export default function POSPage() {
       };
 
       let sale: any = null;
-      let isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+      let isOffline = (typeof navigator !== "undefined" && !navigator.onLine) || !syncEngine.getIsOnline();
 
       if (!isOffline) {
         try {
@@ -358,13 +375,15 @@ export default function POSPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(3000),
           });
 
           if (res.ok) {
             sale = await res.json();
+            syncEngine.reportNetworkSuccess();
           } else if (res.status >= 500 || res.status === 408) {
             console.warn(`Server responded with ${res.status}, saving sale offline.`);
+            syncEngine.reportNetworkFailure();
             isOffline = true;
           } else {
             const err = await res.json().catch(() => ({}));
@@ -373,6 +392,7 @@ export default function POSPage() {
           }
         } catch (netErr) {
           console.warn("Online checkout failed or timed out, switching to offline save:", netErr);
+          syncEngine.reportNetworkFailure();
           isOffline = true;
         }
       }
