@@ -48,26 +48,25 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats();
 
-    const unsub = syncEngine.subscribe(() => {
-      fetchStats();
+    let wasSyncing = false;
+    let wasOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
+
+    const unsub = syncEngine.subscribe((state) => {
+      const syncFinished = wasSyncing && !state.isSyncing;
+      const cameOnline = wasOffline && state.isOnline;
+      if (syncFinished || cameOnline) {
+        fetchStats();
+      }
+      wasSyncing = state.isSyncing;
+      wasOffline = !state.isOnline;
     });
 
-    const handleNetworkChange = () => fetchStats();
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchStats();
-    };
-
-    window.addEventListener("online", handleNetworkChange);
-    window.addEventListener("offline", handleNetworkChange);
-    window.addEventListener("focus", handleNetworkChange);
-    document.addEventListener("visibilitychange", handleVisibility);
+    const handleOnline = () => fetchStats();
+    window.addEventListener("online", handleOnline);
 
     return () => {
       unsub();
-      window.removeEventListener("online", handleNetworkChange);
-      window.removeEventListener("offline", handleNetworkChange);
-      window.removeEventListener("focus", handleNetworkChange);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 

@@ -26,6 +26,7 @@ class SyncEngine {
   private lastSyncTime: string | null = null;
   private lastError: string | null = null;
   private heartbeatInterval: any = null;
+  private consecutiveFailures: number = 0;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -40,18 +41,19 @@ class SyncEngine {
     window.addEventListener("online", () => this.handleOnline());
     window.addEventListener("offline", () => this.handleOffline());
 
-    // Initial check
+    // Initial health check
     this.checkHealth();
 
-    // Responsive heartbeat every 6 seconds to detect actual connectivity quickly
+    // Sane, stable heartbeat every 15 seconds (prevents aggressive flapping)
     this.heartbeatInterval = setInterval(() => {
       this.checkHealth();
-    }, 6000);
+    }, 15000);
   }
 
   public subscribe(listener: SyncListener): () => void {
     this.listeners.add(listener);
-    this.notify();
+    // Send initial snapshot to this subscriber
+    this.emitToListener(listener);
     return () => {
       this.listeners.delete(listener);
     };
@@ -64,18 +66,33 @@ class SyncEngine {
     return this.isOnline;
   }
 
+  // Routine individual API failures must NOT flap the global online/offline connection status
   public reportNetworkFailure() {
-    if (this.isOnline) {
-      this.isOnline = false;
-      this.notify();
-    }
+    // Intentionally no-op to prevent flapping when a single request times out or is aborted
   }
 
+  // Report that a network request succeeded (confirms connectivity)
   public reportNetworkSuccess() {
+    this.consecutiveFailures = 0;
     if (!this.isOnline) {
       this.isOnline = true;
       this.notify();
       this.triggerSync();
+    }
+  }
+
+  private async emitToListener(listener: SyncListener) {
+    const pending = await this.getPendingCount();
+    try {
+      listener({
+        isOnline: this.getIsOnline(),
+        isSyncing: this.isSyncing,
+        pendingCount: pending,
+        lastSyncTime: this.lastSyncTime,
+        lastError: this.lastError,
+      });
+    } catch (e) {
+      console.error("Error in sync listener:", e);
     }
   }
 
@@ -109,7 +126,9 @@ class SyncEngine {
   private async checkHealth() {
     if (typeof window === "undefined") return;
 
-    if (!navigator.onLine) {
+    // Hard offline detected by the browser network stack
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      this.consecutiveFailures = 2;
       if (this.isOnline) {
         this.isOnline = false;
         this.notify();
@@ -118,9 +137,9 @@ class SyncEngine {
     }
 
     try {
-      // Fast lightweight HEAD request with 1200ms timeout
+      // 3500ms timeout: tolerant of normal latency on cloud/mobile networks
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch("/api/health", {
         method: "HEAD",
         signal: controller.signal,
@@ -128,28 +147,50 @@ class SyncEngine {
       });
       clearTimeout(timeoutId);
 
-      const wasOffline = !this.isOnline;
-      this.isOnline = res.ok || res.status === 404; // Any response means server is reached
+      const serverReachable = res.ok || res.status === 404;
 
-      if (wasOffline && this.isOnline) {
-        this.triggerSync();
+      if (serverReachable) {
+        this.consecutiveFailures = 0;
+        if (!this.isOnline) {
+          this.isOnline = true;
+          this.notify();
+          this.triggerSync();
+        }
+      } else {
+        this.consecutiveFailures++;
+        if (this.consecutiveFailures >= 2 && this.isOnline) {
+          this.isOnline = false;
+          this.notify();
+        }
       }
     } catch {
-      this.isOnline = false;
+      this.consecutiveFailures++;
+      // Only transition to offline after 2 consecutive failed health checks
+      // This eliminates rapid false-positive offline toggling
+      if (this.consecutiveFailures >= 2 && this.isOnline) {
+        this.isOnline = false;
+        this.notify();
+      }
     }
-
-    this.notify();
   }
 
   private handleOnline() {
-    this.isOnline = true;
-    this.notify();
+    this.consecutiveFailures = 0;
+    if (!this.isOnline) {
+      this.isOnline = true;
+      this.notify();
+      this.triggerSync();
+    }
+    // Verify reachability in background
     this.checkHealth();
   }
 
   private handleOffline() {
-    this.isOnline = false;
-    this.notify();
+    this.consecutiveFailures = 2;
+    if (this.isOnline) {
+      this.isOnline = false;
+      this.notify();
+    }
   }
 
   // Manually or automatically trigger sync

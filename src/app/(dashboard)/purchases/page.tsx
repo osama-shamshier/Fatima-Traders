@@ -65,11 +65,20 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     fetchPurchases();
+
+    let wasSyncing = false;
+    let wasOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
+
     const unsub = syncEngine.subscribe((state) => {
-      if (!state.isSyncing) {
+      const syncFinished = wasSyncing && !state.isSyncing;
+      const cameOnline = wasOffline && state.isOnline;
+      if (syncFinished || cameOnline) {
         fetchPurchases();
       }
+      wasSyncing = state.isSyncing;
+      wasOffline = !state.isOnline;
     });
+
     const handleOnline = () => fetchPurchases();
     window.addEventListener("online", handleOnline);
     return () => {

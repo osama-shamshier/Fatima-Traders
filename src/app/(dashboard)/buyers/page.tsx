@@ -90,10 +90,17 @@ export default function BuyersPage() {
   }, []);
 
   useEffect(() => {
+    let wasSyncing = false;
+    let wasOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
+
     const unsub = syncEngine.subscribe((state) => {
-      if (!state.isSyncing) {
+      const syncFinished = wasSyncing && !state.isSyncing;
+      const cameOnline = wasOffline && state.isOnline;
+      if (syncFinished || cameOnline) {
         fetchBuyers();
       }
+      wasSyncing = state.isSyncing;
+      wasOffline = !state.isOnline;
     });
     return unsub;
   }, []);

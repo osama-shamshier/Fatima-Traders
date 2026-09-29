@@ -50,20 +50,25 @@ export default function ReportsPage() {
   }, [activeTab, partyType]);
 
   useEffect(() => {
-    const unsub = syncEngine.subscribe(() => {
-      refreshCurrentTab();
+    let wasSyncing = false;
+    let wasOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
+
+    const unsub = syncEngine.subscribe((state) => {
+      const syncFinished = wasSyncing && !state.isSyncing;
+      const cameOnline = wasOffline && state.isOnline;
+      if (syncFinished || cameOnline) {
+        refreshCurrentTab();
+      }
+      wasSyncing = state.isSyncing;
+      wasOffline = !state.isOnline;
     });
 
-    const handleNetworkChange = () => refreshCurrentTab();
-    window.addEventListener("online", handleNetworkChange);
-    window.addEventListener("offline", handleNetworkChange);
-    window.addEventListener("focus", handleNetworkChange);
+    const handleOnline = () => refreshCurrentTab();
+    window.addEventListener("online", handleOnline);
 
     return () => {
       unsub();
-      window.removeEventListener("online", handleNetworkChange);
-      window.removeEventListener("offline", handleNetworkChange);
-      window.removeEventListener("focus", handleNetworkChange);
+      window.removeEventListener("online", handleOnline);
     };
   }, [activeTab, partyType]);
 

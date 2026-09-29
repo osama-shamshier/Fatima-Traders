@@ -1,7 +1,7 @@
 // Service Worker for Fatima Traders Retail Management System
 // Full-app offline shell, static asset caching, and Next.js RSC router support
 
-const CACHE_NAME = "fatima-retail-pwa-v10";
+const CACHE_NAME = "fatima-retail-pwa-v11";
 const STATIC_ASSETS = [
   "/",
   "/login",
@@ -36,7 +36,7 @@ const STATIC_ASSETS = [
 ];
 
 // Helper: Fast timeout fetch to prevent stalled dead-network connections from freezing navigation
-function fetchWithTimeout(request, timeoutMs = 1500) {
+function fetchWithTimeout(request, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error("NetworkTimeout"));
@@ -100,6 +100,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Always bypass Service Worker for health checks so connectivity is tested cleanly
+  if (url.pathname === "/api/health") {
+    return;
+  }
+
   // 1. Static Assets (JS, CSS, fonts, images): Cache-first with network refresh
   if (
     url.pathname.startsWith("/_next/static/") ||
@@ -131,7 +136,7 @@ self.addEventListener("fetch", (event) => {
           return new Response("", { status: 408, statusText: "Offline" });
         }
 
-        return fetchWithTimeout(event.request, 2000)
+        return fetchWithTimeout(event.request, 3000)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
               const responseToCache = networkResponse.clone();
@@ -181,7 +186,7 @@ self.addEventListener("fetch", (event) => {
     }
 
     event.respondWith(
-      fetchWithTimeout(event.request, 1500)
+      fetchWithTimeout(event.request, 3000)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
@@ -217,7 +222,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Page Navigations and HTML Shells: Instant offline match or fast network with cache fallback
+  // 3. Page Navigations and HTML Shells: Instant offline match or network with cache fallback
   const isPageRequest =
     event.request.mode === "navigate" ||
     (event.request.headers.get("Accept") && event.request.headers.get("Accept").includes("text/html")) ||
@@ -275,7 +280,7 @@ self.addEventListener("fetch", (event) => {
     }
 
     event.respondWith(
-      fetchWithTimeout(event.request, 1500)
+      fetchWithTimeout(event.request, 3000)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
@@ -291,7 +296,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 4. API GET requests: Fast network with immediate offline fallback
+  // 4. API GET requests: Fast offline response when offline; normal network when online
   if (url.pathname.startsWith("/api/")) {
     if (!navigator.onLine) {
       event.respondWith(
@@ -307,7 +312,7 @@ self.addEventListener("fetch", (event) => {
     }
 
     event.respondWith(
-      fetchWithTimeout(event.request, 1800)
+      fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
