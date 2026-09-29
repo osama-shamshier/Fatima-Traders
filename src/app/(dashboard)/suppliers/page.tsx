@@ -13,6 +13,7 @@ import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
 import { useSettings } from "@/context/SettingsContext";
 import { cacheCatalogData, getOfflineSuppliers, applyOfflineDisbursementsToSuppliers } from "@/lib/offline/cacheService";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function SuppliersPage() {
   const t = useTranslations("suppliers");
@@ -33,33 +34,54 @@ export default function SuppliersPage() {
   const [ledgerSupplierName, setLedgerSupplierName] = useState("");
 
   const fetchSuppliers = async () => {
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/suppliers", { signal: AbortSignal.timeout(5000) });
+      const cached = await getOfflineSuppliers();
+      if (Array.isArray(cached) && cached.length > 0) {
+        setSuppliers(cached);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial offline suppliers:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/suppliers", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         cacheCatalogData({ suppliers: list });
         const adjusted = await applyOfflineDisbursementsToSuppliers(list);
         setSuppliers(adjusted);
-      } else {
-        const cached = await getOfflineSuppliers();
-        setSuppliers(cached);
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Falling back to cached suppliers:", error);
-      const cached = await getOfflineSuppliers();
-      setSuppliers(cached);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
     fetchSuppliers();
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchSuppliers();
+      }
+    });
     const handleOnline = () => fetchSuppliers();
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const handleAdd = () => {

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "next-intl";
 import { getCombinedBuyerPayments } from "@/lib/offline/cacheService";
 import { putManyInStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function BuyerPaymentsPage() {
   const t = useTranslations("buyerPayments");
@@ -23,38 +24,54 @@ export default function BuyerPaymentsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const fetchPayments = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/buyer-payments", { signal: AbortSignal.timeout(5000) });
+      const combined = await getCombinedBuyerPayments([]);
+      if (Array.isArray(combined) && combined.length > 0) {
+        setPayments(combined);
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial offline buyer payments:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/buyer-payments", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         putManyInStore("buyer_payments", list).catch(() => {});
         const combined = await getCombinedBuyerPayments(list);
         setPayments(combined);
-        setIsLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Online fetch buyer payments failed, falling back to offline cache:", error);
-    }
-
-    try {
-      const combined = await getCombinedBuyerPayments([]);
-      setPayments(combined);
-    } catch (err) {
-      console.error("Failed to load offline buyer payments:", err);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }
   };
 
-
   useEffect(() => {
     fetchPayments();
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchPayments();
+      }
+    });
     const handleOnline = () => fetchPayments();
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const filteredPayments = payments.filter((p) => {

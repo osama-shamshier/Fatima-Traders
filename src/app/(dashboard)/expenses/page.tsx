@@ -32,7 +32,24 @@ export default function ExpensesPage() {
   const [endDate, setEndDate] = useState<string>("");
 
   const fetchExpenses = async () => {
-    setLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
+    try {
+      const cached = await getAllFromStore("expenses");
+      if (cached && cached.length > 0) {
+        setExpenses(cached);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial cached expenses:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const params = new URLSearchParams();
       if (period !== "all") params.append("period", period);
@@ -41,31 +58,19 @@ export default function ExpensesPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/expenses?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`/api/expenses?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         setExpenses(data);
         cacheCatalogData({ expenses: data });
-        setLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Online fetchExpenses failed, falling back to offline cache:", error);
-    }
-
-    // Offline fallback from IndexedDB
-    try {
-      const cached = await getAllFromStore("expenses");
-      if (cached && cached.length > 0) {
-        setExpenses(cached);
-      }
-    } catch (err) {
-      console.error("Failed to load cached expenses:", err);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }
   };
-
 
   useEffect(() => {
     fetchExpenses();
@@ -77,7 +82,12 @@ export default function ExpensesPage() {
         fetchExpenses();
       }
     });
-    return unsub;
+    const handleOnline = () => fetchExpenses();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const handleCustomApply = (e: React.FormEvent) => {

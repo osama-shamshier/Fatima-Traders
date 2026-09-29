@@ -62,28 +62,57 @@ export default function InventoryPage() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch("/api/branches", { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        setBranches(await res.json());
-        return;
-      }
-    } catch (e) {}
-
-    try {
       const cached = await getAllFromStore<any>("branches");
       if (cached && cached.length > 0) setBranches(cached);
     } catch {}
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+    try {
+      const res = await fetch("/api/branches", { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        setBranches(await res.json());
+      }
+    } catch (e) {}
   };
 
   const fetchInventory = async () => {
-    setLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
+    try {
+      const offlineProds = await getOfflineProducts({ search: searchQuery });
+      if (offlineProds && offlineProds.length > 0) {
+        let filtered = offlineProds;
+        if (lowStockOnly) {
+          filtered = filtered.filter((p: any) => Number(p.availableStock || 0) <= Number(p.minStockLevel || 0));
+        }
+        const formatted = filtered.map((p: any) => ({
+          id: p.id,
+          productId: p.id,
+          product: p,
+          quantity: p.availableStock,
+          branch: branches[0] || { name: "Current Branch" },
+        }));
+        setInventory(formatted as any);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial offline inventory:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const params = new URLSearchParams();
       if (searchQuery) params.append("search", searchQuery);
       if (branchFilter) params.append("branchId", branchFilter);
       if (lowStockOnly) params.append("lowStock", "true");
 
-      const res = await fetch(`/api/inventory?${params.toString()}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`/api/inventory?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const raw = await res.json();
         const mapped = raw.map((item: any) => ({
@@ -96,39 +125,26 @@ export default function InventoryPage() {
           ...item,
           quantity: item.availableStock,
         })) as any);
-        setLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Online fetch inventory failed, falling back to offline cache:", e);
-    }
-
-    // Offline fallback from IndexedDB
-    try {
-      const offlineProds = await getOfflineProducts({ search: searchQuery });
-      const formatted = offlineProds.map((p: any) => ({
-        id: p.id,
-        productId: p.id,
-        product: p,
-        quantity: p.availableStock,
-        branch: branches[0] || { name: "Current Branch" },
-      }));
-      setInventory(formatted as any);
-    } catch (err) {
-      console.error("Failed to load offline inventory:", err);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }
   };
 
-
   const fetchMovements = async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (branchFilter) params.append("branchId", branchFilter);
 
-      const res = await fetch(`/api/inventory/movements?${params.toString()}`);
+      const res = await fetch(`/api/inventory/movements?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         setMovements(await res.json());
       }
@@ -140,12 +156,16 @@ export default function InventoryPage() {
   };
 
   const fetchAdjustments = async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (branchFilter) params.append("branchId", branchFilter);
 
-      const res = await fetch(`/api/inventory/adjustments?${params.toString()}`);
+      const res = await fetch(`/api/inventory/adjustments?${params.toString()}`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         setAdjustments(await res.json());
       }

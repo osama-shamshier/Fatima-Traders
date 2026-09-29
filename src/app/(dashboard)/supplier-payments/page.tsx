@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { CreditCard, Plus, Truck, RefreshCw, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { getCombinedSupplierPayments, recordOfflineSupplierPayment, getOfflineSuppliers } from "@/lib/offline/cacheService";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function SupplierPaymentsPage() {
   const t = useTranslations("supplierPayments");
@@ -42,48 +43,73 @@ export default function SupplierPaymentsPage() {
   }, []);
 
   useEffect(() => {
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchPayments();
+        fetchInitialData();
+      }
+    });
     const handleOnline = () => {
       fetchPayments();
       fetchInitialData();
     };
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const fetchPayments = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/supplier-payments", { signal: AbortSignal.timeout(5000) });
+      const combined = await getCombinedSupplierPayments([]);
+      if (Array.isArray(combined) && combined.length > 0) {
+        setPayments(combined);
+        setIsLoading(false);
+      }
+    } catch (e) {
+      console.warn("Initial offline supplier payments load failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/supplier-payments", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const combined = await getCombinedSupplierPayments(Array.isArray(data) ? data : []);
         setPayments(combined);
-      } else {
-        const combined = await getCombinedSupplierPayments([]);
-        setPayments(combined);
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Falling back to offline supplier payments:", e);
-      const combined = await getCombinedSupplierPayments([]);
-      setPayments(combined);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }
   };
 
-
   const fetchInitialData = async () => {
     try {
+      const cachedS = await getOfflineSuppliers();
+      if (cachedS && cachedS.length > 0) setSuppliers(cachedS);
+    } catch {}
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+    try {
       const [suppRes, purRes] = await Promise.all([
-        fetch("/api/suppliers", { signal: AbortSignal.timeout(5000) }).catch(() => null),
-        fetch("/api/purchases", { signal: AbortSignal.timeout(5000) }).catch(() => null),
+        fetch("/api/suppliers", { signal: AbortSignal.timeout(2500) }).catch(() => null),
+        fetch("/api/purchases", { signal: AbortSignal.timeout(2500) }).catch(() => null),
       ]);
       if (suppRes && suppRes.ok) {
         const sData = await suppRes.json();
         setSuppliers(Array.isArray(sData) ? sData : []);
-      } else {
-        const cachedS = await getOfflineSuppliers();
-        if (cachedS && cachedS.length > 0) setSuppliers(cachedS);
       }
       if (purRes && purRes.ok) {
         const pData = await purRes.json();
@@ -91,8 +117,6 @@ export default function SupplierPaymentsPage() {
       }
     } catch (e) {
       console.error(e);
-      const cachedS = await getOfflineSuppliers();
-      if (cachedS && cachedS.length > 0) setSuppliers(cachedS);
     }
   };
 

@@ -69,10 +69,35 @@ export default function ReportsPage() {
 
 
   const fetchPartyList = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
+    try {
+      if (partyType === "Customers") {
+        const buyers = await getOfflineBuyers();
+        if (buyers && buyers.length > 0) {
+          setPartyList(buyers);
+          setIsLoading(false);
+        }
+      } else {
+        const suppliers = await getOfflineSuppliers();
+        if (suppliers && suppliers.length > 0) {
+          setPartyList(suppliers);
+          setIsLoading(false);
+        }
+      }
+    } catch (e) {
+      console.warn("Initial offline party list load failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const endpoint = partyType === "Customers" ? "/api/buyers" : "/api/suppliers";
-      const res = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(endpoint, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         if (partyType === "Customers") {
@@ -82,82 +107,113 @@ export default function ReportsPage() {
           const adjusted = await applyOfflineDisbursementsToSuppliers(Array.isArray(data) ? data : []);
           setPartyList(adjusted);
         }
-      } else {
-        throw new Error("Failed to fetch party list");
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Failed to fetch online party list, falling back to offline cache:", e);
-      if (partyType === "Customers") {
-        const buyers = await getOfflineBuyers();
-        setPartyList(buyers);
-      } else {
-        const suppliers = await getOfflineSuppliers();
-        setPartyList(suppliers);
-      }
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }
   };
 
-
   const fetchValuation = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/reports/inventory-valuation", { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        setValuationData(await res.json());
-      } else {
-        throw new Error("Valuation fetch failed");
+      const prods = await getOfflineProducts();
+      if (prods && prods.length > 0) {
+        const totalValuation = prods.reduce((sum, p) => {
+          const stock = Number(p.availableStock !== undefined ? p.availableStock : (p as any).currentStock || 0);
+          const cost = Number((p as any).costPrice || ((p as any).sellingPrice ? (p as any).sellingPrice * 0.7 : 0));
+          return sum + (stock > 0 ? stock * cost : 0);
+        }, 0);
+        setValuationData({ totalValuation });
+        setIsLoading(false);
       }
     } catch (e) {
-      console.warn("Valuation fetch error, using offline products:", e);
-      const prods = await getOfflineProducts();
-      const totalValuation = prods.reduce((sum, p) => {
-        const stock = Number(p.availableStock !== undefined ? p.availableStock : (p as any).currentStock || 0);
-        const cost = Number((p as any).costPrice || ((p as any).sellingPrice ? (p as any).sellingPrice * 0.7 : 0));
-        return sum + (stock > 0 ? stock * cost : 0);
-      }, 0);
-      setValuationData({ totalValuation });
+      console.warn("Initial offline valuation load failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/reports/inventory-valuation", { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        setValuationData(await res.json());
+        syncEngine.reportNetworkSuccess();
+      }
+    } catch (e) {
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }
   };
 
   const fetchSalesReport = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/sales", { signal: AbortSignal.timeout(5000) });
+      const combined = await getCombinedSales([]);
+      if (combined && combined.length > 0) {
+        setSalesData(combined);
+        setIsLoading(false);
+      }
+    } catch (e) {
+      console.warn("Initial offline sales report load failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/sales", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const combined = await getCombinedSales(Array.isArray(data) ? data : []);
         setSalesData(combined);
-      } else {
-        const combined = await getCombinedSales([]);
-        setSalesData(combined);
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Sales report fetch error, using offline sales:", e);
-      const combined = await getCombinedSales([]);
-      setSalesData(combined);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }
   };
 
   const fetchProfitLoss = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/reports/profit-loss", { signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
-        setPlData(await res.json());
-      } else {
-        const pl = await calculateOfflineShiftProfitLoss();
+      const pl = await calculateOfflineShiftProfitLoss();
+      if (pl) {
         setPlData(pl);
+        setIsLoading(false);
       }
     } catch (e) {
-      console.warn("Profit/loss fetch error, using offline calculations:", e);
-      const pl = await calculateOfflineShiftProfitLoss();
-      setPlData(pl);
+      console.warn("Initial offline profit-loss report load failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/reports/profit-loss", { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        setPlData(await res.json());
+        syncEngine.reportNetworkSuccess();
+      }
+    } catch (e) {
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }

@@ -72,21 +72,35 @@ export default function DashboardPage() {
   }, []);
 
   const fetchStats = async () => {
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      const res = await fetch("/api/dashboard/stats", { signal: AbortSignal.timeout(5000) });
+      const localStats = await calculateOfflineDashboardStats();
+      if (localStats) {
+        setStats(localStats);
+        setIsLoading(false);
+      }
+    } catch (e) {
+      console.warn("Error calculating initial offline dashboard stats:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/dashboard/stats", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const serverData = await res.json();
         // Merge pending offline outbox items into server response
         const mergedStats = await mergePendingOutboxIntoDashboardStats(serverData);
         setStats(mergedStats);
-      } else {
-        const localStats = await calculateOfflineDashboardStats();
-        if (localStats) setStats(localStats);
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Server stats fetch failed, calculating offline dashboard stats:", e);
-      const localStats = await calculateOfflineDashboardStats();
-      if (localStats) setStats(localStats);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }

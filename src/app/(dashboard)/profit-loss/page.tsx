@@ -25,6 +25,7 @@ import { useTranslations } from "next-intl";
 import { generateProfitLossPDF, exportProfitLossCSV } from "@/lib/pdfExport";
 import { calculateOfflineShiftProfitLoss, getOfflineProducts } from "@/lib/offline/cacheService";
 import { getAllFromStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 import { useSettings } from "@/context/SettingsContext";
 
 export default function ProfitLossPage() {
@@ -65,28 +66,27 @@ export default function ProfitLossPage() {
 
   const fetchBranchesAndProducts = async () => {
     try {
-      const [bRes, pRes] = await Promise.all([
-        fetch("/api/branches", { signal: AbortSignal.timeout(5000) }).catch(() => null),
-        fetch("/api/products", { signal: AbortSignal.timeout(5000) }).catch(() => null),
-      ]);
-      if (bRes && bRes.ok) {
-        setBranches(await bRes.json());
-      } else {
-        const cachedB = await getAllFromStore<any>("branches");
-        if (cachedB && cachedB.length > 0) setBranches(cachedB);
-      }
-      if (pRes && pRes.ok) {
-        setProducts(await pRes.json());
-      } else {
-        const cachedP = await getOfflineProducts();
-        if (cachedP && cachedP.length > 0) setProducts(cachedP);
-      }
-    } catch (e) {
-      console.error(e);
       const cachedB = await getAllFromStore<any>("branches");
       if (cachedB && cachedB.length > 0) setBranches(cachedB);
       const cachedP = await getOfflineProducts();
       if (cachedP && cachedP.length > 0) setProducts(cachedP);
+    } catch {}
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+    try {
+      const [bRes, pRes] = await Promise.all([
+        fetch("/api/branches", { signal: AbortSignal.timeout(2500) }).catch(() => null),
+        fetch("/api/products", { signal: AbortSignal.timeout(2500) }).catch(() => null),
+      ]);
+      if (bRes && bRes.ok) {
+        setBranches(await bRes.json());
+      }
+      if (pRes && pRes.ok) {
+        setProducts(await pRes.json());
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -119,7 +119,25 @@ export default function ProfitLossPage() {
   };
 
   const fetchProfitLoss = async () => {
-    setIsLoading(true);
+    // 1. Instant Cache-First Hydration (< 10ms)
+    try {
+      const { filterStart, filterEnd } = getFilterBounds();
+      const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
+      if (offlineReport) {
+        setPlData(offlineReport);
+        setIsLoading(false);
+      }
+    } catch (e) {
+      console.warn("Initial offline profit-loss calculation failed:", e);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
     try {
       const params = new URLSearchParams();
       if (period !== "all") params.append("period", period);
@@ -130,19 +148,13 @@ export default function ProfitLossPage() {
         if (endDate) params.append("endDate", endDate);
       }
 
-      const res = await fetch(`/api/reports/profit-loss?${params.toString()}`, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`/api/reports/profit-loss?${params.toString()}`, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         setPlData(await res.json());
-      } else {
-        const { filterStart, filterEnd } = getFilterBounds();
-        const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
-        if (offlineReport) setPlData(offlineReport);
+        syncEngine.reportNetworkSuccess();
       }
     } catch (e) {
-      console.warn("Server P&L fetch failed, falling back to local offline shift calculations:", e);
-      const { filterStart, filterEnd } = getFilterBounds();
-      const offlineReport = await calculateOfflineShiftProfitLoss(filterStart, filterEnd);
-      if (offlineReport) setPlData(offlineReport);
+      syncEngine.reportNetworkFailure();
     } finally {
       setIsLoading(false);
     }

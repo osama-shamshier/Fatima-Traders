@@ -12,6 +12,7 @@ import { Search, Plus, ShoppingBag, X, Eye } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { getCombinedPurchases } from "@/lib/offline/cacheService";
 import { putManyInStore } from "@/lib/offline/db";
+import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function PurchasesPage() {
   const t = useTranslations("purchases");
@@ -27,38 +28,54 @@ export default function PurchasesPage() {
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
 
   const fetchPurchases = async () => {
+    // 1. Instant Cache-First Hydration (< 10ms)
     try {
-      setLoading(true);
-      const res = await fetch("/api/purchases", { signal: AbortSignal.timeout(5000) });
+      const combined = await getCombinedPurchases([]);
+      if (Array.isArray(combined) && combined.length > 0) {
+        setPurchases(combined);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.warn("Failed to load initial offline purchases:", err);
+    }
+
+    // 2. Skip network completely if offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
+    // 3. Online background refresh
+    try {
+      const res = await fetch("/api/purchases", { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         putManyInStore("purchases", list).catch(() => {});
         const combined = await getCombinedPurchases(list);
         setPurchases(combined);
-        setLoading(false);
-        return;
+        syncEngine.reportNetworkSuccess();
       }
     } catch (error) {
-      console.warn("Online fetch purchases failed, falling back to offline cache:", error);
-    }
-
-    try {
-      const combined = await getCombinedPurchases([]);
-      setPurchases(combined);
-    } catch (err) {
-      console.error("Failed to load offline purchases:", err);
+      syncEngine.reportNetworkFailure();
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
     fetchPurchases();
+    const unsub = syncEngine.subscribe((state) => {
+      if (!state.isSyncing) {
+        fetchPurchases();
+      }
+    });
     const handleOnline = () => fetchPurchases();
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    return () => {
+      unsub();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   const handleAdd = () => {
