@@ -12,6 +12,7 @@ import { BuyerFormModal } from "@/components/buyers/BuyerFormModal";
 import { BuyerLedgerModal } from "@/components/buyers/BuyerLedgerModal";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 import {
   cacheCatalogData,
   applyOfflineCreditsToBuyers,
@@ -23,6 +24,7 @@ import { syncEngine } from "@/lib/offline/syncEngine";
 export default function BuyersPage() {
   const t = useTranslations("buyers");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const searchParams = useSearchParams();
   const initialFilter = searchParams.get("filter");
@@ -154,7 +156,7 @@ export default function BuyersPage() {
       filterType: filterType,
       items,
       totalOutstanding: totalOutstandingSum,
-      storeName: "FATIMA TRADERS",
+      storeName: settings.storeName,
     });
   };
 

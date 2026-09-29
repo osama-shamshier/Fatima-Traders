@@ -30,10 +30,12 @@ import {
 import { getCombinedSales } from "@/lib/offline/cacheService";
 import { putManyInStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function SalesPage() {
   const t = useTranslations("sales");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,7 +164,7 @@ export default function SalesPage() {
       totalPaid: totalPaidAmount,
       totalOutstanding: totalOutstandingAmount,
       totalRoundOff: totalRoundOffAmount,
-      storeName: "FATIMA TRADERS",
+      storeName: settings.storeName,
     });
   };
 

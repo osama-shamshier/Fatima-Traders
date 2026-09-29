@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getCachedSettings } from "@/context/SettingsContext";
 
 export interface PartyReportItem {
   name: string;
@@ -25,8 +26,10 @@ export function generatePartiesPDF({
   filterType = "ALL",
   items,
   totalOutstanding,
-  storeName = "FATIMA TRADERS",
+  storeName,
 }: GeneratePartiesPDFOptions) {
+  const cached = getCachedSettings();
+  const activeStoreName = storeName || cached.storeName || "FATIMA TRADERS";
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -46,7 +49,7 @@ export function generatePartiesPDF({
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text(storeName.toUpperCase(), 14, 10);
+  doc.text(activeStoreName.toUpperCase(), 14, 10);
 
   doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
@@ -149,7 +152,7 @@ export function generatePartiesPDF({
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text(
-        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        `Page ${data.pageNumber} of ${pageNumber} • ${activeStoreName} Retail Management System`,
         105,
         290,
         { align: "center" }
@@ -202,8 +205,10 @@ export function generateSalesSummaryPDF({
   totalPaid,
   totalOutstanding,
   totalRoundOff = 0,
-  storeName = "FATIMA TRADERS",
+  storeName,
 }: GenerateSalesSummaryPDFOptions) {
+  const cached = getCachedSettings();
+  const activeStoreName = storeName || cached.storeName || "FATIMA TRADERS";
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
@@ -229,7 +234,7 @@ export function generateSalesSummaryPDF({
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text(storeName.toUpperCase(), 14, 10);
+  doc.text(activeStoreName.toUpperCase(), 14, 10);
 
   doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
@@ -374,7 +379,7 @@ export function generateSalesSummaryPDF({
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text(
-        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        `Page ${data.pageNumber} of ${pageNumber} • ${activeStoreName} Retail Management System`,
         148,
         202,
         { align: "center" }
@@ -530,8 +535,10 @@ export function generateProfitLossPDF({
   branchName = "All Branches",
   productName = "All Products",
   plData,
-  storeName = "FATIMA TRADERS",
+  storeName,
 }: ProfitLossPDFOptions) {
+  const cached = getCachedSettings();
+  const activeStoreName = storeName || cached.storeName || "FATIMA TRADERS";
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
@@ -561,7 +568,7 @@ export function generateProfitLossPDF({
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text(storeName.toUpperCase(), 14, 10);
+  doc.text(activeStoreName.toUpperCase(), 14, 10);
 
   doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
@@ -736,7 +743,7 @@ export function generateProfitLossPDF({
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text(
-        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        `Page ${data.pageNumber} of ${pageNumber} • ${activeStoreName} Retail Management System`,
         148,
         202,
         { align: "center" }
@@ -882,10 +889,15 @@ export function generateLedgerPDF({
   periodCredit,
   closingBalance,
   entries,
-  storeName = "FATIMA TRADERS",
-  storeAddress = "Purani Ghalla Mandi, Ahmad Pur East",
-  storePhone = "0334-7776934",
+  storeName,
+  storeAddress,
+  storePhone,
 }: GenerateLedgerPDFOptions) {
+  const cached = getCachedSettings();
+  const activeStoreName = storeName || cached.storeName || "FATIMA TRADERS";
+  const activeStoreAddress = storeAddress || cached.address || "Purani Ghalla Mandi, Ahmad Pur East";
+  const activeStorePhone = storePhone || cached.phone || "0334-7776934";
+
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -912,12 +924,12 @@ export function generateLedgerPDF({
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text(storeName.toUpperCase(), 14, 11);
+  doc.text(activeStoreName.toUpperCase(), 14, 11);
 
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(203, 213, 225); // slate-300
-  doc.text(`${storeAddress} | Tel: ${storePhone}`, 14, 18);
+  doc.text(`${activeStoreAddress} | Tel: ${activeStorePhone}`, 14, 18);
 
   // Statement Title (Right Aligned)
   doc.setFont("helvetica", "bold");
@@ -1151,7 +1163,7 @@ export function generateLedgerPDF({
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text(
-        `Page ${data.pageNumber} of ${pageNumber} • ${storeName} Retail Management System`,
+        `Page ${data.pageNumber} of ${pageNumber} • ${activeStoreName} Retail Management System`,
         105,
         290,
         { align: "center" }

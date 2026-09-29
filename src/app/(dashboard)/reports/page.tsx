@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 import {
   getOfflineProducts,
   getCombinedSales,
@@ -24,6 +25,7 @@ import { syncEngine } from "@/lib/offline/syncEngine";
 export default function ReportsPage() {
   const t = useTranslations("reports");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState<"valuation" | "sales" | "profit-loss" | "area-balances">("valuation");
   const [valuationData, setValuationData] = useState<any | null>(null);
@@ -216,6 +218,7 @@ export default function ReportsPage() {
       filterType,
       items,
       totalOutstanding,
+      storeName: settings.storeName,
     });
   };
 

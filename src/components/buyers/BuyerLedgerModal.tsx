@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PAKISTANI_BANKS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, RefreshCw, DollarSign, User, Download, Calendar, X, FileText } from "lucide-react";
+import { CreditCard, RefreshCw, DollarSign, User, Download, Calendar, X, FileText, Printer } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import { useTranslations } from "next-intl";
 import { generateLedgerPDF } from "@/lib/pdfExport";
 import { getCombinedBuyerLedger, recordOfflineBuyerPayment } from "@/lib/offline/cacheService";
+import { useSettings } from "@/context/SettingsContext";
 
 interface BuyerLedgerModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface BuyerLedgerModalProps {
 export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSuccess }: BuyerLedgerModalProps) {
   const t = useTranslations("ledger");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const [ledger, setLedger] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -144,6 +146,9 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
       periodCredit,
       closingBalance,
       entries: filteredLedger,
+      storeName: settings.storeName,
+      storeAddress: settings.address,
+      storePhone: settings.phone,
     });
   };
 
@@ -315,6 +320,17 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
                 className="text-xs font-semibold gap-1 border-slate-300 hover:bg-slate-50 h-8 px-2.5"
               >
                 <Download className="w-3.5 h-3.5 text-blue-600" /> {t("exportCsv")}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                disabled={filteredLedger.length === 0 && openingBalance === 0}
+                className="text-xs font-semibold gap-1 border-slate-300 hover:bg-slate-50 h-8 px-2.5"
+                title="Direct Print Statement"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-700" /> Print
               </Button>
 
               <Button
@@ -505,9 +521,13 @@ export function BuyerLedgerModal({ isOpen, onClose, buyerId, buyerName, onSucces
           <div className="hidden print:block mb-6 border-b pb-4">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-wide uppercase">FATIMA TRADERS</h1>
-                <p className="text-xs text-slate-600">Chemical & Packing Materials Store</p>
-                <p className="text-xs text-slate-600">Purani Ghalla Mandi, Ahmad Pur East | Tel: 0334-7776934</p>
+                <h1 className="text-2xl font-black text-slate-900 tracking-wide uppercase">
+                  {settings.storeName || "FATIMA TRADERS"}
+                </h1>
+                {settings.tagline && <p className="text-xs text-slate-600">{settings.tagline}</p>}
+                <p className="text-xs text-slate-600">
+                  {settings.address || "Purani Ghalla Mandi, Ahmad Pur East"}{settings.phone ? ` | Tel: ${settings.phone}` : ""}
+                </p>
               </div>
               <div className="text-end">
                 <h2 className="text-lg font-bold text-slate-900 uppercase">Customer Account Statement</h2>

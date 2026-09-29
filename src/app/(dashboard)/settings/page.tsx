@@ -6,62 +6,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, Save, CheckCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
   const tc = useTranslations("common");
+  const { settings: globalSettings, updateSettings } = useSettings();
 
-  const [settings, setSettings] = useState({
-    storeName: "FATIMA TRADERS",
-    currency: "PKR",
-    currencySymbol: "Rs.",
-    taxRate: "0",
-    phone: "0334-7776934",
-    address: "Purani Ghalla Mandi, Ahmad Pur East",
-    receiptHeader: "FATIMA TRADERS (Ahmad Pur East)",
-    receiptFooter: "Thank you for shopping with us! برائے رابطہ: 0334-7776934",
-  });
-
+  const [formSettings, setFormSettings] = useState(globalSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch("/api/settings");
-      if (res.ok) {
-        const data = await res.json();
-        if (Object.keys(data).length > 0) {
-          setSettings((prev) => ({ ...prev, ...data }));
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    setFormSettings(globalSettings);
+  }, [globalSettings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setSavedSuccess(false);
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-
-      if (res.ok) {
-        setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
-      } else {
-        alert("Failed to save settings");
-      }
+      await updateSettings(formSettings);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
     } catch (e) {
-      console.error(e);
+      console.error("Error saving settings:", e);
+      alert("Failed to save settings");
     } finally {
       setIsSaving(false);
     }
@@ -87,24 +57,33 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold">{t("storeName")}</Label>
                 <Input
                   required
-                  value={settings.storeName}
-                  onChange={(e) => setSettings({ ...settings, storeName: e.target.value })}
-                  className="text-xs mt-1 bg-white"
+                  value={formSettings.storeName}
+                  onChange={(e) => setFormSettings({ ...formSettings, storeName: e.target.value })}
+                  className="text-xs mt-1 bg-white font-medium"
                 />
               </div>
               <div>
                 <Label className="text-xs font-semibold">{t("phone")}</Label>
                 <Input
-                  value={settings.phone}
-                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                  value={formSettings.phone}
+                  onChange={(e) => setFormSettings({ ...formSettings, phone: e.target.value })}
                   className="text-xs mt-1 bg-white"
                 />
               </div>
               <div className="sm:col-span-2">
                 <Label className="text-xs font-semibold">{t("address")}</Label>
                 <Input
-                  value={settings.address}
-                  onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                  value={formSettings.address}
+                  onChange={(e) => setFormSettings({ ...formSettings, address: e.target.value })}
+                  className="text-xs mt-1 bg-white"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-xs font-semibold">Store Tagline / Subtitle (Prints & Ledgers)</Label>
+                <Input
+                  value={formSettings.tagline || ""}
+                  onChange={(e) => setFormSettings({ ...formSettings, tagline: e.target.value })}
+                  placeholder="e.g. Chemical & Packing Materials Store"
                   className="text-xs mt-1 bg-white"
                 />
               </div>
@@ -117,16 +96,16 @@ export default function SettingsPage() {
               <div>
                 <Label className="text-xs font-semibold">{t("currency")}</Label>
                 <Input
-                  value={settings.currency}
-                  onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+                  value={formSettings.currency}
+                  onChange={(e) => setFormSettings({ ...formSettings, currency: e.target.value })}
                   className="text-xs mt-1 bg-white"
                 />
               </div>
               <div>
                 <Label className="text-xs font-semibold">{t("currencySymbol")}</Label>
                 <Input
-                  value={settings.currencySymbol}
-                  onChange={(e) => setSettings({ ...settings, currencySymbol: e.target.value })}
+                  value={formSettings.currencySymbol}
+                  onChange={(e) => setFormSettings({ ...formSettings, currencySymbol: e.target.value })}
                   className="text-xs mt-1 bg-white"
                 />
               </div>
@@ -134,8 +113,8 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold">{t("taxRate")}</Label>
                 <Input
                   type="number"
-                  value={settings.taxRate}
-                  onChange={(e) => setSettings({ ...settings, taxRate: e.target.value })}
+                  value={formSettings.taxRate}
+                  onChange={(e) => setFormSettings({ ...formSettings, taxRate: e.target.value })}
                   className="text-xs mt-1 bg-white font-mono"
                 />
               </div>
@@ -148,16 +127,16 @@ export default function SettingsPage() {
               <div>
                 <Label className="text-xs font-semibold">{t("receiptHeader")}</Label>
                 <Input
-                  value={settings.receiptHeader}
-                  onChange={(e) => setSettings({ ...settings, receiptHeader: e.target.value })}
+                  value={formSettings.receiptHeader}
+                  onChange={(e) => setFormSettings({ ...formSettings, receiptHeader: e.target.value })}
                   className="text-xs mt-1 bg-white"
                 />
               </div>
               <div>
                 <Label className="text-xs font-semibold">{t("receiptFooter")}</Label>
                 <Input
-                  value={settings.receiptFooter}
-                  onChange={(e) => setSettings({ ...settings, receiptFooter: e.target.value })}
+                  value={formSettings.receiptFooter}
+                  onChange={(e) => setFormSettings({ ...formSettings, receiptFooter: e.target.value })}
                   className="text-xs mt-1 bg-white"
                 />
               </div>

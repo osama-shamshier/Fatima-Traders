@@ -6,6 +6,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ function formatPlainNumber(val: number): string {
 export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalProps) {
   const t = useTranslations("sales");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const handlePrint = () => {
     window.print();
@@ -51,10 +53,12 @@ export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalPro
                 <p className="text-slate-500 font-mono mt-1 font-bold">#{sale.invoiceNumber}</p>
               </div>
               <div className="text-end">
-                <h2 className="text-xl font-black text-slate-900 uppercase">FATIMA TRADERS</h2>
+                <h2 className="text-xl font-black text-slate-900 uppercase">
+                  {settings.storeName || "FATIMA TRADERS"}
+                </h2>
                 <p className="text-slate-500 text-xs font-semibold">{sale.branch?.name}</p>
-                <p className="text-slate-500 text-xs">{sale.branch?.address}</p>
-                <p className="text-slate-500 text-xs font-mono">{sale.branch?.phone}</p>
+                <p className="text-slate-500 text-xs">{sale.branch?.address || settings.address}</p>
+                <p className="text-slate-500 text-xs font-mono">{sale.branch?.phone || settings.phone}</p>
               </div>
             </div>
 
@@ -164,9 +168,9 @@ export function InvoiceModal({ isOpen, onClose, sale, loading }: InvoiceModalPro
             </div>
 
             {/* Footer */}
-            <div className="border-t pt-6 text-center text-xs text-slate-400 space-y-1">
-              <p className="font-semibold text-slate-600">Thank you for your business with Fatima Traders!</p>
-              <p>For any inquiries, contact: 0334-7776934 | Purani Ghalla Mandi, Ahmad Pur East</p>
+            <div className="border-t pt-6 text-center text-xs text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-700">Thank you for your business with {settings.storeName || "Fatima Traders"}!</p>
+              <p>For any inquiries, contact: {settings.phone || "0334-7776934"}{settings.address ? ` | ${settings.address}` : ""}</p>
             </div>
           </div>
         )}

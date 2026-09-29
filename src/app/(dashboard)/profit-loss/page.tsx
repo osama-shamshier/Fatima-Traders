@@ -25,10 +25,12 @@ import { useTranslations } from "next-intl";
 import { generateProfitLossPDF, exportProfitLossCSV } from "@/lib/pdfExport";
 import { calculateOfflineShiftProfitLoss, getOfflineProducts } from "@/lib/offline/cacheService";
 import { getAllFromStore } from "@/lib/offline/db";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function ProfitLossPage() {
   const t = useTranslations("profitLoss");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const [plData, setPlData] = useState<any | null>(null);
   const [branches, setBranches] = useState<any[]>([]);
@@ -196,7 +198,7 @@ export default function ProfitLossPage() {
         branchName: getBranchLabel(),
         productName: getProductLabel(),
         plData,
-        storeName: "FATIMA TRADERS",
+        storeName: settings.storeName,
       });
     } catch (err) {
       console.error("PDF download error:", err);

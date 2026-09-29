@@ -1983,6 +1983,22 @@ export async function precacheFullApplicationData(): Promise<void> {
     fetch("/api/buyers/due-dates", { signal: AbortSignal.timeout(5000) }).catch(() => {});
     fetch("/api/buyer-payments", { signal: AbortSignal.timeout(5000) }).catch(() => {});
     fetch("/api/supplier-payments", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+
+    // Pre-fetch and cache system settings
+    fetch("/api/settings", { signal: AbortSignal.timeout(5000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (settings) => {
+        if (settings && Object.keys(settings).length > 0) {
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("app_settings", JSON.stringify(settings));
+              window.dispatchEvent(new CustomEvent("app:settings-updated", { detail: settings }));
+            } catch {}
+          }
+          await putInStore("meta", { key: "app_settings", value: settings });
+        }
+      })
+      .catch(() => {});
   } catch (err) {
     console.warn("Background pre-caching application data error:", err);
   }

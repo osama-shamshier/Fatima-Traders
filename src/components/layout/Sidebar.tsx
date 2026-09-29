@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 import {
   LayoutDashboard,
   Building2,
@@ -245,6 +246,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("header");
+  const { settings } = useSettings();
 
   const effectiveRoles = userRoles.length > 0 ? userRoles : [userRole];
 
@@ -329,7 +331,9 @@ export function Sidebar({
                 className="h-full w-full object-cover rounded-lg"
               />
             </div>
-            <span className="text-base font-bold tracking-tight text-white">{t("storeName")}</span>
+            <span className="text-base font-bold tracking-tight text-white truncate max-w-[170px]" title={settings.storeName || t("storeName")}>
+              {settings.storeName || t("storeName")}
+            </span>
           </Link>
           
           {/* Mobile Close Trigger */}

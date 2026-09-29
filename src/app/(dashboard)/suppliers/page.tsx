@@ -11,11 +11,13 @@ import { TableLoader } from "@/components/ui/loader";
 import { Search, Plus, Truck, X, Download, MapPin, Edit, Trash2, FileText } from "lucide-react";
 import { generatePartiesPDF } from "@/lib/pdfExport";
 import { useTranslations } from "next-intl";
+import { useSettings } from "@/context/SettingsContext";
 import { cacheCatalogData, getOfflineSuppliers, applyOfflineDisbursementsToSuppliers } from "@/lib/offline/cacheService";
 
 export default function SuppliersPage() {
   const t = useTranslations("suppliers");
   const tc = useTranslations("common");
+  const { settings } = useSettings();
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,6 +132,7 @@ export default function SuppliersPage() {
       filterType,
       items,
       totalOutstanding: totalOutstandingPayables,
+      storeName: settings.storeName,
     });
   };
 

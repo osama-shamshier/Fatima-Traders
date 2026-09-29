@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Store, Mail, Lock } from "lucide-react";
 import { ButtonSpinner } from "@/components/ui/loader";
+import { useSettings } from "@/context/SettingsContext";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -18,6 +19,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { settings } = useSettings();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -72,8 +74,8 @@ export default function LoginPage() {
                 className="w-full h-full object-cover rounded-xl"
               />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mt-3 text-center">Fatima Traders</h1>
-            <p className="text-blue-200 text-xs font-medium">Multi-Branch Store Management System</p>
+            <h1 className="text-2xl font-bold tracking-tight mt-3 text-center">{settings.storeName || "Fatima Traders"}</h1>
+            <p className="text-blue-200 text-xs font-medium">{settings.tagline || "Multi-Branch Store Management System"}</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Printer } from "lucide-react";
+import { useSettings } from "@/context/SettingsContext";
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -19,11 +20,15 @@ function formatPlainNumber(val: number): string {
 }
 
 export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
+  const { settings } = useSettings();
   if (!sale) return null;
 
   const handlePrint = () => {
     window.print();
   };
+
+  const branchOrStoreAddress = sale.branch?.address || settings.address;
+  const branchOrStorePhone = sale.branch?.phone || settings.phone;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -35,11 +40,20 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
         {/* Thermal Receipt Style Print Area */}
         <div id="receipt-print-area" className="p-2 font-mono text-xs space-y-3">
           <div className="text-center space-y-0.5">
-            <h2 className="text-lg font-black uppercase tracking-wide text-slate-900">FATIMA TRADERS</h2>
+            <h2 className="text-lg font-black uppercase tracking-wide text-slate-900">
+              {settings.storeName || "FATIMA TRADERS"}
+            </h2>
+            {settings.receiptHeader && (
+              <p className="text-[11px] font-semibold text-slate-700">
+                {settings.receiptHeader}
+              </p>
+            )}
             <p className="text-[11px] text-slate-600">
-              {sale.branch?.name || "Main Branch"} {sale.branch?.address ? `- ${sale.branch.address}` : ""}
+              {sale.branch?.name || "Main Branch"}{branchOrStoreAddress ? ` - ${branchOrStoreAddress}` : ""}
             </p>
-            <p className="text-[11px] text-slate-800 font-bold">Tel: 03347776934</p>
+            {branchOrStorePhone && (
+              <p className="text-[11px] text-slate-800 font-bold">Tel: {branchOrStorePhone}</p>
+            )}
           </div>
 
           <div className="border-t border-b border-dashed py-2 space-y-1 text-slate-800">
@@ -142,9 +156,15 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
             </div>
           </div>
 
-          <div className="text-center pt-3 text-[11px] text-slate-500">
-            <p>Thank you for your purchase!</p>
-            <p>Please visit again.</p>
+          <div className="text-center pt-3 text-[11px] text-slate-500 whitespace-pre-line">
+            {settings.receiptFooter ? (
+              <p>{settings.receiptFooter}</p>
+            ) : (
+              <>
+                <p>Thank you for your purchase!</p>
+                <p>Please visit again.</p>
+              </>
+            )}
           </div>
         </div>
 

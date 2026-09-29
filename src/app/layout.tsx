@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { type Locale } from "@/i18n/config";
+import { SettingsProvider } from "@/context/SettingsContext";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -56,7 +57,9 @@ export default async function RootLayout({
       </head>
       <body className={locale === "ur" ? "font-urdu" : ""}>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
+          <SettingsProvider>
+            {children}
+          </SettingsProvider>
         </NextIntlClientProvider>
       </body>
     </html>
