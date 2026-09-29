@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { consumeInventoryFIFO } from "@/lib/fifo";
 import { generateInvoiceNumber } from "@/lib/utils";
 import { getPakistanPeriodBounds } from "@/lib/dateUtils";
+import { auth } from "@/lib/auth";
 
 function getDateRange(period: string | null, startDate: string | null, endDate: string | null) {
   if (!period && !startDate && !endDate) return null;
@@ -93,15 +94,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Items are required" }, { status: 400 });
     }
 
-    // Execute pre-checks concurrently in a single network round-trip
-    const [user, defaultBranch, activeSession] = await Promise.all([
-      prisma.user.findFirst(),
-      !branchId ? prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } }) : null,
-      !sessionId ? prisma.cashCounterSession.findFirst({ where: { status: "OPEN" } }) : null,
-    ]);
+    // Determine authenticated cashier user
+    const session = await auth();
+    let userId = session?.user?.id || body.userId || body.createdById;
 
-    if (!user) throw new Error("No user found in system.");
-    const userId = user.id;
+    if (!userId && session?.user?.email) {
+      const u = await prisma.user.findFirst({
+        where: { email: { equals: session.user.email, mode: "insensitive" }, isDeleted: false },
+        select: { id: true },
+      });
+      if (u) userId = u.id;
+    }
+
+    if (!userId) {
+      const fallbackUser = await prisma.user.findFirst({
+        where: { isActive: true, isDeleted: false },
+        select: { id: true },
+      });
+      if (fallbackUser) userId = fallbackUser.id;
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "User authentication required" }, { status: 401 });
+    }
+
+    // Execute pre-checks concurrently in a single network round-trip
+    const [defaultBranch, activeSession] = await Promise.all([
+      !branchId ? prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } }) : null,
+      !sessionId
+        ? (await prisma.cashCounterSession.findFirst({ where: { status: "OPEN", userId } })) ||
+          (await prisma.cashCounterSession.findFirst({ where: { status: "OPEN" } }))
+        : null,
+    ]);
 
     if (!branchId && defaultBranch) {
       branchId = defaultBranch.id;
@@ -233,6 +257,12 @@ export async function POST(request: NextRequest) {
                     unit: { select: { abbreviation: true } },
                   },
                 },
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
               },
             },
           },

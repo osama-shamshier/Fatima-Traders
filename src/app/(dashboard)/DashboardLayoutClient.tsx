@@ -7,9 +7,11 @@ import { Header } from "@/components/layout/Header";
 import { cn } from "@/lib/utils";
 import { canAccessRoute, getDefaultUserRoute, isOwner } from "@/lib/rbac";
 import { OfflineWarmupEngine } from "@/components/offline/OfflineWarmupEngine";
+import { UserProvider, CurrentUser } from "@/context/UserContext";
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
+  user?: CurrentUser;
   userName?: string;
   userRole?: string;
   userRoles?: string[];
@@ -18,6 +20,7 @@ interface DashboardLayoutClientProps {
 
 export function DashboardLayoutClient({ 
   children,
+  user,
   userName = "User",
   userRole = "User",
   userRoles = [],
@@ -48,33 +51,35 @@ export function DashboardLayoutClient({
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <OfflineWarmupEngine />
-      <Sidebar 
-        isMobileOpen={isMobileSidebarOpen} 
-        setIsMobileOpen={setIsMobileSidebarOpen}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-        userName={userName}
-        userRole={userRole}
-        userRoles={userRoles}
-        userPermissions={userPermissions}
-      />
-      <div 
-        className={cn(
-          "flex flex-1 flex-col transition-all duration-300 ease-in-out min-w-0",
-          isSidebarCollapsed ? "md:ps-0" : "md:ps-64"
-        )}
-      >
-        <Header 
-          onToggleSidebar={handleToggleSidebar}
-          isSidebarCollapsed={isSidebarCollapsed}
+    <UserProvider initialUser={user}>
+      <div className="flex min-h-screen bg-slate-50">
+        <OfflineWarmupEngine />
+        <Sidebar 
+          isMobileOpen={isMobileSidebarOpen} 
+          setIsMobileOpen={setIsMobileSidebarOpen}
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
           userName={userName}
+          userRole={userRole}
+          userRoles={userRoles}
+          userPermissions={userPermissions}
         />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {children}
-        </main>
+        <div 
+          className={cn(
+            "flex flex-1 flex-col transition-all duration-300 ease-in-out min-w-0",
+            isSidebarCollapsed ? "md:ps-0" : "md:ps-64"
+          )}
+        >
+          <Header 
+            onToggleSidebar={handleToggleSidebar}
+            isSidebarCollapsed={isSidebarCollapsed}
+            userName={userName}
+          />
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </UserProvider>
   );
 }

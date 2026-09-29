@@ -30,6 +30,13 @@ export default async function DashboardLayout({
     select: {
       id: true,
       name: true,
+      email: true,
+      branchId: true,
+      branch: {
+        select: {
+          name: true,
+        },
+      },
       userRoles: {
         select: {
           role: {
@@ -66,9 +73,20 @@ export default async function DashboardLayout({
     )
   );
 
+  const currentUser = {
+    id: user.id,
+    name: user.name || session.user.name || "User",
+    email: user.email || session.user.email || "",
+    roles,
+    permissions,
+    branchId: user.branchId || (session.user as any)?.branchId || null,
+    branchName: user.branch?.name || (session.user as any)?.branchName || null,
+  };
+
   return (
     <DashboardLayoutClient 
-      userName={user.name || session.user.name || "User"} 
+      user={currentUser}
+      userName={currentUser.name} 
       userRole={userRole}
       userRoles={roles}
       userPermissions={permissions}

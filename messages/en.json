@@ -272,7 +272,11 @@
     "colActions": "Actions",
     "active": "Active",
     "inactive": "Inactive",
-    "noProducts": "No products found matching filters."
+    "noProducts": "No products found matching filters.",
+    "export": "Export",
+    "exportPdf": "Export as PDF (.pdf)",
+    "exportCsv": "Export as CSV (.csv)",
+    "noProductsToExport": "No products to export."
   },
   "categories": {
     "title": "Product Categories",

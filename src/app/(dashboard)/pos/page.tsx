@@ -21,6 +21,7 @@ import {
 } from "@/lib/offline/cacheService";
 import { getAllFromStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
+import { useUser } from "@/context/UserContext";
 
 interface Product {
   id: string;
@@ -39,6 +40,7 @@ interface CartItem extends Product {
 
 export default function POSPage() {
   const t = useTranslations("pos");
+  const { user: currentUser } = useUser();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
@@ -323,6 +325,10 @@ export default function POSPage() {
         buyerId: selectedBuyerId || undefined,
         buyer: foundBuyer ? { id: foundBuyer.id, name: foundBuyer.name, companyName: foundBuyer.companyName } : undefined,
         branchId: selectedBranchId,
+        userId: currentUser?.id,
+        createdById: currentUser?.id,
+        cashierName: currentUser?.name,
+        createdBy: currentUser ? { id: currentUser.id, name: currentUser.name } : undefined,
         subtotal,
         discount: globalDiscount,
         roundOff: effRoundOff,
@@ -388,6 +394,9 @@ export default function POSPage() {
       }
 
       if (sale) {
+        if (!sale.createdBy && currentUser) {
+          sale.createdBy = { id: currentUser.id, name: currentUser.name };
+        }
         setCompletedSale(sale);
         setIsCheckoutOpen(false);
         setIsReceiptOpen(true);

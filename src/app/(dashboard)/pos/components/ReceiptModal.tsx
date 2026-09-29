@@ -73,7 +73,7 @@ export function ReceiptModal({ isOpen, onClose, sale }: ReceiptModalProps) {
             </div>
             <div className="flex justify-between">
               <span>Cashier:</span>
-              <span>{sale.createdBy?.name || "Admin"}</span>
+              <span>{sale.createdBy?.name || (sale as any).cashierName || "Admin"}</span>
             </div>
             {sale.buyer && (
               <div className="flex justify-between">

@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { consumeInventoryFIFO } from "@/lib/fifo";
 import { generateInvoiceNumber } from "@/lib/utils";
+import { auth } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
     const body = await request.json();
     let {
       clientSaleId,
@@ -41,6 +43,7 @@ export async function POST(request: NextRequest) {
         include: {
           buyer: true,
           branch: true,
+          createdBy: { select: { id: true, name: true } },
           items: {
             include: {
               product: { select: { id: true, name: true, sku: true } },
@@ -54,15 +57,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Fetch context concurrently
-    const [user, defaultBranch, activeSession] = await Promise.all([
-      prisma.user.findFirst(),
-      !branchId ? prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } }) : null,
-      !sessionId ? prisma.cashCounterSession.findFirst({ where: { status: "OPEN" } }) : null,
-    ]);
+    // 2. Determine authenticated cashier user
+    let userId = body.userId || body.createdById || session?.user?.id;
+    if (!userId && session?.user?.email) {
+      const u = await prisma.user.findFirst({
+        where: { email: { equals: session.user.email, mode: "insensitive" }, isDeleted: false },
+        select: { id: true },
+      });
+      if (u) userId = u.id;
+    }
 
-    if (!user) throw new Error("No user found in system.");
-    const userId = user.id;
+    if (!userId) {
+      const fallbackUser = await prisma.user.findFirst({
+        where: { isActive: true, isDeleted: false },
+        select: { id: true },
+      });
+      if (fallbackUser) userId = fallbackUser.id;
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "User authentication required" }, { status: 401 });
+    }
+
+    // 3. Fetch context concurrently
+    const [defaultBranch, activeSession] = await Promise.all([
+      !branchId ? prisma.branch.findFirst({ where: { isActive: true, isDeleted: false } }) : null,
+      !sessionId
+        ? (await prisma.cashCounterSession.findFirst({ where: { status: "OPEN", userId } })) ||
+          (await prisma.cashCounterSession.findFirst({ where: { status: "OPEN" } }))
+        : null,
+    ]);
 
     if (!branchId && defaultBranch) {
       branchId = defaultBranch.id;
@@ -203,6 +227,12 @@ export async function POST(request: NextRequest) {
                     unit: { select: { abbreviation: true } },
                   },
                 },
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
               },
             },
           },

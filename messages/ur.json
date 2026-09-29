@@ -273,7 +273,11 @@
     "colActions": "کارروائی",
     "active": "فعال",
     "inactive": "غیر فعال",
-    "noProducts": "کوئی پروڈکٹ نہیں ملی۔"
+    "noProducts": "کوئی پروڈکٹ نہیں ملی۔",
+    "export": "ایکسپورٹ",
+    "exportPdf": "پی ڈی ایف ایکسپورٹ (PDF)",
+    "exportCsv": "ایکسل / سی ایس وی ایکسپورٹ (CSV)",
+    "noProductsToExport": "ایکسپورٹ کے لیے کوئی پروڈکٹ دستیاب نہیں ہے۔"
   },
   "categories": {
     "title": "پروڈکٹ کیٹیگریز",

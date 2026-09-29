@@ -1199,3 +1199,221 @@ export function generateLedgerPDF({
   doc.save(filename);
 }
 
+export interface ProductReportItem {
+  id?: string;
+  sku: string;
+  name: string;
+  description?: string | null;
+  category?: { id?: string; name: string } | null;
+  unit?: { id?: string; name: string; abbreviation?: string } | null;
+  sellingPrice: number;
+  minStockLevel?: number;
+  availableStock?: number;
+  isActive?: boolean;
+}
+
+export interface GenerateProductsPDFOptions {
+  categoryName?: string;
+  products: ProductReportItem[];
+  storeName?: string;
+}
+
+/**
+ * Generates and downloads a clean, professional Product Catalog & Price List PDF
+ */
+export function generateProductsPDF({
+  categoryName,
+  products,
+  storeName,
+}: GenerateProductsPDFOptions) {
+  const cached = getCachedSettings();
+  const activeStoreName = storeName || cached.storeName || "FATIMA TRADERS";
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  // Top Dark Banner Header (210mm width for portrait A4)
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, 210, 24, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(activeStoreName.toUpperCase(), 14, 10);
+
+  doc.setFontSize(9.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(203, 213, 225); // slate-300
+  let subtitle = "Product Catalog & Master Price List";
+  if (categoryName && categoryName !== "All Categories") {
+    subtitle += ` • Category: ${cleanAscii(categoryName)}`;
+  }
+  doc.text(subtitle, 14, 17);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-PK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-PK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  doc.setFontSize(8);
+  doc.text(`Generated: ${dateStr} at ${timeStr}`, 196, 10, { align: "right" });
+  doc.text(`Total Products: ${products.length}`, 196, 17, { align: "right" });
+
+  // Table Data Preparation
+  const tableRows = products.map((p, index) => {
+    return [
+      (index + 1).toString(),
+      cleanAscii(p.sku, "-"),
+      cleanAscii(p.name, "-"),
+      cleanAscii(p.category?.name, "-"),
+      cleanAscii(p.unit?.name || p.unit?.abbreviation, "-"),
+      `Rs. ${Number(p.sellingPrice || 0).toLocaleString("en-PK", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`,
+      (p.minStockLevel ?? 0).toString(),
+      p.isActive !== false ? "Active" : "Inactive",
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 29,
+    head: [
+      [
+        "#",
+        "SKU",
+        "Product Name",
+        "Category",
+        "Unit",
+        "Selling Price",
+        "Min Stock",
+        "Status",
+      ],
+    ],
+    body: tableRows,
+    foot: [
+      [
+        "",
+        "TOTAL",
+        `${products.length} Products`,
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+    ],
+    theme: "striped",
+    headStyles: {
+      fillColor: [30, 41, 59], // slate-800
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 8.5,
+      halign: "left",
+    },
+    footStyles: {
+      fillColor: [241, 245, 249], // slate-100
+      textColor: [15, 23, 42],
+      fontStyle: "bold",
+      fontSize: 8.5,
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 26, fontStyle: "normal" },
+      2: { cellWidth: 48, fontStyle: "bold" },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 26, halign: "right", fontStyle: "bold", textColor: [37, 99, 235] },
+      6: { cellWidth: 14, halign: "center" },
+      7: { cellWidth: 14, halign: "center" },
+    },
+    didDrawPage: (data) => {
+      const pageNumber = (doc as any).internal.getNumberOfPages();
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text(
+        `Page ${data.pageNumber} of ${pageNumber} • ${activeStoreName} Retail Management System`,
+        105,
+        290,
+        { align: "center" }
+      );
+    },
+  });
+
+  const dateStamp = now.toISOString().slice(0, 10);
+  const sanitizedCat =
+    categoryName && categoryName !== "All Categories"
+      ? `_${categoryName.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+      : "";
+  const filename = `Product_Catalog${sanitizedCat}_${dateStamp}.pdf`;
+
+  doc.save(filename);
+}
+
+/**
+ * Exports products list to CSV spreadsheet
+ */
+export function exportProductsCSV({
+  products,
+  categoryName,
+}: {
+  products: ProductReportItem[];
+  categoryName?: string;
+}) {
+  const headers = [
+    "SKU",
+    "Product Name",
+    "Category",
+    "Unit",
+    "Selling Price (PKR)",
+    "Min Stock Level",
+    "Status",
+    "Description",
+  ];
+
+  const rows = products.map((p) => [
+    `"${(p.sku || "").replace(/"/g, '""')}"`,
+    `"${(p.name || "").replace(/"/g, '""')}"`,
+    `"${(p.category?.name || "").replace(/"/g, '""')}"`,
+    `"${(p.unit?.name || p.unit?.abbreviation || "").replace(/"/g, '""')}"`,
+    Number(p.sellingPrice || 0),
+    p.minStockLevel || 0,
+    `"${p.isActive !== false ? "Active" : "Inactive"}"`,
+    `"${(p.description || "").replace(/"/g, '""')}"`,
+  ]);
+
+  const csvContent =
+    "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  const sanitizedCat =
+    categoryName && categoryName !== "All Categories"
+      ? `_${categoryName.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+      : "";
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Product_Catalog${sanitizedCat}_${dateStamp}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+

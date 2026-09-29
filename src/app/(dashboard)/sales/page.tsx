@@ -145,7 +145,7 @@ export default function SalesPage() {
       saleDate: s.saleDate,
       buyerName: s.buyer ? s.buyer.name : "Walk-in Cash Customer",
       branchName: s.branch?.name || "Main Branch",
-      cashierName: s.createdBy?.name || "Admin",
+      cashierName: s.createdBy?.name || (s as any).cashierName || "Admin",
       grandTotal: Number(s.grandTotal || 0),
       amountPaid: Number(s.amountPaid || 0),
       outstandingAmount: Number(s.outstandingAmount || 0),
@@ -391,7 +391,7 @@ export default function SalesPage() {
                       {sale.buyer ? sale.buyer.name : "👤 Walk-in Cash Customer"}
                     </td>
                     <td className="p-3.5 text-slate-600">{sale.branch?.name || "-"}</td>
-                    <td className="p-3.5 text-slate-600 font-mono">{sale.createdBy?.name || "Admin"}</td>
+                    <td className="p-3.5 text-slate-600 font-mono">{sale.createdBy?.name || (sale as any).cashierName || "Admin"}</td>
                     <td className="p-3.5 text-right font-mono font-bold text-slate-900">{formatCurrency(sale.grandTotal)}</td>
                     <td className="p-3.5 text-right font-mono text-xs">
                       {sale.roundOff ? (

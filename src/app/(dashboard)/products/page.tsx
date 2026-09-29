@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Search, Package, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Edit2, Trash2, Search, Package, RefreshCw, Download, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
@@ -10,6 +10,7 @@ import { ProductFormModal } from "@/components/products/ProductFormModal";
 import { useTranslations } from "next-intl";
 import { cacheCatalogData, getOfflineProducts } from "@/lib/offline/cacheService";
 import { getAllFromStore, putManyInStore } from "@/lib/offline/db";
+import { generateProductsPDF, exportProductsCSV } from "@/lib/pdfExport";
 
 export default function ProductsPage() {
   const t = useTranslations("products");
@@ -20,6 +21,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -108,6 +111,46 @@ export default function ProductsPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [search, categoryId, isActive]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const getCategoryName = () => {
+    if (!categoryId) return "All Categories";
+    const found = categories.find((c) => c.id === categoryId);
+    return found ? found.name : "All Categories";
+  };
+
+  const handleExportPDF = () => {
+    if (products.length === 0) {
+      alert(t("noProductsToExport"));
+      return;
+    }
+    generateProductsPDF({
+      categoryName: getCategoryName(),
+      products,
+    });
+  };
+
+  const handleExportCSV = () => {
+    if (products.length === 0) {
+      alert(t("noProductsToExport"));
+      return;
+    }
+    exportProductsCSV({
+      categoryName: getCategoryName(),
+      products,
+    });
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
@@ -132,15 +175,64 @@ export default function ProductsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingProduct(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0"
-        >
-          <Plus className="me-2 h-4 w-4" /> {t("addProduct")}
-        </Button>
+        <div className="flex items-center gap-2.5">
+          {/* Export Dropdown Button */}
+          <div className="relative" ref={exportMenuRef}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExportMenu((prev) => !prev)}
+              disabled={loading || products.length === 0}
+              className="bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-xs border-slate-300 text-xs h-9 px-3 gap-1.5"
+              title={t("export")}
+            >
+              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <span>{t("export")}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                  showExportMenu ? "rotate-180" : ""
+                }`}
+              />
+            </Button>
+
+            {showExportMenu && (
+              <div className="absolute end-0 mt-1.5 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExportPDF();
+                  }}
+                  className="w-full text-start px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{t("exportPdf")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExportCSV();
+                  }}
+                  className="w-full text-start px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{t("exportCsv")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={() => {
+              setEditingProduct(null);
+              setIsModalOpen(true);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm shrink-0"
+          >
+            <Plus className="me-2 h-4 w-4" /> {t("addProduct")}
+          </Button>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}

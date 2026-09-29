@@ -438,6 +438,8 @@ export async function recordOfflineSale(payload: {
     paymentStatus,
     paymentMethod: payload.paymentMethod || "CASH",
     notes: payload.notes || "Offline Transaction",
+    createdById: (payload as any).userId || (payload as any).createdById || null,
+    createdBy: (payload as any).createdBy || ((payload as any).cashierName ? { name: (payload as any).cashierName } : null),
     items: saleItems,
   };
 
@@ -620,6 +622,8 @@ export async function getCombinedSales(liveSales: any[] = []): Promise<any[]> {
             buyer: p.buyer || null,
             branchId: p.branchId || null,
             items: p.items || [],
+            createdBy: p.createdBy || (p.cashierName ? { name: p.cashierName } : null),
+            createdById: p.userId || p.createdById || null,
             isOffline: true,
             isOfflinePending: true,
           });
