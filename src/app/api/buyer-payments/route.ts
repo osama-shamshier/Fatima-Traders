@@ -1,15 +1,52 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPakistanPeriodBounds } from "@/lib/dateUtils";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get("period");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const buyerId = searchParams.get("buyerId");
+    const paymentMethod = searchParams.get("paymentMethod");
+
+    const whereClause: any = { isDeleted: false };
+
+    if (buyerId) whereClause.buyerId = buyerId;
+    if (paymentMethod && paymentMethod !== "ALL") whereClause.paymentMethod = paymentMethod;
+
+    if (period && period !== "all") {
+      const bounds = getPakistanPeriodBounds(period, startDate, endDate);
+      if (bounds.start || bounds.end) {
+        const dateFilter: any = {};
+        if (bounds.start) dateFilter.gte = bounds.start;
+        if (bounds.end) dateFilter.lte = bounds.end;
+        whereClause.OR = [
+          { paymentDate: dateFilter },
+          { createdAt: dateFilter },
+        ];
+      }
+    } else if (startDate || endDate) {
+      const bounds = getPakistanPeriodBounds("custom", startDate, endDate);
+      if (bounds.start || bounds.end) {
+        const dateFilter: any = {};
+        if (bounds.start) dateFilter.gte = bounds.start;
+        if (bounds.end) dateFilter.lte = bounds.end;
+        whereClause.OR = [
+          { paymentDate: dateFilter },
+          { createdAt: dateFilter },
+        ];
+      }
+    }
+
     const payments = await prisma.buyerPayment.findMany({
-      where: { isDeleted: false },
+      where: whereClause,
       include: {
         buyer: true,
         sale: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { paymentDate: "desc" },
     });
 
     return NextResponse.json(payments);

@@ -999,6 +999,7 @@
     "thisMonth": "This Month",
     "lastMonth": "Last Month",
     "customRange": "Custom Range",
+    "dateFilter": "Date Filter",
     "notes": "Notes",
     "close": "Close"
   }
