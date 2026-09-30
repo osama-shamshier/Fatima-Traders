@@ -664,7 +664,11 @@
     "paymentMethod": "Payment Method",
     "cash": "💵 Cash",
     "bank": "🏦 Bank / Digital Wallet",
-    "savePurchase": "Save Purchase & Update Inventory"
+    "savePurchase": "Save Purchase & Update Inventory",
+    "editPurchase": "Edit Bill",
+    "deletePurchase": "Delete Bill",
+    "deleteConfirm": "Are you sure you want to delete purchase bill {invoice}? This will reverse added inventory, delete FIFO batches, and update supplier balances.",
+    "deleteSuccess": "Purchase bill deleted successfully."
   },
   "inventory": {
     "title": "Inventory Stock & Batch Tracking",

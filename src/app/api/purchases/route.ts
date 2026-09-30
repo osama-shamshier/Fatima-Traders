@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createInventoryLayers } from "@/lib/fifo";
+import { reconcileSupplier } from "@/lib/supplierUtils";
 
 export async function GET() {
   try {
@@ -219,6 +220,8 @@ export async function POST(request: Request) {
             },
           });
         }
+
+        await reconcileSupplier(tx as any, supplierId);
 
         return newPurchase;
       },

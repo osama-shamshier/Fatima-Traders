@@ -7,11 +7,12 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { TableLoader } from "@/components/ui/loader";
 import { PurchaseCreateModal } from "@/components/purchases/PurchaseCreateModal";
+import { PurchaseEditModal } from "@/components/purchases/PurchaseEditModal";
 import { PurchaseViewModal } from "@/components/purchases/PurchaseViewModal";
-import { Search, Plus, ShoppingBag, X, Eye } from "lucide-react";
+import { Search, Plus, ShoppingBag, X, Eye, Edit, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { getCombinedPurchases } from "@/lib/offline/cacheService";
-import { putManyInStore } from "@/lib/offline/db";
+import { putManyInStore, deleteFromStore } from "@/lib/offline/db";
 import { syncEngine } from "@/lib/offline/syncEngine";
 
 export default function PurchasesPage() {
@@ -26,6 +27,10 @@ export default function PurchasesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editPurchaseId, setEditPurchaseId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchPurchases = async () => {
     // 1. Instant Cache-First Hydration (< 10ms)
@@ -47,7 +52,7 @@ export default function PurchasesPage() {
 
     // 3. Online background refresh
     try {
-      const res = await fetch("/api/purchases", { signal: AbortSignal.timeout(2500) });
+      const res = await fetch("/api/purchases", { signal: AbortSignal.timeout(3500) });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -94,6 +99,42 @@ export default function PurchasesPage() {
   const handleView = (id: string) => {
     setSelectedPurchaseId(id);
     setIsViewModalOpen(true);
+  };
+
+  const handleEdit = (id: string) => {
+    setEditPurchaseId(id);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = async (id: string, invoiceNumber?: string) => {
+    const invLabel = invoiceNumber ? `#${invoiceNumber}` : "this purchase";
+    const confirmMsg = t("deleteConfirm", { invoice: invLabel });
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/purchases/${id}`, {
+        method: "DELETE",
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to delete purchase.");
+      }
+
+      await deleteFromStore("purchases", id).catch(() => {});
+      alert(resData.message || t("deleteSuccess"));
+      await fetchPurchases();
+    } catch (error: any) {
+      console.error("Error deleting purchase:", error);
+      alert(error.message || "Failed to delete purchase.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filteredPurchases = purchases.filter((p) => {
@@ -261,14 +302,36 @@ export default function PurchasesPage() {
                       </Badge>
                     </td>
                     <td className="p-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleView(purchase.id)}
-                        className="h-8 px-2.5 text-xs text-blue-600 hover:bg-blue-50 font-semibold gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> {t("viewBill")}
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleView(purchase.id)}
+                          className="h-7 px-2 text-xs font-semibold border-blue-200 text-blue-700 hover:bg-blue-50 gap-1"
+                          title={t("viewBill")}
+                        >
+                          <Eye className="w-3.5 h-3.5" /> {t("viewBill")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(purchase.id)}
+                          className="h-7 w-7 p-0 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                          title={t("editPurchase")}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={deletingId === purchase.id}
+                          onClick={() => handleDelete(purchase.id, purchase.invoiceNumber)}
+                          className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                          title={t("deletePurchase")}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -284,6 +347,16 @@ export default function PurchasesPage() {
         onSuccess={fetchPurchases}
       />
 
+      <PurchaseEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditPurchaseId(null);
+        }}
+        onSuccess={fetchPurchases}
+        purchaseId={editPurchaseId}
+      />
+
       {selectedPurchaseId && (
         <PurchaseViewModal
           isOpen={isViewModalOpen}
@@ -292,6 +365,8 @@ export default function PurchasesPage() {
             setSelectedPurchaseId(null);
           }}
           purchaseId={selectedPurchaseId}
+          onEdit={(id) => handleEdit(id)}
+          onDelete={(id, inv) => handleDelete(id, inv)}
         />
       )}
     </div>

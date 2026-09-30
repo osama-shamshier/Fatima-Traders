@@ -6,14 +6,17 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ui/loader";
+import { Edit, Trash2 } from "lucide-react";
 
 interface PurchaseViewModalProps {
   isOpen: boolean;
   onClose: () => void;
   purchaseId: string | null;
+  onEdit?: (purchaseId: string) => void;
+  onDelete?: (purchaseId: string, invoiceNumber?: string) => void;
 }
 
-export function PurchaseViewModal({ isOpen, onClose, purchaseId }: PurchaseViewModalProps) {
+export function PurchaseViewModal({ isOpen, onClose, purchaseId, onEdit, onDelete }: PurchaseViewModalProps) {
   const [purchase, setPurchase] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,6 +38,17 @@ export function PurchaseViewModal({ isOpen, onClose, purchaseId }: PurchaseViewM
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClick = () => {
+    if (!purchaseId) return;
+    onClose();
+    if (onEdit) onEdit(purchaseId);
+  };
+
+  const handleDeleteClick = () => {
+    if (!purchaseId) return;
+    if (onDelete) onDelete(purchaseId, purchase?.invoiceNumber);
   };
 
   return (
@@ -141,7 +155,29 @@ export function PurchaseViewModal({ isOpen, onClose, purchaseId }: PurchaseViewM
         ) : (
           <div className="py-8 text-center text-xs text-slate-500">Purchase record not found.</div>
         )}
-        <DialogFooter className="border-t pt-3">
+        <DialogFooter className="border-t pt-3 flex flex-row items-center justify-between sm:justify-between w-full">
+          <div className="flex items-center gap-2">
+            {onDelete && purchase && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteClick}
+                className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </Button>
+            )}
+            {onEdit && purchase && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditClick}
+                className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 gap-1.5"
+              >
+                <Edit className="w-3.5 h-3.5" /> Edit
+              </Button>
+            )}
+          </div>
           <Button variant="outline" onClick={onClose} size="sm">
             Close
           </Button>
